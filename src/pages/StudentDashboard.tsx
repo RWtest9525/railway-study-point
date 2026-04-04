@@ -13,6 +13,7 @@ import {
   Clock,
   Shield,
   Settings,
+  User,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { trialWholeDaysLeft } from '../lib/authUtils';

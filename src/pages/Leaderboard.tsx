@@ -22,7 +22,42 @@ export function Leaderboard() {
     (async () => {
       try {
         const { data, error: rpcError } = await supabase.rpc('get_leaderboard', { limit_n: 100 });
-        if (rpcError) throw rpcError;
+        
+        if (rpcError) {
+          // Fallback if RPC fails or doesn't exist yet
+          const { data: results, error: resError } = await supabase
+            .from('results')
+            .select('user_id, score, profiles(full_name)')
+            .order('created_at', { ascending: false });
+
+          if (resError) throw resError;
+
+          const userStats: Record<string, { full_name: string; total_score: number; exams_taken: number }> = {};
+          results?.forEach((r: any) => {
+            const uid = r.user_id;
+            if (!userStats[uid]) {
+              userStats[uid] = {
+                full_name: r.profiles?.full_name || 'Student',
+                total_score: 0,
+                exams_taken: 0,
+              };
+            }
+            userStats[uid].total_score += r.score;
+            userStats[uid].exams_taken += 1;
+          });
+
+          const sorted = Object.entries(userStats)
+            .map(([id, stats]) => ({
+              user_id: id,
+              ...stats,
+            }))
+            .sort((a, b) => b.total_score - a.total_score)
+            .slice(0, 100);
+
+          setRows(sorted);
+          return;
+        }
+
         const normalized = (data ?? []).map((r) => ({
           user_id: r.user_id,
           full_name: r.full_name || 'Student',

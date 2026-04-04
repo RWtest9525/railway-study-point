@@ -80,7 +80,8 @@ export function Upgrade() {
 
       await loadRazorpayScript();
 
-      if (!(window as any).Razorpay) {
+      const RazorpayConstructor = (window as any).Razorpay;
+      if (!RazorpayConstructor) {
         throw new Error('Razorpay failed to initialize');
       }
 
@@ -147,7 +148,7 @@ export function Upgrade() {
         },
       };
 
-      const razorpay = new (window as any).Razorpay(options);
+      const razorpay = new RazorpayConstructor(options);
       razorpay.on('payment.failed', () => {
         setError('Payment failed or was cancelled. You can try again.');
         setLoading(false);
