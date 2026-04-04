@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
-import { getAppOrigin } from '../lib/siteUrl';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -78,12 +77,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const origin = getAppOrigin();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${origin}/dashboard`,
+        emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
           full_name: fullName,
         },
@@ -94,11 +92,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    const origin = getAppOrigin();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${origin}/dashboard`,
+        redirectTo: `${window.location.origin}/dashboard`,
       },
     });
     if (error) throw error;
