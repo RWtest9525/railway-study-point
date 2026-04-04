@@ -36,28 +36,28 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-700">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4 py-12">
+      <div className="max-w-md w-full bg-gray-800 rounded-2xl shadow-2xl p-6 sm:p-8 border border-gray-700">
         <div className="flex flex-col items-center mb-6">
-          <BrandLogo variant="hero" className="drop-shadow-lg" />
+          <BrandLogo variant="hero" className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-lg" />
           <p className="text-center text-blue-400 font-semibold tracking-wide mt-4">
             Railway Study Point
           </p>
         </div>
-        <h1 className="text-3xl font-bold text-white text-center mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white text-center mb-2">
           Welcome Back
         </h1>
-        <p className="text-gray-400 text-center mb-8">
+        <p className="text-gray-400 text-center mb-8 text-sm sm:text-base">
           Sign in to continue your preparation
         </p>
 
         {error && (
-          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
+          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6 text-sm">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Email
@@ -68,7 +68,7 @@ export function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-gray-700 text-white pl-12 pr-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full bg-gray-700 text-white pl-10 pr-4 py-2.5 sm:py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
                 placeholder="you@example.com"
                 required
               />
@@ -92,7 +92,7 @@ export function Login() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-700 text-white pl-12 pr-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full bg-gray-700 text-white pl-10 pr-4 py-2.5 sm:py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
                 placeholder="••••••••"
                 required
               />
@@ -102,7 +102,7 @@ export function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -119,13 +119,13 @@ export function Login() {
 
         <button
           onClick={handleGoogleSignIn}
-          className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2"
+          className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2 text-sm sm:text-base"
         >
           <Chrome className="w-5 h-5" />
           Sign in with Google
         </button>
 
-        <p className="mt-8 text-center text-gray-400">
+        <p className="mt-8 text-center text-gray-400 text-sm">
           Don't have an account?{' '}
           <button
             onClick={() => navigate('/signup')}

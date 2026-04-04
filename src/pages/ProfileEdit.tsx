@@ -81,7 +81,7 @@ export function ProfileEdit() {
           ← Back to Dashboard
         </button>
 
-        <div className="bg-gray-800 rounded-2xl border border-gray-700 p-8">
+        <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
               <User className="w-6 h-6 text-white" />

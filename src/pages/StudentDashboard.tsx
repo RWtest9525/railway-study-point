@@ -129,114 +129,141 @@ export function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <nav className="bg-gray-800 border-b border-gray-700">
+      <nav className="bg-gray-800 border-b border-gray-700 sticky top-0 z-[100]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3 min-w-0">
-              <BrandLogo variant="nav" className="bg-white/5 ring-2 ring-white/15 shadow-md" />
-              <span className="text-xl font-bold text-white truncate">Railway Study Point</span>
+          <div className="flex justify-between items-center h-16 sm:h-20">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <BrandLogo variant="nav" className="w-8 h-8 sm:w-10 sm:h-10 bg-white/5 ring-2 ring-white/15 shadow-md" />
+              <span className="text-lg sm:text-xl font-bold text-white truncate">Railway Study Point</span>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap justify-end">
-              <button
-                type="button"
-                onClick={() => navigate('/leaderboard')}
-                className="text-gray-300 hover:text-white text-sm flex items-center gap-1"
-              >
-                <Trophy className="w-4 h-4 text-amber-400" />
-                Leaderboard
-              </button>
-              {effectiveRole === 'admin' && (
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="hidden md:flex items-center gap-4">
                 <button
                   type="button"
-                  onClick={() => navigate('/admin-portal')}
-                  className="text-gray-300 hover:text-white text-sm flex items-center gap-1"
+                  onClick={() => navigate('/leaderboard')}
+                  className="text-gray-300 hover:text-white text-sm flex items-center gap-1 transition"
                 >
-                  <Shield className="w-4 h-4 text-red-400" />
-                  Admin
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                  Leaderboard
                 </button>
-              )}
-              <div className="relative" ref={settingsRef}>
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen((o) => !o)}
-                  className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition"
-                  aria-expanded={settingsOpen}
-                  aria-label="Settings menu"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
-                {settingsOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[150] py-1 text-sm">
-                    <button
-                      type="button"
-                      className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700"
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        navigate('/profile');
-                      }}
-                    >
-                      Profile
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700"
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        navigate('/membership');
-                      }}
-                    >
-                      Membership
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700"
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        navigate('/support');
-                      }}
-                    >
-                      Contact support
-                    </button>
-                  </div>
+                {effectiveRole === 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin-portal')}
+                    className="text-gray-300 hover:text-white text-sm flex items-center gap-1 transition"
+                  >
+                    <Shield className="w-4 h-4 text-red-400" />
+                    Admin
+                  </button>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => navigate('/profile')}
-                className="text-gray-300 hover:text-white text-sm max-w-[10rem] sm:max-w-xs truncate text-left font-medium underline-offset-2 hover:underline"
-              >
-                Hello, {profile?.full_name || 'Student'}
-              </button>
-              {isPremium ? (
-                <span className="flex flex-col items-end gap-0.5">
-                  <span className="flex items-center gap-1 bg-yellow-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    <Crown className="w-4 h-4" />
-                    Premium
-                  </span>
-                  {profile?.premium_until && (
-                    <span className="text-xs text-gray-500">
-                      until {new Date(profile.premium_until).toLocaleDateString()}
+
+              <div className="flex items-center gap-2 sm:gap-3">
+                {isPremium ? (
+                  <span className="hidden sm:flex flex-col items-end gap-0.5">
+                    <span className="flex items-center gap-1 bg-yellow-600/20 text-yellow-500 border border-yellow-500/30 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                      <Crown className="w-3 h-3 sm:w-4 h-4" />
+                      Premium
                     </span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/upgrade')}
+                    className="flex items-center gap-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition shadow-lg shadow-yellow-900/20"
+                  >
+                    <Crown className="w-3 h-3 sm:w-4 h-4" />
+                    <span className="hidden xs:inline text-[10px] sm:text-sm uppercase tracking-wider">Go Premium</span>
+                    <span className="xs:hidden">Pro</span>
+                  </button>
+                )}
+
+                <div className="relative" ref={settingsRef}>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen((o) => !o)}
+                    className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition"
+                    aria-expanded={settingsOpen}
+                    aria-label="Settings menu"
+                  >
+                    <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </button>
+                  {settingsOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-[150] py-2 text-sm overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-700 mb-1">
+                        <p className="text-gray-400 text-[10px] uppercase tracking-widest font-bold mb-1">Signed in as</p>
+                        <p className="text-white font-medium truncate">{profile?.full_name || 'Student'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
+                        onClick={() => {
+                          setSettingsOpen(false);
+                          navigate('/profile');
+                        }}
+                      >
+                        <User className="w-4 h-4 text-blue-400" />
+                        Profile
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
+                        onClick={() => {
+                          setSettingsOpen(false);
+                          navigate('/membership');
+                        }}
+                      >
+                        <Crown className="w-4 h-4 text-yellow-400" />
+                        Membership
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
+                        onClick={() => {
+                          setSettingsOpen(false);
+                          navigate('/leaderboard');
+                        }}
+                      >
+                        <Trophy className="w-4 h-4 text-amber-400" />
+                        Leaderboard
+                      </button>
+                      {effectiveRole === 'admin' && (
+                        <button
+                          type="button"
+                          className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
+                          onClick={() => {
+                            setSettingsOpen(false);
+                            navigate('/admin-portal');
+                          }}
+                        >
+                          <Shield className="w-4 h-4 text-red-400" />
+                          Admin Portal
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3 border-t border-gray-700 mt-1"
+                        onClick={() => {
+                          setSettingsOpen(false);
+                          navigate('/support');
+                        }}
+                      >
+                        <Briefcase className="w-4 h-4 text-green-400" />
+                        Contact Support
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition flex items-center gap-3"
+                        onClick={handleSignOut}
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                      </button>
+                    </div>
                   )}
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => navigate('/upgrade')}
-                  className="flex items-center gap-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-2 rounded-lg font-semibold transition"
-                >
-                  <Crown className="w-4 h-4" />
-                  Go Premium
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="text-gray-300 hover:text-white transition"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -295,42 +322,44 @@ export function StudentDashboard() {
                   Recent Results
                 </h2>
                 <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                          Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                          Score
-                        </th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                          Time Taken
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700">
-                      {recentResults.map((result) => (
-                        <tr key={result.id} className="hover:bg-gray-700/50">
-                          <td className="px-6 py-4 text-gray-300">
-                            {new Date(result.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`font-semibold ${
-                              (result.score / result.total_questions) * 100 >= 60
-                                ? 'text-green-400'
-                                : 'text-red-400'
-                            }`}>
-                              {result.score}/{result.total_questions}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-gray-300">
-                            {Math.floor(result.time_taken_seconds / 60)}m {result.time_taken_seconds % 60}s
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[600px] sm:min-w-0">
+                      <thead className="bg-gray-700">
+                        <tr>
+                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-semibold text-gray-300">
+                            Date
+                          </th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-semibold text-gray-300">
+                            Score
+                          </th>
+                          <th className="px-4 sm:px-6 py-3 text-left text-sm font-semibold text-gray-300">
+                            Time Taken
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-700">
+                        {recentResults.map((result) => (
+                          <tr key={result.id} className="hover:bg-gray-700/50">
+                            <td className="px-4 sm:px-6 py-4 text-gray-300 text-sm">
+                              {new Date(result.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 sm:px-6 py-4">
+                              <span className={`font-semibold text-sm ${
+                                (result.score / result.total_questions) * 100 >= 60
+                                  ? 'text-green-400'
+                                  : 'text-red-400'
+                              }`}>
+                                {result.score}/{result.total_questions}
+                              </span>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4 text-gray-300 text-sm">
+                              {Math.floor(result.time_taken_seconds / 60)}m {result.time_taken_seconds % 60}s
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}

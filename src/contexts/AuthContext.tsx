@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (userId: string) => {
+  const loadProfile = useCallback(async (userId: string, email?: string, fullName?: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -46,7 +46,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (error) throw error;
-      setProfile(data);
+
+      if (!data && email) {
+        // Create profile if it doesn't exist (e.g. after Google login)
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: email,
+            full_name: fullName || email.split('@')[0],
+            is_premium: false,
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        setProfile(newProfile);
+      } else {
+        setProfile(data);
+      }
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
@@ -58,7 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadProfile(session.user.id);
+        loadProfile(
+          session.user.id,
+          session.user.email,
+          session.user.user_metadata?.full_name
+        );
       } else {
         setLoading(false);
       }
@@ -70,7 +92,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (async () => {
         setUser(session?.user ?? null);
         if (session?.user) {
-          await loadProfile(session.user.id);
+          await loadProfile(
+            session.user.id,
+            session.user.email,
+            session.user.user_metadata?.full_name
+          );
         } else {
           setProfile(null);
           setLoading(false);
@@ -84,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    await loadProfile(user.id);
+    await loadProfile(user.id, user.email, user.user_metadata?.full_name);
   }, [user, loadProfile]);
 
   const effectiveRole = useMemo(
@@ -123,7 +149,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       },
     });
-    if (error) throw error;
+    if (error) {
+      console.error('Signup error:', error.message);
+      throw error;
+    }
+    // Note: If users don't receive emails, check Supabase dashboard -> Auth -> Providers -> Email -> Confirm Email (must be ON)
+    // and check SMTP settings in Settings -> Auth -> SMTP.
     return { needsEmailConfirmation: !data.session };
   };
 

@@ -19,7 +19,7 @@ function computePremiumUntil(
 }
 
 export function Upgrade() {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, loading: authLoading } = useAuth();
   const { navigate } = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -44,6 +44,14 @@ export function Upgrade() {
   }, []);
 
   const displayRupees = (pricePaise / 100).toFixed(pricePaise % 100 === 0 ? 0 : 2);
+
+  if (authLoading || !settingsLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   const handleUpgrade = async () => {
     if (!profile) return;
@@ -72,7 +80,7 @@ export function Upgrade() {
 
       await loadRazorpayScript();
 
-      if (!window.Razorpay) {
+      if (!(window as any).Razorpay) {
         throw new Error('Razorpay failed to initialize');
       }
 
@@ -139,7 +147,7 @@ export function Upgrade() {
         },
       };
 
-      const razorpay = new window.Razorpay(options);
+      const razorpay = new (window as any).Razorpay(options);
       razorpay.on('payment.failed', () => {
         setError('Payment failed or was cancelled. You can try again.');
         setLoading(false);
