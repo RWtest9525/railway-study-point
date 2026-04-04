@@ -1,0 +1,97 @@
+import { useRouter } from './contexts/RouterContext';
+import { useAuth } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { Login } from './pages/Login';
+import { Signup } from './pages/Signup';
+import { StudentDashboard } from './pages/StudentDashboard';
+import { ExamInterface } from './pages/ExamInterface';
+import { Results } from './pages/Results';
+import { Upgrade } from './pages/Upgrade';
+import { AdminPortal } from './pages/admin/AdminPortal';
+
+function AppContent() {
+  const { currentPath } = useRouter();
+  const { user, profile, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (currentPath === '/login') {
+    return <Login />;
+  }
+
+  if (currentPath === '/signup') {
+    return <Signup />;
+  }
+
+  if (currentPath === '/dashboard') {
+    return (
+      <ProtectedRoute>
+        <StudentDashboard />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath.startsWith('/exam/')) {
+    const examId = currentPath.replace('/exam/', '');
+    return (
+      <ProtectedRoute>
+        <ExamInterface examId={examId} />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath.startsWith('/results/')) {
+    const resultId = currentPath.replace('/results/', '');
+    return (
+      <ProtectedRoute>
+        <Results resultId={resultId} />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/upgrade') {
+    return (
+      <ProtectedRoute>
+        <Upgrade />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/admin-portal') {
+    return (
+      <ProtectedRoute requireAdmin>
+        <AdminPortal />
+      </ProtectedRoute>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  if (profile?.role === 'admin') {
+    return (
+      <ProtectedRoute requireAdmin>
+        <AdminPortal />
+      </ProtectedRoute>
+    );
+  }
+
+  return (
+    <ProtectedRoute>
+      <StudentDashboard />
+    </ProtectedRoute>
+  );
+}
+
+function App() {
+  return <AppContent />;
+}
+
+export default App;
