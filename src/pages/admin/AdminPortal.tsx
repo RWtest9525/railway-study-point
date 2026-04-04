@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from '../../contexts/RouterContext';
-import { FileText, PlusCircle, DollarSign, LogOut, Settings, UserPlus } from 'lucide-react';
+import { FileText, PlusCircle, DollarSign, LogOut, Settings, UserPlus, MessageSquare } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionBank } from './QuestionBank';
 import { ExamCreator } from './ExamCreator';
 import { RevenueTracker } from './RevenueTracker';
 import { PremiumSettings } from './PremiumSettings';
 import { UserPromotion } from './UserPromotion';
+import { SupportInbox } from './SupportInbox';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
   const { navigate } = useRouter();
   const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'admins'
+    'questions' | 'exams' | 'revenue' | 'premium' | 'admins' | 'support'
   >('questions');
 
   const handleSignOut = async () => {
@@ -27,6 +28,7 @@ export function AdminPortal() {
     { id: 'revenue' as const, name: 'Revenue', icon: DollarSign },
     { id: 'premium' as const, name: 'Premium', icon: Settings },
     { id: 'admins' as const, name: 'Admins', icon: UserPlus },
+    { id: 'support' as const, name: 'Support', icon: MessageSquare },
   ];
 
   return (
@@ -93,6 +95,7 @@ export function AdminPortal() {
           {activeTab === 'revenue' && <RevenueTracker />}
           {activeTab === 'premium' && <PremiumSettings />}
           {activeTab === 'admins' && <UserPromotion />}
+          {activeTab === 'support' && <SupportInbox />}
         </div>
       </div>
     </div>

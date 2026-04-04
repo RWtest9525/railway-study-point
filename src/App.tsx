@@ -9,11 +9,23 @@ import { Results } from './pages/Results';
 import { Upgrade } from './pages/Upgrade';
 import { Leaderboard } from './pages/Leaderboard';
 import { ProfileEdit } from './pages/ProfileEdit';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
+import { Membership } from './pages/Membership';
+import { ContactSupport } from './pages/ContactSupport';
 import { AdminPortal } from './pages/admin/AdminPortal';
 
 function AppContent() {
   const { currentPath } = useRouter();
   const { user, loading, effectiveRole } = useAuth();
+
+  if (currentPath === '/forgot-password') {
+    return <ForgotPassword />;
+  }
+
+  if (currentPath === '/reset-password') {
+    return <ResetPassword />;
+  }
 
   if (loading) {
     return (
@@ -77,6 +89,22 @@ function AppContent() {
     return (
       <ProtectedRoute>
         <ProfileEdit />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/membership') {
+    return (
+      <ProtectedRoute>
+        <Membership />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/support') {
+    return (
+      <ProtectedRoute>
+        <ContactSupport />
       </ProtectedRoute>
     );
   }

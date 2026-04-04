@@ -97,9 +97,23 @@ export function Upgrade() {
 
             const newUntil = computePremiumUntil(profile.premium_until, validityDays);
 
+            const wasActive =
+              profile.premium_until && new Date(profile.premium_until) > new Date();
+            const premiumPatch: {
+              is_premium: boolean;
+              premium_until: string;
+              premium_started_at?: string;
+            } = {
+              is_premium: true,
+              premium_until: newUntil,
+            };
+            if (!wasActive || !profile.premium_started_at) {
+              premiumPatch.premium_started_at = new Date().toISOString();
+            }
+
             const { error: premiumError } = await supabase
               .from('profiles')
-              .update({ is_premium: true, premium_until: newUntil })
+              .update(premiumPatch)
               .eq('id', profile.id);
 
             if (premiumError) throw premiumError;

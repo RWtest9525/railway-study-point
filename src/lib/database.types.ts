@@ -16,8 +16,10 @@ export interface Database {
           id: string
           email: string
           full_name: string
+          phone: string
           is_premium: boolean
           premium_until: string | null
+          premium_started_at: string | null
           role: 'admin' | 'student'
           created_at: string
           updated_at: string
@@ -26,8 +28,10 @@ export interface Database {
           id: string
           email: string
           full_name?: string
+          phone?: string
           is_premium?: boolean
           premium_until?: string | null
+          premium_started_at?: string | null
           role?: 'admin' | 'student'
           created_at?: string
           updated_at?: string
@@ -36,9 +40,41 @@ export interface Database {
           id?: string
           email?: string
           full_name?: string
+          phone?: string
           is_premium?: boolean
           premium_until?: string | null
+          premium_started_at?: string | null
           role?: 'admin' | 'student'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: EmptyRel[]
+      }
+      support_queries: {
+        Row: {
+          id: string
+          user_id: string
+          message: string
+          admin_reply: string | null
+          status: 'open' | 'replied' | 'closed'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          message: string
+          admin_reply?: string | null
+          status?: 'open' | 'replied' | 'closed'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          message?: string
+          admin_reply?: string | null
+          status?: 'open' | 'replied' | 'closed'
           created_at?: string
           updated_at?: string
         }

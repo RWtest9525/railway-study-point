@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
-import { Brain as Train, Briefcase, Users, Crown, LogOut, Trophy, Clock, User, Shield } from 'lucide-react';
+import {
+  Brain as Train,
+  Briefcase,
+  Users,
+  Crown,
+  LogOut,
+  Trophy,
+  Clock,
+  Shield,
+  Settings,
+} from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { trialWholeDaysLeft } from '../lib/authUtils';
 
@@ -18,6 +28,18 @@ export function StudentDashboard() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [recentResults, setRecentResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
 
   useEffect(() => {
     loadRecentResults();
@@ -124,14 +146,6 @@ export function StudentDashboard() {
                 <Trophy className="w-4 h-4 text-amber-400" />
                 Leaderboard
               </button>
-              <button
-                type="button"
-                onClick={() => navigate('/profile')}
-                className="text-gray-300 hover:text-white text-sm flex items-center gap-1"
-              >
-                <User className="w-4 h-4 text-blue-400" />
-                Profile
-              </button>
               {effectiveRole === 'admin' && (
                 <button
                   type="button"
@@ -142,9 +156,58 @@ export function StudentDashboard() {
                   Admin
                 </button>
               )}
-              <span className="text-gray-300">
+              <div className="relative" ref={settingsRef}>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen((o) => !o)}
+                  className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition"
+                  aria-expanded={settingsOpen}
+                  aria-label="Settings menu"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+                {settingsOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[150] py-1 text-sm">
+                    <button
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700"
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        navigate('/profile');
+                      }}
+                    >
+                      Profile
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700"
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        navigate('/membership');
+                      }}
+                    >
+                      Membership
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700"
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        navigate('/support');
+                      }}
+                    >
+                      Contact support
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/profile')}
+                className="text-gray-300 hover:text-white text-sm max-w-[10rem] sm:max-w-xs truncate text-left font-medium underline-offset-2 hover:underline"
+              >
                 Hello, {profile?.full_name || 'Student'}
-              </span>
+              </button>
               {isPremium ? (
                 <span className="flex flex-col items-end gap-0.5">
                   <span className="flex items-center gap-1 bg-yellow-600 text-white px-3 py-1 rounded-full text-sm font-semibold">

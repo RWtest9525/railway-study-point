@@ -25,6 +25,8 @@ export function TrialUpgradeNudge() {
     currentPath === '/login' ||
     currentPath === '/signup' ||
     currentPath === '/upgrade' ||
+    currentPath === '/forgot-password' ||
+    currentPath === '/reset-password' ||
     currentPath.startsWith('/admin-portal');
 
   useEffect(() => {

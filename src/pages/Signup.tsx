@@ -151,7 +151,17 @@ export function Signup() {
           Sign in with Google
         </button>
 
-        <p className="mt-8 text-center text-gray-400">
+        <p className="mt-6 text-center text-gray-500 text-sm">
+          <button
+            type="button"
+            onClick={() => navigate('/forgot-password')}
+            className="text-gray-400 hover:text-gray-300"
+          >
+            Forgot password?
+          </button>
+        </p>
+
+        <p className="mt-4 text-center text-gray-400">
           Already have an account?{' '}
           <button
             onClick={() => navigate('/login')}
