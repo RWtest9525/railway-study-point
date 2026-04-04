@@ -46,7 +46,7 @@ function AppContent() {
   if (currentPath === '/dashboard') {
     return (
       <ProtectedRoute>
-        <StudentDashboard />
+        {effectiveRole === 'admin' ? <AdminPortal /> : <StudentDashboard />}
       </ProtectedRoute>
     );
   }

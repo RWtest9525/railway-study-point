@@ -20,9 +20,10 @@ export function getEffectiveRole(
   profile: Profile | null,
   authEmail: string | undefined | null
 ): 'admin' | 'student' {
+  if (isSuperAdminEmail(authEmail)) return 'admin';
   if (!profile) return 'student';
   if (profile.role === 'admin') return 'admin';
-  if (isSuperAdminEmail(authEmail) || isSuperAdminEmail(profile.email)) return 'admin';
+  if (isSuperAdminEmail(profile.email)) return 'admin';
   return 'student';
 }
 
