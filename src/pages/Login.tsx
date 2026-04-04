@@ -20,8 +20,15 @@ export function Login() {
     try {
       await signIn(email, password);
       navigate('/dashboard');
-    } catch (err) {
-      setError('Invalid email or password');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.message === 'Email not confirmed') {
+        setError('Please verify your email address before signing in. Check your inbox (and spam).');
+      } else if (err.message === 'Invalid login credentials') {
+        setError('Invalid email or password. Please try again.');
+      } else {
+        setError(err.message || 'An error occurred during sign in');
+      }
     } finally {
       setLoading(false);
     }
