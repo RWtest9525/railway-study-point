@@ -24,8 +24,10 @@ export function Signup() {
       const { needsEmailConfirmation } = await signUp(email, password, fullName);
       if (needsEmailConfirmation) {
         setInfo(
-          'We sent a confirmation link to your email. Open it to finish signing up, then return here to sign in.'
+          'Account created successfully! You can now sign in using your email and password.'
         );
+        // Wait a bit and navigate to login so they can sign in immediately
+        setTimeout(() => navigate('/login'), 3000);
         return;
       }
       navigate('/dashboard');
