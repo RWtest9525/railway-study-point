@@ -7,11 +7,13 @@ import { StudentDashboard } from './pages/StudentDashboard';
 import { ExamInterface } from './pages/ExamInterface';
 import { Results } from './pages/Results';
 import { Upgrade } from './pages/Upgrade';
+import { Leaderboard } from './pages/Leaderboard';
+import { ProfileEdit } from './pages/ProfileEdit';
 import { AdminPortal } from './pages/admin/AdminPortal';
 
 function AppContent() {
   const { currentPath } = useRouter();
-  const { user, profile, loading } = useAuth();
+  const { user, loading, effectiveRole } = useAuth();
 
   if (loading) {
     return (
@@ -63,6 +65,22 @@ function AppContent() {
     );
   }
 
+  if (currentPath === '/leaderboard') {
+    return (
+      <ProtectedRoute>
+        <Leaderboard />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/profile') {
+    return (
+      <ProtectedRoute>
+        <ProfileEdit />
+      </ProtectedRoute>
+    );
+  }
+
   if (currentPath === '/admin-portal') {
     return (
       <ProtectedRoute requireAdmin>
@@ -75,7 +93,7 @@ function AppContent() {
     return <Login />;
   }
 
-  if (profile?.role === 'admin') {
+  if (effectiveRole === 'admin') {
     return (
       <ProtectedRoute requireAdmin>
         <AdminPortal />

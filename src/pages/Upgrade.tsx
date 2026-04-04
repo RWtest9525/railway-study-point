@@ -1,23 +1,58 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
-import { Crown, Check } from 'lucide-react';
+import { loadRazorpayScript } from '../lib/razorpayLoader';
+import { Check } from 'lucide-react';
+import { BrandLogo } from '../components/BrandLogo';
 
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
+function computePremiumUntil(
+  currentUntil: string | null | undefined,
+  validityDays: number
+): string {
+  const base =
+    currentUntil && new Date(currentUntil) > new Date()
+      ? new Date(currentUntil)
+      : new Date();
+  base.setDate(base.getDate() + validityDays);
+  return base.toISOString();
 }
 
 export function Upgrade() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const { navigate } = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pricePaise, setPricePaise] = useState(3900);
+  const [validityDays, setValidityDays] = useState(365);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+        if (!error && data) {
+          setPricePaise(data.premium_price_paise);
+          setValidityDays(data.premium_validity_days);
+        }
+      } catch {
+        /* keep defaults if migration not applied */
+      } finally {
+        setSettingsLoaded(true);
+      }
+    })();
+  }, []);
+
+  const displayRupees = (pricePaise / 100).toFixed(pricePaise % 100 === 0 ? 0 : 2);
 
   const handleUpgrade = async () => {
     if (!profile) return;
+
+    const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
+    if (!key || String(key).trim() === '') {
+      setError('Razorpay is not configured. Add VITE_RAZORPAY_KEY_ID in your environment.');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -27,7 +62,7 @@ export function Upgrade() {
         .from('transactions')
         .insert({
           user_id: profile.id,
-          amount: 3900,
+          amount: pricePaise,
           status: 'pending',
         })
         .select()
@@ -35,58 +70,70 @@ export function Upgrade() {
 
       if (transactionError) throw transactionError;
 
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => {
-        const razorpay = new window.Razorpay({
-          key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-          amount: 3900,
-          currency: 'INR',
-          name: 'Railway Study Point',
-          description: 'Premium Access',
-          order_id: transactionData.id,
-          handler: async (response: any) => {
-            try {
-              const { error: updateError } = await supabase
-                .from('transactions')
-                .update({
-                  status: 'success',
-                  razorpay_payment_id: response.razorpay_payment_id,
-                })
-                .eq('id', transactionData.id);
+      await loadRazorpayScript();
 
-              if (updateError) throw updateError;
+      if (!window.Razorpay) {
+        throw new Error('Razorpay failed to initialize');
+      }
 
-              const { error: premiumError } = await supabase
-                .from('profiles')
-                .update({ is_premium: true })
-                .eq('id', profile.id);
+      const options: Record<string, unknown> = {
+        key,
+        amount: pricePaise,
+        currency: 'INR',
+        name: 'Railway Study Point',
+        description: `Premium — ${validityDays} day${validityDays === 1 ? '' : 's'}`,
+        handler: async (response: { razorpay_payment_id?: string }) => {
+          try {
+            const paymentId = response.razorpay_payment_id;
+            const { error: updateError } = await supabase
+              .from('transactions')
+              .update({
+                status: 'success',
+                razorpay_payment_id: paymentId ?? null,
+              })
+              .eq('id', transactionData.id);
 
-              if (premiumError) throw premiumError;
+            if (updateError) throw updateError;
 
-              navigate('/dashboard');
-            } catch (err) {
-              setError('Payment verification failed. Please contact support.');
-              console.error(err);
-            }
-          },
-          prefill: {
-            email: profile.email,
-            name: profile.full_name,
-          },
-          theme: {
-            color: '#2563eb',
-          },
-        });
+            const newUntil = computePremiumUntil(profile.premium_until, validityDays);
 
-        razorpay.open();
+            const { error: premiumError } = await supabase
+              .from('profiles')
+              .update({ is_premium: true, premium_until: newUntil })
+              .eq('id', profile.id);
+
+            if (premiumError) throw premiumError;
+
+            await refreshProfile();
+            navigate('/dashboard');
+          } catch (err) {
+            console.error(err);
+            setError('Payment recorded but updating your account failed. Contact support with your payment ID.');
+          } finally {
+            setLoading(false);
+          }
+        },
+        prefill: {
+          email: profile.email,
+          name: profile.full_name,
+        },
+        theme: {
+          color: '#2563eb',
+        },
+        modal: {
+          ondismiss: () => setLoading(false),
+        },
       };
 
-      document.head.appendChild(script);
+      const razorpay = new window.Razorpay(options);
+      razorpay.on('payment.failed', () => {
+        setError('Payment failed or was cancelled. You can try again.');
+        setLoading(false);
+      });
+      razorpay.open();
     } catch (err) {
-      setError('Failed to initiate payment. Please try again.');
       console.error(err);
-    } finally {
+      setError('Could not start payment. Check your connection and Razorpay key.');
       setLoading(false);
     }
   };
@@ -103,8 +150,8 @@ export function Upgrade() {
 
         <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700">
           <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Crown className="w-10 h-10 text-white" />
+            <div className="flex justify-center mb-4">
+              <BrandLogo variant="hero" className="w-24 h-24 sm:w-28 sm:h-28 drop-shadow-lg" />
             </div>
             <h1 className="text-4xl font-bold text-white mb-2">
               Go Premium
@@ -116,9 +163,13 @@ export function Upgrade() {
 
           <div className="bg-gray-700 rounded-xl p-8 mb-8 text-center">
             <div className="text-5xl font-bold text-white mb-2">
-              ₹39
+              ₹{displayRupees}
             </div>
-            <p className="text-gray-300">One-time payment</p>
+            <p className="text-gray-300">
+              {settingsLoaded
+                ? `Includes ${validityDays} day${validityDays === 1 ? '' : 's'} of premium access (set by admin)`
+                : 'Loading pricing…'}
+            </p>
           </div>
 
           <div className="space-y-4 mb-8">
@@ -137,17 +188,17 @@ export function Upgrade() {
           </div>
 
           {error && (
-            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
+            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6 text-sm">
               {error}
             </div>
           )}
 
           <button
             onClick={handleUpgrade}
-            disabled={loading}
+            disabled={loading || !settingsLoaded}
             className="w-full bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-bold py-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-lg"
           >
-            {loading ? 'Processing...' : 'Upgrade Now - ₹39'}
+            {loading ? 'Processing…' : `Upgrade Now — ₹${displayRupees}`}
           </button>
 
           <p className="text-center text-gray-400 text-sm mt-4">

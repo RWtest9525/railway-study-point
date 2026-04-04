@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, loading, effectiveRole } = useAuth();
 
   if (loading) {
     return (
@@ -21,7 +21,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     return <Navigate to="/login" />;
   }
 
-  if (requireAdmin && profile?.role !== 'admin') {
+  if (requireAdmin && effectiveRole !== 'admin') {
     return <Navigate to="/dashboard" />;
   }
 

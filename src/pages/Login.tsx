@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
-import { LogIn, Mail, Lock, Chrome } from 'lucide-react';
+import { Mail, Lock, Chrome } from 'lucide-react';
+import { BrandLogo } from '../components/BrandLogo';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -37,15 +38,12 @@ export function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-700">
-        <div className="flex justify-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
-            <LogIn className="w-8 h-8 text-white" />
-          </div>
+        <div className="flex flex-col items-center mb-6">
+          <BrandLogo variant="hero" className="drop-shadow-lg" />
+          <p className="text-center text-blue-400 font-semibold tracking-wide mt-4">
+            Railway Study Point
+          </p>
         </div>
-
-        <p className="text-center text-blue-400 font-semibold tracking-wide mb-2">
-          Railway Study Point
-        </p>
         <h1 className="text-3xl font-bold text-white text-center mb-2">
           Welcome Back
         </h1>

@@ -48,7 +48,7 @@ export function ExamCreator() {
     }
   };
 
-  const loadQuestions = async (category: string) => {
+  const loadQuestions = async (category: 'ALP' | 'NTPC' | 'Group-D') => {
     try {
       const { data, error } = await supabase
         .from('questions')

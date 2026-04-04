@@ -13,7 +13,7 @@ interface ExamInterfaceProps {
 }
 
 export function ExamInterface({ examId }: ExamInterfaceProps) {
-  const { profile } = useAuth();
+  const { profile, canAccessTests, loading: authLoading } = useAuth();
   const { navigate } = useRouter();
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -25,8 +25,13 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const [startTime] = useState(Date.now());
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!canAccessTests) {
+      navigate('/upgrade');
+      return;
+    }
     loadExamData();
-  }, [examId]);
+  }, [examId, canAccessTests, authLoading, navigate]);
 
   useEffect(() => {
     if (timeRemaining > 0) {

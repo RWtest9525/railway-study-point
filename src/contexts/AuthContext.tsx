@@ -1,14 +1,25 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
+import {
+  getEffectiveRole,
+  hasActivePremium,
+  canAccessTests as canAccessTestsFn,
+  trialExpiredNeedsPremium,
+} from '../lib/authUtils';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
+  effectiveRole: 'admin' | 'student';
+  isPremium: boolean;
+  canAccessTests: boolean;
+  trialExpiredNeedsPremium: boolean;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (
     email: string,
@@ -26,32 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      })();
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const loadProfile = async (userId: string) => {
+  const loadProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -66,7 +52,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      (async () => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await loadProfile(session.user.id);
+        } else {
+          setProfile(null);
+          setLoading(false);
+        }
+      })();
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadProfile]);
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    await loadProfile(user.id);
+  }, [user, loadProfile]);
+
+  const effectiveRole = useMemo(
+    () => getEffectiveRole(profile, user?.email),
+    [profile, user?.email]
+  );
+
+  const isPremium = useMemo(() => hasActivePremium(profile), [profile]);
+
+  const canAccessTests = useMemo(() => {
+    if (loading) return true;
+    return canAccessTestsFn(profile, effectiveRole);
+  }, [profile, effectiveRole, loading]);
+
+  const trialExpiredNeedsPremiumFlag = useMemo(() => {
+    if (loading || !user) return false;
+    return trialExpiredNeedsPremium(profile, effectiveRole);
+  }, [profile, effectiveRole, loading, user]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -109,7 +145,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     profile,
+    effectiveRole,
+    isPremium,
+    canAccessTests,
+    trialExpiredNeedsPremium: trialExpiredNeedsPremiumFlag,
     loading,
+    refreshProfile,
     signIn,
     signUp,
     signInWithGoogle,

@@ -6,6 +6,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+type EmptyRel = never;
+
 export interface Database {
   public: {
     Tables: {
@@ -15,6 +17,7 @@ export interface Database {
           email: string
           full_name: string
           is_premium: boolean
+          premium_until: string | null
           role: 'admin' | 'student'
           created_at: string
           updated_at: string
@@ -24,6 +27,7 @@ export interface Database {
           email: string
           full_name?: string
           is_premium?: boolean
+          premium_until?: string | null
           role?: 'admin' | 'student'
           created_at?: string
           updated_at?: string
@@ -33,10 +37,36 @@ export interface Database {
           email?: string
           full_name?: string
           is_premium?: boolean
+          premium_until?: string | null
           role?: 'admin' | 'student'
           created_at?: string
           updated_at?: string
         }
+        Relationships: EmptyRel[]
+      }
+      site_settings: {
+        Row: {
+          id: number
+          premium_price_paise: number
+          premium_validity_days: number
+          trial_nudge_interval_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          premium_price_paise?: number
+          premium_validity_days?: number
+          trial_nudge_interval_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          premium_price_paise?: number
+          premium_validity_days?: number
+          trial_nudge_interval_seconds?: number
+          updated_at?: string
+        }
+        Relationships: EmptyRel[]
       }
       questions: {
         Row: {
@@ -69,6 +99,7 @@ export interface Database {
           created_by?: string | null
           created_at?: string
         }
+        Relationships: EmptyRel[]
       }
       exams: {
         Row: {
@@ -101,6 +132,7 @@ export interface Database {
           created_by?: string | null
           created_at?: string
         }
+        Relationships: EmptyRel[]
       }
       results: {
         Row: {
@@ -133,6 +165,7 @@ export interface Database {
           answers?: Record<string, number>
           created_at?: string
         }
+        Relationships: EmptyRel[]
       }
       transactions: {
         Row: {
@@ -162,7 +195,22 @@ export interface Database {
           status?: 'pending' | 'success' | 'failed'
           created_at?: string
         }
+        Relationships: EmptyRel[]
       }
     }
+    Views: Record<string, never>
+    Functions: {
+      get_leaderboard: {
+        Args: { limit_n?: number }
+        Returns: {
+          user_id: string
+          full_name: string
+          total_score: number
+          exams_taken: number
+        }[]
+      }
+    }
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }

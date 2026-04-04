@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from '../../contexts/RouterContext';
-import { FileText, PlusCircle, DollarSign, LogOut, Trophy } from 'lucide-react';
+import { FileText, PlusCircle, DollarSign, LogOut, Settings, UserPlus } from 'lucide-react';
+import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionBank } from './QuestionBank';
 import { ExamCreator } from './ExamCreator';
 import { RevenueTracker } from './RevenueTracker';
+import { PremiumSettings } from './PremiumSettings';
+import { UserPromotion } from './UserPromotion';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
   const { navigate } = useRouter();
-  const [activeTab, setActiveTab] = useState<'questions' | 'exams' | 'revenue'>('questions');
+  const [activeTab, setActiveTab] = useState<
+    'questions' | 'exams' | 'revenue' | 'premium' | 'admins'
+  >('questions');
 
   const handleSignOut = async () => {
     await signOut();
@@ -20,6 +25,8 @@ export function AdminPortal() {
     { id: 'questions' as const, name: 'Question Bank', icon: FileText },
     { id: 'exams' as const, name: 'Exam Creator', icon: PlusCircle },
     { id: 'revenue' as const, name: 'Revenue', icon: DollarSign },
+    { id: 'premium' as const, name: 'Premium', icon: Settings },
+    { id: 'admins' as const, name: 'Admins', icon: UserPlus },
   ];
 
   return (
@@ -27,17 +34,24 @@ export function AdminPortal() {
       <nav className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-bold text-white leading-tight">Railway Study Point</span>
+            <div className="flex items-center gap-3 min-w-0">
+              <BrandLogo variant="nav" className="bg-white/5 ring-2 ring-white/15 shadow-md" />
+              <div className="flex flex-col min-w-0">
+                <span className="text-xl font-bold text-white leading-tight truncate">
+                  Railway Study Point
+                </span>
                 <span className="text-xs text-gray-400">Admin</span>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="text-sm text-blue-400 hover:text-blue-300"
+              >
+                Student dashboard
+              </button>
               <span className="text-gray-300">
                 {profile?.full_name || 'Admin'}
               </span>
@@ -77,6 +91,8 @@ export function AdminPortal() {
           {activeTab === 'questions' && <QuestionBank />}
           {activeTab === 'exams' && <ExamCreator />}
           {activeTab === 'revenue' && <RevenueTracker />}
+          {activeTab === 'premium' && <PremiumSettings />}
+          {activeTab === 'admins' && <UserPromotion />}
         </div>
       </div>
     </div>

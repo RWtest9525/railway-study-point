@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
-import { Brain as Train, Briefcase, Users, Crown, LogOut, Trophy, Clock } from 'lucide-react';
+import { Brain as Train, Briefcase, Users, Crown, LogOut, Trophy, Clock, User, Shield } from 'lucide-react';
+import { BrandLogo } from '../components/BrandLogo';
+import { trialWholeDaysLeft } from '../lib/authUtils';
 
 type Exam = Database['public']['Tables']['exams']['Row'];
 type Result = Database['public']['Tables']['results']['Row'];
 
 export function StudentDashboard() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, isPremium, effectiveRole, canAccessTests, trialExpiredNeedsPremium } =
+    useAuth();
   const { navigate } = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [exams, setExams] = useState<Exam[]>([]);
@@ -18,20 +21,24 @@ export function StudentDashboard() {
 
   useEffect(() => {
     loadRecentResults();
-  }, []);
+  }, [profile?.id]);
 
   useEffect(() => {
-    if (selectedCategory) {
+    if (selectedCategory === 'ALP' || selectedCategory === 'NTPC' || selectedCategory === 'Group-D') {
       loadExams(selectedCategory);
     }
   }, [selectedCategory]);
 
   const loadRecentResults = async () => {
+    if (!profile?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('results')
         .select('*')
-        .eq('user_id', profile?.id)
+        .eq('user_id', profile.id)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -44,7 +51,7 @@ export function StudentDashboard() {
     }
   };
 
-  const loadExams = async (category: string) => {
+  const loadExams = async (category: 'ALP' | 'NTPC' | 'Group-D') => {
     try {
       const { data, error } = await supabase
         .from('exams')
@@ -63,6 +70,8 @@ export function StudentDashboard() {
     await signOut();
     navigate('/login');
   };
+
+  const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile), [profile]);
 
   const categories = [
     {
@@ -101,32 +110,65 @@ export function StudentDashboard() {
       <nav className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">Railway Study Point</span>
+            <div className="flex items-center gap-3 min-w-0">
+              <BrandLogo variant="nav" className="bg-white/5 ring-2 ring-white/15 shadow-md" />
+              <span className="text-xl font-bold text-white truncate">Railway Study Point</span>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={() => navigate('/leaderboard')}
+                className="text-gray-300 hover:text-white text-sm flex items-center gap-1"
+              >
+                <Trophy className="w-4 h-4 text-amber-400" />
+                Leaderboard
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/profile')}
+                className="text-gray-300 hover:text-white text-sm flex items-center gap-1"
+              >
+                <User className="w-4 h-4 text-blue-400" />
+                Profile
+              </button>
+              {effectiveRole === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin-portal')}
+                  className="text-gray-300 hover:text-white text-sm flex items-center gap-1"
+                >
+                  <Shield className="w-4 h-4 text-red-400" />
+                  Admin
+                </button>
+              )}
               <span className="text-gray-300">
                 Hello, {profile?.full_name || 'Student'}
               </span>
-              {profile?.is_premium ? (
-                <span className="flex items-center gap-1 bg-yellow-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                  <Crown className="w-4 h-4" />
-                  Premium
+              {isPremium ? (
+                <span className="flex flex-col items-end gap-0.5">
+                  <span className="flex items-center gap-1 bg-yellow-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    <Crown className="w-4 h-4" />
+                    Premium
+                  </span>
+                  {profile?.premium_until && (
+                    <span className="text-xs text-gray-500">
+                      until {new Date(profile.premium_until).toLocaleDateString()}
+                    </span>
+                  )}
                 </span>
               ) : (
                 <button
+                  type="button"
                   onClick={() => navigate('/upgrade')}
                   className="flex items-center gap-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-2 rounded-lg font-semibold transition"
                 >
                   <Crown className="w-4 h-4" />
-                  Go Premium ₹39
+                  Go Premium
                 </button>
               )}
               <button
+                type="button"
                 onClick={handleSignOut}
                 className="text-gray-300 hover:text-white transition"
               >
@@ -147,6 +189,18 @@ export function StudentDashboard() {
               <p className="text-gray-400">
                 Select a category to start practicing
               </p>
+              {effectiveRole !== 'admin' && !isPremium && daysLeftTrial !== null && (
+                <p className="mt-3 text-amber-400 text-sm font-medium">
+                  Free trial: {daysLeftTrial} day{daysLeftTrial === 1 ? '' : 's'} left — then upgrade to
+                  keep taking tests.
+                </p>
+              )}
+              {trialExpiredNeedsPremium && (
+                <p className="mt-3 text-orange-300 text-sm">
+                  Your free week is over. You can still use Leaderboard and Profile. Upgrade to take new
+                  tests.
+                </p>
+              )}
             </div>
 
             <div className="grid md:grid-cols-3 gap-6 mb-12">
@@ -234,6 +288,11 @@ export function StudentDashboard() {
               <p className="text-gray-400">
                 Choose an exam to start practicing
               </p>
+              {trialExpiredNeedsPremium && (
+                <p className="mt-2 text-orange-300 text-sm">
+                  Tests are locked — upgrade to premium to continue.
+                </p>
+              )}
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -262,22 +321,29 @@ export function StudentDashboard() {
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => {
-                      if (exam.is_premium && !profile?.is_premium) {
+                      if (!canAccessTests) {
                         navigate('/upgrade');
-                      } else {
-                        navigate(`/exam/${exam.id}`);
+                        return;
                       }
+                      if (exam.is_premium && !isPremium) {
+                        navigate('/upgrade');
+                        return;
+                      }
+                      navigate(`/exam/${exam.id}`);
                     }}
                     className={`w-full py-2 rounded-lg font-semibold transition ${
-                      exam.is_premium && !profile?.is_premium
+                      !canAccessTests || (exam.is_premium && !isPremium)
                         ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                         : 'bg-blue-600 hover:bg-blue-700 text-white'
                     }`}
                   >
-                    {exam.is_premium && !profile?.is_premium
-                      ? 'Upgrade to Access'
-                      : 'Start Exam'}
+                    {!canAccessTests
+                      ? 'Upgrade to continue'
+                      : exam.is_premium && !isPremium
+                        ? 'Upgrade to Access'
+                        : 'Start Exam'}
                   </button>
                 </div>
               ))}
