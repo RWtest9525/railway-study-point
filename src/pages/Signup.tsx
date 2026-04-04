@@ -24,13 +24,14 @@ export function Signup() {
       const { needsEmailConfirmation } = await signUp(email, password, fullName);
       if (needsEmailConfirmation) {
         setInfo(
-          'Account created successfully! You can now sign in using your email and password.'
+          'Account created! You need to verify your email. If you turned off confirmation in Supabase, try logging in now.'
         );
-        // Wait a bit and navigate to login so they can sign in immediately
-        setTimeout(() => navigate('/login'), 3000);
-        return;
+        // If they still need to verify, they stay on signup for a bit or can manually go to login
+        setTimeout(() => navigate('/login'), 5000);
+      } else {
+        // Logged in immediately (email confirmation OFF)
+        navigate('/dashboard');
       }
-      navigate('/dashboard');
     } catch (err) {
       setError('Failed to create account. Please try again.');
     } finally {

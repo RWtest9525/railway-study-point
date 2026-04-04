@@ -2,14 +2,18 @@ import type { Database } from './database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
-export const DEFAULT_ADMIN_EMAIL = 'Saichauhan239@gmail.com';
+export const ADMIN_EMAILS = [
+  'saichauhan239@gmail.com',
+  'yashvishal647@gmail.com',
+];
 
 export function normalizeEmail(email: string | undefined | null): string {
   return (email ?? '').trim().toLowerCase();
 }
 
 export function isSuperAdminEmail(email: string | undefined | null): boolean {
-  return normalizeEmail(email) === normalizeEmail(DEFAULT_ADMIN_EMAIL);
+  const norm = normalizeEmail(email);
+  return ADMIN_EMAILS.some((e) => normalizeEmail(e) === norm);
 }
 
 export function getEffectiveRole(

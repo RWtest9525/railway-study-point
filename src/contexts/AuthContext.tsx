@@ -154,8 +154,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Signup error:', error.message);
       throw error;
     }
-    // Note: If users don't receive emails, check Supabase dashboard -> Auth -> Providers -> Email -> Confirm Email (must be ON)
-    // and check SMTP settings in Settings -> Auth -> SMTP.
+
+    // If session is returned immediately, Supabase email confirmation is OFF
+    if (data.session) {
+      setUser(data.session.user);
+      await loadProfile(
+        data.session.user.id,
+        data.session.user.email,
+        data.session.user.user_metadata?.full_name
+      );
+    }
+
     return { needsEmailConfirmation: !data.session };
   };
 
