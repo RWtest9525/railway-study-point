@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
+import { getAppOrigin } from '../lib/siteUrl';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -10,7 +11,11 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<{ needsEmailConfirmation: boolean }>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -73,23 +78,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const origin = getAppOrigin();
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: `${origin}/dashboard`,
         data: {
           full_name: fullName,
         },
       },
     });
     if (error) throw error;
+    return { needsEmailConfirmation: !data.session };
   };
 
   const signInWithGoogle = async () => {
+    const origin = getAppOrigin();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${origin}/dashboard`,
       },
     });
     if (error) throw error;

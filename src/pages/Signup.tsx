@@ -8,6 +8,7 @@ export function Signup() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp, signInWithGoogle } = useAuth();
   const { navigate } = useRouter();
@@ -15,10 +16,17 @@ export function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setInfo('');
     setLoading(true);
 
     try {
-      await signUp(email, password, fullName);
+      const { needsEmailConfirmation } = await signUp(email, password, fullName);
+      if (needsEmailConfirmation) {
+        setInfo(
+          'We sent a confirmation link to your email. Open it to finish signing up, then return here to sign in.'
+        );
+        return;
+      }
       navigate('/dashboard');
     } catch (err) {
       setError('Failed to create account. Please try again.');
@@ -53,6 +61,12 @@ export function Signup() {
         <p className="text-gray-400 text-center mb-8">
           Start your railway exam preparation today
         </p>
+
+        {info && (
+          <div className="bg-blue-900/50 border border-blue-500 text-blue-100 px-4 py-3 rounded-lg mb-6 text-sm">
+            {info}
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
