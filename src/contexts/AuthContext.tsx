@@ -114,10 +114,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadProfile(user.id, user.email, user.user_metadata?.full_name);
   }, [user, loadProfile]);
 
-  const effectiveRole = useMemo(
-    () => getEffectiveRole(profile, user?.email),
-    [profile, user?.email]
-  );
+  const effectiveRole = useMemo(() => {
+    const role = getEffectiveRole(profile, user?.email);
+    console.log('Effective role computed:', role, 'for user:', user?.email, 'profile role:', profile?.role);
+    return role;
+  }, [profile, user?.email]);
 
   const isPremium = useMemo(() => hasActivePremium(profile), [profile]);
 

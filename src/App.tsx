@@ -19,13 +19,8 @@ function AppContent() {
   const { currentPath } = useRouter();
   const { user, loading, effectiveRole } = useAuth();
 
-  if (currentPath === '/forgot-password') {
-    return <ForgotPassword />;
-  }
-
-  if (currentPath === '/reset-password') {
-    return <ResetPassword />;
-  }
+  // HIGH PRIORITY: If we are logged in as an admin, show the Admin Portal regardless of the path (unless it's a specific action)
+  const isAdmin = effectiveRole === 'admin';
 
   if (loading) {
     return (
@@ -35,18 +30,36 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/login') {
-    return <Login />;
+  // Auth pages are public
+  if (currentPath === '/forgot-password') return <ForgotPassword />;
+  if (currentPath === '/reset-password') return <ResetPassword />;
+  if (currentPath === '/signup') return <Signup />;
+  if (currentPath === '/login') return <Login />;
+
+  // If not logged in, go to login
+  if (!user) return <Login />;
+
+  // ADMIN OVERRIDE: If admin, prioritize Admin Portal
+  if (isAdmin) {
+    // Admins can still visit specific student pages if they want, but default to AdminPortal
+    if (
+      currentPath === '/dashboard' ||
+      currentPath === '/' ||
+      currentPath === '/admin-portal'
+    ) {
+      return (
+        <ProtectedRoute requireAdmin>
+          <AdminPortal />
+        </ProtectedRoute>
+      );
+    }
   }
 
-  if (currentPath === '/signup') {
-    return <Signup />;
-  }
-
-  if (currentPath === '/dashboard') {
+  // Standard Routing
+  if (currentPath === '/dashboard' || currentPath === '/') {
     return (
       <ProtectedRoute>
-        {effectiveRole === 'admin' ? <AdminPortal /> : <StudentDashboard />}
+        <StudentDashboard />
       </ProtectedRoute>
     );
   }

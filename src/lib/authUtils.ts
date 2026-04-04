@@ -8,11 +8,13 @@ export const ADMIN_EMAILS = [
 ];
 
 export function normalizeEmail(email: string | undefined | null): string {
-  return (email ?? '').trim().toLowerCase();
+  if (!email) return '';
+  return email.trim().toLowerCase();
 }
 
 export function isSuperAdminEmail(email: string | undefined | null): boolean {
   const norm = normalizeEmail(email);
+  if (!norm) return false;
   return ADMIN_EMAILS.some((e) => normalizeEmail(e) === norm);
 }
 
@@ -20,10 +22,15 @@ export function getEffectiveRole(
   profile: Profile | null,
   authEmail: string | undefined | null
 ): 'admin' | 'student' {
-  if (isSuperAdminEmail(authEmail)) return 'admin';
-  if (!profile) return 'student';
-  if (profile.role === 'admin') return 'admin';
-  if (isSuperAdminEmail(profile.email)) return 'admin';
+  const normAuthEmail = normalizeEmail(authEmail);
+  const normProfileEmail = normalizeEmail(profile?.email);
+  
+  if (isSuperAdminEmail(normAuthEmail) || isSuperAdminEmail(normProfileEmail)) {
+    return 'admin';
+  }
+  
+  if (profile?.role === 'admin') return 'admin';
+  
   return 'student';
 }
 
