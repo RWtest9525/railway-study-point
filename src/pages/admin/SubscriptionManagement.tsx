@@ -38,16 +38,36 @@ export function SubscriptionManagement() {
 
   const loadUsers = async () => {
     setListLoading(true);
+    setError('');
     try {
       const { data, error: qErr } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, email, full_name, phone, role, is_premium, premium_until, premium_started_at, created_at, updated_at')
         .order('created_at', { ascending: false });
 
-      if (qErr) throw qErr;
+      if (qErr) {
+        console.error('Error loading users:', qErr);
+        // Fallback if created_at doesn't exist
+        if (qErr.message?.includes('created_at') || qErr.message?.includes('does not exist')) {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, phone, role, is_premium, premium_until, premium_started_at')
+            .limit(100);
+          
+          if (!fallbackError && fallbackData) {
+            const usersWithDate = fallbackData.map(u => ({
+              ...u,
+              created_at: new Date().toISOString()
+            }));
+            setUsers(usersWithDate);
+          }
+        }
+        return;
+      }
       setUsers(data || []);
     } catch (err) {
       console.error(err);
+      setError('Failed to load subscription data. Please run migration 20260405000000_fix_schema_issues.sql');
     } finally {
       setListLoading(false);
     }

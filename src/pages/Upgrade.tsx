@@ -25,16 +25,49 @@ export function Upgrade() {
   const [pricePaise, setPricePaise] = useState(3900);
   const [validityDays, setValidityDays] = useState(365);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+
+  // Load Razorpay SDK dynamically
+  useEffect(() => {
+    const loadRazorpay = () => {
+      // Check if Razorpay is already loaded
+      if (window.Razorpay) {
+        setRazorpayLoaded(true);
+        return;
+      }
+
+      // Create script element
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => {
+        console.log('Razorpay SDK loaded successfully');
+        setRazorpayLoaded(true);
+      };
+      script.onerror = () => {
+        console.error('Failed to load Razorpay SDK');
+        setError('Failed to load payment gateway. Please check your internet connection.');
+      };
+      document.body.appendChild(script);
+    };
+
+    loadRazorpay();
+  }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('premium_price_paise, premium_validity_days')
+          .eq('id', 1)
+          .maybeSingle();
         if (!error && data) {
           setPricePaise(data.premium_price_paise);
           setValidityDays(data.premium_validity_days);
         }
-      } catch {
+      } catch (e) {
+        console.error('Error loading site settings:', e);
         /* keep defaults if migration not applied */
       } finally {
         setSettingsLoaded(true);

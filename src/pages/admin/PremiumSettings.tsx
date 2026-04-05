@@ -25,16 +25,26 @@ export function PremiumSettings() {
     (async () => {
       try {
         console.log('Loading premium settings...');
+        // First, check if the site_settings table exists and has the required columns
         const { data, error } = await supabase
           .from('site_settings')
-          .select('*')
+          .select('id, premium_price_paise, premium_validity_days, trial_nudge_interval_seconds')
           .eq('id', 1)
           .maybeSingle();
         
         if (error) {
           console.error('Site settings fetch error:', error);
           // Check if it's a "not found" error (PGRST116) which is expected if no settings exist
-          if (error.code !== 'PGRST116') {
+          if (error.code === 'PGRST116') {
+            // No settings exist, will create defaults below
+            console.log('No settings found, will create defaults');
+          } else if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+            // Schema issue - missing column
+            console.error('Schema issue detected:', error.message);
+            setError('Database schema needs update. Please run the migration: 20260405000000_fix_schema_issues.sql in your Supabase SQL editor.');
+            setLoading(false);
+            return;
+          } else {
             setError(`Failed to load settings: ${error.message}`);
           }
         }

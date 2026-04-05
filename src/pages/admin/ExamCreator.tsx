@@ -10,7 +10,7 @@ type Question = Database['public']['Tables']['questions']['Row'];
 
 export function ExamCreator() {
   const { profile } = useAuth();
-  const [exams, setExams] = useState<Exam[]>([]);
+  const [exams, setExams] = useState<(Exam & { subject?: string | null })[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -47,23 +47,62 @@ export function ExamCreator() {
 
   const loadExams = async () => {
     setLoading(true);
+    setError('');
     try {
+      // Try to load exams with all columns
       const { data, error } = await supabase
         .from('exams')
-        .select('*')
+        .select('id, title, category, subject, question_ids, duration_minutes, is_premium, created_by, created_at')
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading exams:', error);
-        setError('Failed to load exams.');
-        setExams([]); // Set empty array instead of failing
+        
+        // Check if it's a column issue
+        if (error.message?.includes('subject') || error.message?.includes('does not exist')) {
+          // Try without subject column
+          console.log('Trying without subject column...');
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('exams')
+            .select('id, title, category, question_ids, duration_minutes, is_premium, created_by, created_at')
+            .order('created_at', { ascending: false });
+          
+          if (fallbackError) {
+            setError('Failed to load exams. Please run migration 20260405000000_fix_schema_issues.sql');
+            setExams([]);
+          } else {
+            // Add default subject for display
+            const examsWithSubject = (fallbackData || []).map(e => ({
+              ...e,
+              subject: 'General' as string | null
+            }));
+            setExams(examsWithSubject);
+          }
+        } else if (error.message?.includes('created_at')) {
+          // Try without ordering by created_at
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('exams')
+            .select('id, title, category, subject, question_ids, duration_minutes, is_premium, created_by')
+            .limit(100);
+          
+          if (!fallbackError && fallbackData) {
+            const examsWithDate = fallbackData.map(e => ({
+              ...e,
+              created_at: new Date().toISOString()
+            }));
+            setExams(examsWithDate);
+          }
+        } else {
+          setError(`Failed to load exams: ${error.message}`);
+          setExams([]);
+        }
       } else {
         setExams(data || []);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading exams:', error);
-      setError('Failed to load exams.');
-      setExams([]); // Set empty array instead of failing
+      setError(`Failed to load exams: ${error.message || 'Unknown error'}. Please run migration 20260405000000_fix_schema_issues.sql`);
+      setExams([]);
     } finally {
       setLoading(false);
     }

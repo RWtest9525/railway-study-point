@@ -48,9 +48,11 @@ export function UserManagement() {
     setError('');
     try {
       console.log('Loading users from Supabase...');
+      
+      // Check if created_at column exists by trying to query it
       const { data, error: qErr } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, email, full_name, phone, role, is_premium, premium_until, premium_started_at, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       console.log('Users data:', data);
@@ -58,8 +60,31 @@ export function UserManagement() {
 
       if (qErr) {
         console.error('Error loading users:', qErr);
-        setError(`Failed to load users: ${qErr.message}. Please check your Supabase permissions.`);
-        setUsers([]);
+        
+        // Check if it's a column not found error
+        if (qErr.message?.includes('created_at') || qErr.message?.includes('does not exist')) {
+          // Try without created_at ordering
+          console.log('Trying without created_at column...');
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, phone, role, is_premium, premium_until, premium_started_at')
+            .limit(100);
+          
+          if (fallbackError) {
+            setError(`Failed to load users: ${fallbackError.message}. Please run migration 20260405000000_fix_schema_issues.sql in Supabase.`);
+            setUsers([]);
+          } else {
+            // Add a dummy created_at for display purposes
+            const usersWithDate = (fallbackData || []).map(u => ({
+              ...u,
+              created_at: new Date().toISOString()
+            }));
+            setUsers(usersWithDate);
+          }
+        } else {
+          setError(`Failed to load users: ${qErr.message}. Please check your Supabase permissions.`);
+          setUsers([]);
+        }
       } else if (!data) {
         console.log('No data returned from Supabase');
         setUsers([]);
@@ -69,7 +94,7 @@ export function UserManagement() {
       }
     } catch (err: any) {
       console.error('Error loading users:', err);
-      setError(`Failed to load users: ${err.message || 'Unknown error'}`);
+      setError(`Failed to load users: ${err.message || 'Unknown error'}. Please run migration 20260405000000_fix_schema_issues.sql`);
       setUsers([]);
     } finally {
       setListLoading(false);
