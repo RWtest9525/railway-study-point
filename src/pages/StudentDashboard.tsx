@@ -14,6 +14,7 @@ import {
   Shield,
   Settings,
   User,
+  ChevronRight,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { trialWholeDaysLeft } from '../lib/authUtils';

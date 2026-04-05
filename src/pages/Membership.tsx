@@ -6,7 +6,7 @@ import {
   trialWholeDaysLeft,
   FREE_TRIAL_DAYS,
 } from '../lib/authUtils';
-import { Crown, Calendar } from 'lucide-react';
+import { Crown, Calendar, Shield, Clock } from 'lucide-react';
 
 export function Membership() {
   const { profile, effectiveRole } = useAuth();
@@ -41,7 +41,7 @@ export function Membership() {
           {effectiveRole === 'admin' && (
             <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
               <p className="text-red-200 text-xs sm:text-sm flex items-center gap-2">
-                <Shield className="w-4 h-4" />
+                <div className="w-4 h-4 bg-red-400 rounded-full flex items-center justify-center text-white text-[10px] font-bold">A</div>
                 Admin accounts have full access. No membership plan applies.
               </p>
             </div>
@@ -144,7 +144,5 @@ export function Membership() {
         </div>
       </div>
     </div>
-  );
-}
   );
 }

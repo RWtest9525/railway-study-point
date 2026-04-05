@@ -20,7 +20,7 @@ export interface Database {
           is_premium: boolean
           premium_until: string | null
           premium_started_at: string | null
-          role: 'admin' | 'student'
+          role: 'admin' | 'student' | 'banned'
           created_at: string
           updated_at: string
         }
@@ -32,7 +32,7 @@ export interface Database {
           is_premium?: boolean
           premium_until?: string | null
           premium_started_at?: string | null
-          role?: 'admin' | 'student'
+          role?: 'admin' | 'student' | 'banned'
           created_at?: string
           updated_at?: string
         }
@@ -44,7 +44,7 @@ export interface Database {
           is_premium?: boolean
           premium_until?: string | null
           premium_started_at?: string | null
-          role?: 'admin' | 'student'
+          role?: 'admin' | 'student' | 'banned'
           created_at?: string
           updated_at?: string
         }

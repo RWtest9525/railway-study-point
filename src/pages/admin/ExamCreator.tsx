@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
-import { Plus, Trash2, Clock, FileText } from 'lucide-react';
+import { Plus, Trash2, Clock, FileText, Users } from 'lucide-react';
 
 type Exam = Database['public']['Tables']['exams']['Row'];
 type Question = Database['public']['Tables']['questions']['Row'];
