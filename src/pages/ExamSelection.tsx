@@ -53,38 +53,28 @@ export function ExamSelection() {
     <div className="min-h-screen bg-gray-950 text-white pb-24">
       {/* Header */}
       <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between">
           {/* Left: Logo and Company Name */}
-          <div className="flex items-center gap-2">
-            <BrandLogo variant="nav" className="w-8 h-8" />
-            <span className="font-bold text-lg tracking-tight">Railway Study Point</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <BrandLogo variant="nav" className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
+            <span className="font-bold text-sm sm:text-lg tracking-tight truncate hidden xs:block">Railway Study Point</span>
           </div>
 
-          {/* Right: Leaderboard, Premium, Settings */}
-          <div className="flex items-center gap-3">
-            {/* Leaderboard Button */}
-            <button
-              type="button"
-              onClick={() => navigate('/leaderboard')}
-              className="text-gray-300 hover:text-white text-sm flex items-center gap-1.5 transition"
-            >
-              <Trophy className="w-4 h-4 text-amber-400" />
-              <span className="hidden sm:inline">Leaderboard</span>
-            </button>
-
+          {/* Right: Premium, Settings */}
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Premium Button / Badge */}
             {isPremium ? (
-              <div className="bg-yellow-600/20 text-yellow-500 border border-yellow-500/30 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                <Crown className="w-3 h-3" /> Premium
+              <div className="bg-yellow-600/20 text-yellow-500 border border-yellow-500/30 px-2 sm:px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
+                <Crown className="w-3 h-3" />
+                <span className="hidden lg:inline">Premium</span>
               </div>
             ) : (
               <button 
                 onClick={() => navigate('/upgrade')}
-                className="bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition shadow-lg shadow-yellow-900/20 flex items-center gap-1"
+                className="bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white p-2 rounded-lg transition shadow-lg shadow-yellow-900/20 shrink-0"
+                title="Go Premium"
               >
-                <Crown className="w-3 h-3" />
-                <span className="hidden sm:inline">Go Premium</span>
-                <span className="sm:hidden">Upgrade</span>
+                <Crown className="w-4 h-4" />
               </button>
             )}
 
@@ -93,7 +83,7 @@ export function ExamSelection() {
               <button
                 type="button"
                 onClick={() => setSettingsOpen((prev) => !prev)}
-                className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition"
+                className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition shrink-0"
                 aria-expanded={settingsOpen}
               >
                 <Settings className="w-5 h-5" />
@@ -106,6 +96,19 @@ export function ExamSelection() {
                     <p className="text-gray-400 text-[10px] uppercase tracking-widest font-bold mb-1">Signed in as</p>
                     <p className="text-white font-medium truncate">{profile?.full_name || 'Student'}</p>
                   </div>
+                  
+                  {/* Leaderboard Option (moved from header) */}
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
+                    onClick={() => {
+                      setSettingsOpen(false);
+                      navigate('/leaderboard');
+                    }}
+                  >
+                    <Trophy className="w-4 h-4 text-amber-400" />
+                    Leaderboard
+                  </button>
                   
                   {/* Profile Option */}
                   <button
@@ -189,15 +192,15 @@ export function ExamSelection() {
             <BookOpen className="w-5 h-5 text-blue-500" />
             Select Category
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             {mainCategories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => navigate(`/exams/${cat.id}`)}
-                className={`aspect-square rounded-3xl border-2 p-6 flex flex-col items-center justify-center text-center transition-all hover:scale-105 active:scale-95 ${cat.color}`}
+                className={`rounded-xl sm:rounded-2xl border-2 p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all hover:scale-105 active:scale-95 ${cat.color} aspect-[4/3] sm:aspect-square`}
               >
-                <span className="font-bold text-lg md:text-xl leading-tight">{cat.name}</span>
-                <ChevronRight className="w-5 h-5 mt-4 opacity-50" />
+                <span className="font-bold text-sm sm:text-lg leading-tight">{cat.name}</span>
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 mt-2 sm:mt-4 opacity-50" />
               </button>
             ))}
           </div>
