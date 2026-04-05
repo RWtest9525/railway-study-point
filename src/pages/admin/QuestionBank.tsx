@@ -11,6 +11,7 @@ export function QuestionBank() {
   const categories = ['Group-D', 'ALP', 'Technician', 'BSED', 'NTPC', 'Technical'];
   const subjects = ['Math', 'Reasoning', 'Science', 'General Awareness'];
 
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALP');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

@@ -24,17 +24,16 @@ export function PremiumSettings() {
   useEffect(() => {
     (async () => {
       try {
+        console.log('Loading premium settings...');
         const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
         
         if (error) {
-          // Table might not exist, try to create it
           console.error('Site settings error:', error);
-          setError('Database schema not updated. Please run migrations first.');
-          setLoading(false);
-          return;
+          // Don't set error immediately, try to create default
         }
         
         if (data) {
+          console.log('Found existing settings:', data);
           setPriceRupees(String(data.premium_price_paise / 100));
           setValidityDays(data.premium_validity_days);
           if (typeof data.trial_nudge_interval_seconds === 'number') {
@@ -42,6 +41,7 @@ export function PremiumSettings() {
           }
         } else {
           // Insert default settings
+          console.log('Creating default settings...');
           const { error: insertError } = await supabase.from('site_settings').insert({
             id: 1,
             premium_price_paise: 3900,
@@ -51,7 +51,9 @@ export function PremiumSettings() {
           
           if (insertError) {
             console.error('Failed to create default settings:', insertError);
-            setError('Failed to initialize settings. Please check database permissions.');
+            setError('Failed to initialize settings. Database permissions issue.');
+          } else {
+            console.log('Default settings created successfully');
           }
         }
       } catch (err) {

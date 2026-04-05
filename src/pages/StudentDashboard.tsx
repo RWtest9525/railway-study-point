@@ -32,6 +32,7 @@ export function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile), [profile]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -94,8 +95,6 @@ export function StudentDashboard() {
     await signOut();
     navigate('/login');
   };
-
-  const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile), [profile]);
 
   const categories = [
     {
@@ -183,7 +182,7 @@ export function StudentDashboard() {
                 <div className="relative" ref={settingsRef}>
                   <button
                     type="button"
-                    onClick={() => setSettingsOpen((o) => !o)}
+                    onClick={() => setSettingsOpen((prev: boolean) => !prev)}
                     className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition"
                     aria-expanded={settingsOpen}
                   >
