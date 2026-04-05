@@ -206,24 +206,8 @@ export function ExamSelection() {
           </div>
         </section>
 
-        {/* Wide Buttons */}
+        {/* Leaderboard Button */}
         <section className="grid grid-cols-1 gap-4">
-          <button
-            onClick={() => navigate('/mock-tests')}
-            className="w-full bg-gray-900 border-2 border-blue-500/30 hover:border-blue-500 rounded-2xl p-6 flex items-center justify-between group transition-all"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition">
-                <Zap className="w-6 h-6 text-blue-400" />
-              </div>
-              <div className="text-left">
-                <span className="block font-bold text-lg">Mock Test</span>
-                <span className="text-xs text-gray-500">Full length practice sets</span>
-              </div>
-            </div>
-            <ChevronRight className="w-6 h-6 text-gray-600 group-hover:text-blue-400 transition" />
-          </button>
-
           <button
             onClick={() => navigate('/leaderboard')}
             className="w-full bg-gray-900 border-2 border-amber-500/30 hover:border-amber-500 rounded-2xl p-6 flex items-center justify-between group transition-all"

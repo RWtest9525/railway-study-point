@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
-import { User as UserIcon, Mail, Phone, KeyRound } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, KeyRound, ArrowLeft } from 'lucide-react';
 import { getAuthRedirectOrigin } from '../lib/authRedirect';
 
 export function ProfileEdit() {
@@ -83,16 +83,21 @@ export function ProfileEdit() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 py-6 sm:py-12 px-4">
-      <div className="max-w-lg mx-auto">
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard')}
-          className="text-blue-400 hover:text-blue-300 mb-6 transition flex items-center gap-1 text-sm sm:text-base"
-        >
-          ← Back to Dashboard
-        </button>
+    <div className="min-h-screen bg-gray-900 pb-24">
+      {/* Header with back arrow */}
+      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+        <div className="max-w-lg mx-auto px-4 h-16 flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="p-2 hover:bg-gray-800 rounded-full transition"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-300" />
+          </button>
+          <h1 className="font-bold text-lg text-white">Profile</h1>
+        </div>
+      </header>
 
+      <main className="max-w-lg mx-auto px-4 py-8">
         <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 sm:p-8 shadow-xl">
           <div className="flex items-center gap-4 mb-8">
             <div className="w-12 h-12 sm:w-14 sm:h-14 bg-blue-600 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-900/20">
@@ -218,7 +223,7 @@ export function ProfileEdit() {
             </button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

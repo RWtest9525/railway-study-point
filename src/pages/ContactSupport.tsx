@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
-import { MessageSquare, PhoneCall, ChevronRight, Clock, User as UserIcon } from 'lucide-react';
+import { MessageSquare, PhoneCall, ChevronRight, Clock, User as UserIcon, ArrowLeft } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 
 type QueryRow = Database['public']['Tables']['support_queries']['Row'];
@@ -100,16 +100,21 @@ export function ContactSupport() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 py-6 sm:py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard')}
-          className="text-blue-400 hover:text-blue-300 mb-6 transition flex items-center gap-1 text-sm sm:text-base"
-        >
-          ← Back to Dashboard
-        </button>
+    <div className="min-h-screen bg-gray-900 pb-24">
+      {/* Header with back arrow */}
+      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+        <div className="max-w-2xl mx-auto px-4 h-16 flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="p-2 hover:bg-gray-800 rounded-full transition"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-300" />
+          </button>
+          <h1 className="font-bold text-lg text-white">Help & Support</h1>
+        </div>
+      </header>
 
+      <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6 sm:p-8 mb-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-blue-600/20 rounded-lg">
@@ -333,7 +338,7 @@ export function ContactSupport() {
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

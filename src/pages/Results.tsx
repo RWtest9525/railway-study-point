@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
-import { Trophy, Clock, Target, CheckCircle, XCircle, Home } from 'lucide-react';
+import { Trophy, Clock, Target, CheckCircle, XCircle, ArrowLeft, Home } from 'lucide-react';
 
 type Result = Database['public']['Tables']['results']['Row'];
 type Question = Database['public']['Tables']['questions']['Row'];
@@ -80,8 +80,21 @@ export function Results({ resultId }: ResultsProps) {
   const userAnswers = result!.answers as Record<string, number>;
 
   return (
-    <div className="min-h-screen bg-gray-900 py-8">
-      <div className="max-w-5xl mx-auto px-4">
+    <div className="min-h-screen bg-gray-900 pb-24">
+      {/* Header with back arrow */}
+      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="p-2 hover:bg-gray-800 rounded-full transition"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-300" />
+          </button>
+          <h1 className="font-bold text-lg text-white">Results</h1>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700 mb-8">
           <div className="text-center mb-8">
             <div className={`w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center ${
@@ -231,16 +244,7 @@ export function Results({ resultId }: ResultsProps) {
           })}
         </div>
 
-        <div className="mt-8 flex justify-center">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition"
-          >
-            <Home className="w-5 h-5" />
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy } from 'lucide-react';
+import { Trophy, ArrowLeft } from 'lucide-react';
 
 type Row = {
   user_id: string;
@@ -87,26 +87,21 @@ export function Leaderboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900 py-6 sm:py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard')}
-          className="text-blue-400 hover:text-blue-300 mb-6 transition flex items-center gap-1 text-sm sm:text-base"
-        >
-          ← Back to Dashboard
-        </button>
-
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-amber-500 to-amber-700 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-amber-900/20">
-            <Trophy className="w-6 h-6 sm:w-10 sm:h-10 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">Leaderboard</h1>
-            <p className="text-gray-400 text-xs sm:text-base">Top performers across all exams</p>
-          </div>
+    <div className="min-h-screen bg-gray-900 pb-24">
+      {/* Header with back arrow */}
+      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="p-2 hover:bg-gray-800 rounded-full transition"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-300" />
+          </button>
+          <h1 className="font-bold text-lg text-white">Leaderboard</h1>
         </div>
+      </header>
 
+      <main className="max-w-3xl mx-auto px-4 py-8">
         {loading && (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500" />
@@ -188,7 +183,7 @@ export function Leaderboard() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
