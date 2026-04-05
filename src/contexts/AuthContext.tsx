@@ -58,10 +58,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             is_premium: false,
           })
           .select()
-          .single();
+          .maybeSingle(); // use maybeSingle to be safe
 
-        if (createError) throw createError;
-        setProfile(newProfile);
+        if (createError) {
+          // If profile was created by another concurrent call, just fetch it
+          if (createError.code === '23505') {
+            const { data: existingData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single();
+            setProfile(existingData);
+          } else {
+            throw createError;
+          }
+        } else {
+          setProfile(newProfile);
+        }
       } else {
         setProfile(data);
       }
