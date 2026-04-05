@@ -45,6 +45,7 @@ export function UserManagement() {
 
   const loadUsers = async () => {
     setListLoading(true);
+    setError('');
     try {
       console.log('Loading users from Supabase...');
       const { data, error: qErr } = await supabase
@@ -57,16 +58,19 @@ export function UserManagement() {
 
       if (qErr) {
         console.error('Error loading users:', qErr);
-        setError('Failed to load users.');
-        setUsers([]); // Set empty array instead of failing
+        setError(`Failed to load users: ${qErr.message}. Please check your Supabase permissions.`);
+        setUsers([]);
+      } else if (!data) {
+        console.log('No data returned from Supabase');
+        setUsers([]);
       } else {
-        console.log('Setting users:', data?.length || 0, 'users found');
-        setUsers(data || []);
+        console.log('Setting users:', data.length, 'users found');
+        setUsers(data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading users:', err);
-      setError('Failed to load users.');
-      setUsers([]); // Set empty array instead of failing
+      setError(`Failed to load users: ${err.message || 'Unknown error'}`);
+      setUsers([]);
     } finally {
       setListLoading(false);
     }

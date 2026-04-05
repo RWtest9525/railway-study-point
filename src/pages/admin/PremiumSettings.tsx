@@ -25,11 +25,18 @@ export function PremiumSettings() {
     (async () => {
       try {
         console.log('Loading premium settings...');
-        const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('*')
+          .eq('id', 1)
+          .maybeSingle();
         
         if (error) {
-          console.error('Site settings error:', error);
-          // Don't set error immediately, try to create default
+          console.error('Site settings fetch error:', error);
+          // Check if it's a "not found" error (PGRST116) which is expected if no settings exist
+          if (error.code !== 'PGRST116') {
+            setError(`Failed to load settings: ${error.message}`);
+          }
         }
         
         if (data) {
@@ -41,26 +48,56 @@ export function PremiumSettings() {
           }
         } else {
           // Insert default settings
-          console.log('Creating default settings...');
-          const { error: insertError } = await supabase.from('site_settings').insert({
-            id: 1,
-            premium_price_paise: 3900,
-            premium_validity_days: 365,
-            trial_nudge_interval_seconds: 10
-          });
+          console.log('No settings found, creating defaults...');
+          const { data: insertData, error: insertError } = await supabase
+            .from('site_settings')
+            .insert({
+              id: 1,
+              premium_price_paise: 3900,
+              premium_validity_days: 365,
+              trial_nudge_interval_seconds: 10
+            })
+            .select()
+            .single();
           
           if (insertError) {
             console.error('Failed to create default settings:', insertError);
-            setError('Failed to initialize settings. Database permissions issue.');
-          } else {
+            // Check if it's a duplicate key error (settings might have been created by another request)
+            if (insertError.code === '23505') {
+              console.log('Settings already exist, fetching...');
+              const { data: existingData, error: fetchError } = await supabase
+                .from('site_settings')
+                .select('*')
+                .eq('id', 1)
+                .single();
+              
+              if (fetchError) {
+                setError(`Failed to load settings: ${fetchError.message}`);
+              } else if (existingData) {
+                setPriceRupees(String(existingData.premium_price_paise / 100));
+                setValidityDays(existingData.premium_validity_days);
+                if (typeof existingData.trial_nudge_interval_seconds === 'number') {
+                  setNudgeIntervalSec(existingData.trial_nudge_interval_seconds);
+                }
+              }
+            } else {
+              setError(`Failed to initialize settings: ${insertError.message}`);
+            }
+          } else if (insertData) {
             console.log('Default settings created successfully');
+            setPriceRupees(String(insertData.premium_price_paise / 100));
+            setValidityDays(insertData.premium_validity_days);
+            if (typeof insertData.trial_nudge_interval_seconds === 'number') {
+              setNudgeIntervalSec(insertData.trial_nudge_interval_seconds);
+            }
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Settings load error:', err);
-        setError('Failed to load settings. Database connection issue.');
+        setError(`Failed to load settings: ${err.message || 'Unknown error'}`);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
   }, []);
 
