@@ -3,6 +3,7 @@ import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { Trophy, Clock, Target, CheckCircle, XCircle, ArrowLeft, Home } from 'lucide-react';
+import { BottomNav } from '../components/BottomNav';
 
 type Result = Database['public']['Tables']['results']['Row'];
 type Question = Database['public']['Tables']['questions']['Row'];
@@ -244,7 +245,9 @@ export function Results({ resultId }: ResultsProps) {
           })}
         </div>
 
-      </main>
+        </main>
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }

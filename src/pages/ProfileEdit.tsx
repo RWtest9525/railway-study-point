@@ -4,6 +4,7 @@ import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
 import { User as UserIcon, Mail, Phone, KeyRound, ArrowLeft } from 'lucide-react';
 import { getAuthRedirectOrigin } from '../lib/authRedirect';
+import { BottomNav } from '../components/BottomNav';
 
 export function ProfileEdit() {
   const { profile, user, refreshProfile } = useAuth();
@@ -223,7 +224,9 @@ export function ProfileEdit() {
             </button>
           </div>
         </div>
-      </main>
+        </main>
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }

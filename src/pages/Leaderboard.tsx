@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useRouter } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Trophy, ArrowLeft } from 'lucide-react';
+import { BottomNav } from '../components/BottomNav';
 
 type Row = {
   user_id: string;
@@ -184,6 +185,8 @@ export function Leaderboard() {
           </div>
         )}
       </main>
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   FREE_TRIAL_DAYS,
 } from '../lib/authUtils';
 import { Crown, Calendar, Shield, Clock, ArrowLeft } from 'lucide-react';
+import { BottomNav } from '../components/BottomNav';
 
 export function Membership() {
   const { profile, effectiveRole } = useAuth();
@@ -147,7 +148,9 @@ export function Membership() {
             </div>
           )}
         </div>
-      </main>
+        </main>
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }

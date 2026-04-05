@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { MessageSquare, PhoneCall, ChevronRight, Clock, User as UserIcon, ArrowLeft } from 'lucide-react';
 import type { Database } from '../lib/database.types';
+import { BottomNav } from '../components/BottomNav';
 
 type QueryRow = Database['public']['Tables']['support_queries']['Row'];
 
@@ -338,7 +339,9 @@ export function ContactSupport() {
             ))}
           </div>
         )}
-      </main>
+        </main>
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }

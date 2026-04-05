@@ -15,6 +15,7 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { Membership } from './pages/Membership';
 import { ContactSupport } from './pages/ContactSupport';
+import { Notifications } from './pages/Notifications';
 import { AdminPortal } from './pages/admin/AdminPortal';
 import { StudentDashboard } from './pages/StudentDashboard';
 
@@ -156,6 +157,14 @@ function AppContent() {
     return (
       <ProtectedRoute>
         <ContactSupport />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/notifications') {
+    return (
+      <ProtectedRoute>
+        <Notifications />
       </ProtectedRoute>
     );
   }

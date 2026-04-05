@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { 
@@ -9,36 +9,17 @@ import {
   ChevronRight,
   Zap,
   BookOpen,
-  Settings,
-  User,
-  LogOut,
-  Briefcase
+  Bell
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { trialWholeDaysLeft } from '../lib/authUtils';
+import { BottomNav } from '../components/BottomNav';
 
 export function ExamSelection() {
-  const { profile, isPremium, effectiveRole, trialExpiredNeedsPremium, signOut } = useAuth();
+  const { profile, isPremium, effectiveRole, trialExpiredNeedsPremium } = useAuth();
   const { navigate } = useRouter();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const settingsRef = useRef<HTMLDivElement>(null);
 
   const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile), [profile]);
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
-        setSettingsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, []);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/login');
-  };
 
   const mainCategories = [
     { id: 'Group-D', name: 'Group D', gradient: 'from-blue-600/20 to-blue-800/20', border: 'border-blue-500/30', text: 'text-blue-400', hover: 'hover:border-blue-400 hover:shadow-blue-500/20' },
@@ -53,116 +34,21 @@ export function ExamSelection() {
     <div className="min-h-screen bg-gray-950 text-white pb-24">
       {/* Header */}
       <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Left: Logo and Company Name */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <BrandLogo variant="nav" className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
-            <span className="font-bold text-xs sm:text-base tracking-tight truncate text-white hidden md:block">Railway Study Point</span>
-            <span className="font-bold text-xs tracking-tight truncate text-white md:hidden">RSP</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <BrandLogo variant="nav" className="w-8 h-8 sm:w-10 sm:h-10 shrink-0" />
+            <span className="font-bold text-base sm:text-xl tracking-tight truncate text-white">Railway Study Point</span>
           </div>
 
-          {/* Right: Premium, Settings */}
-          <div className="flex items-center gap-2">
-            {/* Premium Button / Badge */}
-            {isPremium ? (
-              <div className="bg-yellow-600/20 text-yellow-500 border border-yellow-500/30 px-2 sm:px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
-                <Crown className="w-3 h-3" />
-                <span className="hidden lg:inline">Premium</span>
-              </div>
-            ) : (
-              <button 
-                onClick={() => navigate('/upgrade')}
-                className="bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white p-2 rounded-lg transition shadow-lg shadow-yellow-900/20 shrink-0"
-                title="Go Premium"
-              >
-                <Crown className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Settings Button with Dropdown */}
-            <div className="relative" ref={settingsRef}>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen((prev) => !prev)}
-                className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition shrink-0"
-                aria-expanded={settingsOpen}
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-              
-              {settingsOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-[150] py-2 text-sm overflow-hidden">
-                  {/* User Name Display */}
-                  <div className="px-4 py-3 border-b border-gray-700 mb-1">
-                    <p className="text-gray-400 text-[10px] uppercase tracking-widest font-bold mb-1">Signed in as</p>
-                    <p className="text-white font-medium truncate">{profile?.full_name || 'Student'}</p>
-                  </div>
-                  
-                  {/* Leaderboard Option (moved from header) */}
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
-                    onClick={() => {
-                      setSettingsOpen(false);
-                      navigate('/leaderboard');
-                    }}
-                  >
-                    <Trophy className="w-4 h-4 text-amber-400" />
-                    Leaderboard
-                  </button>
-                  
-                  {/* Profile Option */}
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
-                    onClick={() => {
-                      setSettingsOpen(false);
-                      navigate('/profile');
-                    }}
-                  >
-                    <User className="w-4 h-4 text-blue-400" />
-                    Profile
-                  </button>
-                  
-                  {/* Membership Option */}
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
-                    onClick={() => {
-                      setSettingsOpen(false);
-                      navigate('/membership');
-                    }}
-                  >
-                    <Crown className="w-4 h-4 text-yellow-400" />
-                    Membership
-                  </button>
-                  
-                  {/* Contact Support */}
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3 border-t border-gray-700 mt-1"
-                    onClick={() => {
-                      setSettingsOpen(false);
-                      navigate('/support');
-                    }}
-                  >
-                    <Briefcase className="w-4 h-4 text-green-400" />
-                    Contact Support
-                  </button>
-                  
-                  {/* Logout Button */}
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition flex items-center gap-3"
-                    onClick={handleSignOut}
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Right: Notification Bell */}
+          <button
+            onClick={() => navigate('/notifications')}
+            className="relative p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition shrink-0"
+          >
+            <Bell className="w-6 h-6" />
+            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-900" />
+          </button>
         </div>
       </header>
 
@@ -261,6 +147,8 @@ export function ExamSelection() {
           </div>
         </section>
       </main>
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }
