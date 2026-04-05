@@ -46,16 +46,21 @@ export function UserManagement() {
   const loadUsers = async () => {
     setListLoading(true);
     try {
+      console.log('Loading users from Supabase...');
       const { data, error: qErr } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
+
+      console.log('Users data:', data);
+      console.log('Users error:', qErr);
 
       if (qErr) {
         console.error('Error loading users:', qErr);
         setError('Failed to load users.');
         setUsers([]); // Set empty array instead of failing
       } else {
+        console.log('Setting users:', data?.length || 0, 'users found');
         setUsers(data || []);
       }
     } catch (err) {
@@ -219,7 +224,7 @@ export function UserManagement() {
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.full_name.toLowerCase().includes(searchQuery.toLowerCase());
+      (u.full_name && u.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const isPremium = u.is_premium && u.premium_until && new Date(u.premium_until) > new Date();
     const matchesPremium = premiumFilter === 'all' || 
@@ -228,6 +233,11 @@ export function UserManagement() {
 
     return matchesSearch && matchesPremium;
   });
+
+  console.log('Total users:', users.length);
+  console.log('Filtered users:', filteredUsers.length);
+  console.log('Search query:', searchQuery);
+  console.log('Premium filter:', premiumFilter);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
