@@ -19,61 +19,71 @@ export function Leaderboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    (async () => {
+    const fetchLeaderboard = async () => {
       try {
-        const { data, error: rpcError } = await supabase.rpc('get_leaderboard', { limit_n: 100 });
+        // 1. Try RPC first (Efficient)
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_leaderboard', { limit_n: 100 });
         
-        if (rpcError) {
-          // Fallback if RPC fails or doesn't exist yet
-          const { data: results, error: resError } = await supabase
-            .from('results')
-            .select('user_id, score, profiles(full_name)')
-            .order('created_at', { ascending: false });
-
-          if (resError) throw resError;
-
-          const userStats: Record<string, { full_name: string; total_score: number; exams_taken: number }> = {};
-          results?.forEach((r: any) => {
-            const uid = r.user_id;
-            if (!userStats[uid]) {
-              userStats[uid] = {
-                full_name: r.profiles?.full_name || 'Student',
-                total_score: 0,
-                exams_taken: 0,
-              };
-            }
-            userStats[uid].total_score += r.score;
-            userStats[uid].exams_taken += 1;
-          });
-
-          const sorted = Object.entries(userStats)
-            .map(([id, stats]) => ({
-              user_id: id,
-              ...stats,
-            }))
-            .sort((a, b) => b.total_score - a.total_score)
-            .slice(0, 100);
-
-          setRows(sorted);
+        if (!rpcError && rpcData) {
+          const normalized = rpcData.map((r: any) => ({
+            user_id: r.user_id,
+            full_name: r.full_name || 'Student',
+            total_score: Number(r.total_score),
+            exams_taken: Number(r.exams_taken),
+          }));
+          setRows(normalized);
+          setLoading(false);
           return;
         }
 
-        const normalized = (data ?? []).map((r) => ({
-          user_id: r.user_id,
-          full_name: r.full_name || 'Student',
-          total_score: Number(r.total_score),
-          exams_taken: Number(r.exams_taken),
-        }));
-        setRows(normalized);
-      } catch (e) {
-        console.error(e);
-        setError(
-          'Could not load leaderboard. Run the latest database migration in Supabase (includes get_leaderboard).'
-        );
+        // 2. Fallback: Manual aggregation (Resilient)
+        console.warn('Leaderboard RPC missing or failed, using manual fallback');
+        const { data: results, error: resError } = await supabase
+          .from('results')
+          .select('user_id, score, profiles:user_id(full_name)')
+          .order('created_at', { ascending: false });
+
+        if (resError) throw resError;
+
+        if (!results || results.length === 0) {
+          setRows([]);
+          setLoading(false);
+          return;
+        }
+
+        const userStats: Record<string, { full_name: string; total_score: number; exams_taken: number }> = {};
+        
+        results.forEach((r: any) => {
+          const uid = r.user_id;
+          if (!userStats[uid]) {
+            userStats[uid] = {
+              full_name: (r.profiles as any)?.full_name || 'Student',
+              total_score: 0,
+              exams_taken: 0,
+            };
+          }
+          userStats[uid].total_score += (r.score || 0);
+          userStats[uid].exams_taken += 1;
+        });
+
+        const sorted = Object.entries(userStats)
+          .map(([id, stats]) => ({
+            user_id: id,
+            ...stats,
+          }))
+          .sort((a, b) => b.total_score - a.total_score)
+          .slice(0, 100);
+
+        setRows(sorted);
+      } catch (e: any) {
+        console.error('Leaderboard error:', e);
+        setError('Leaderboard is currently unavailable. Please try again later.');
       } finally {
         setLoading(false);
       }
-    })();
+    };
+
+    fetchLeaderboard();
   }, []);
 
   return (
