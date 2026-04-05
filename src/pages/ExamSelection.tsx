@@ -41,12 +41,12 @@ export function ExamSelection() {
   };
 
   const mainCategories = [
-    { id: 'Group-D', name: 'Group D', color: 'bg-blue-600/10 border-blue-500/50 text-blue-400' },
-    { id: 'ALP', name: 'ALP', color: 'bg-orange-600/10 border-orange-500/50 text-orange-400' },
-    { id: 'Technician', name: 'Technician', color: 'bg-purple-600/10 border-purple-500/50 text-purple-400' },
-    { id: 'BSED', name: 'BSED', color: 'bg-green-600/10 border-green-500/50 text-green-400' },
-    { id: 'NTPC', name: 'NTPC', color: 'bg-pink-600/10 border-pink-500/50 text-pink-400' },
-    { id: 'Technical', name: 'Technical (Electrician/Fitter/Welder)', color: 'bg-amber-600/10 border-amber-500/50 text-amber-400' },
+    { id: 'Group-D', name: 'Group D', gradient: 'from-blue-600/20 to-blue-800/20', border: 'border-blue-500/30', text: 'text-blue-400', hover: 'hover:border-blue-400 hover:shadow-blue-500/20' },
+    { id: 'ALP', name: 'ALP', gradient: 'from-orange-600/20 to-orange-800/20', border: 'border-orange-500/30', text: 'text-orange-400', hover: 'hover:border-orange-400 hover:shadow-orange-500/20' },
+    { id: 'Technician', name: 'Technician', gradient: 'from-purple-600/20 to-purple-800/20', border: 'border-purple-500/30', text: 'text-purple-400', hover: 'hover:border-purple-400 hover:shadow-purple-500/20' },
+    { id: 'BSED', name: 'BSED', gradient: 'from-green-600/20 to-green-800/20', border: 'border-green-500/30', text: 'text-green-400', hover: 'hover:border-green-400 hover:shadow-green-500/20' },
+    { id: 'NTPC', name: 'NTPC', gradient: 'from-pink-600/20 to-pink-800/20', border: 'border-pink-500/30', text: 'text-pink-400', hover: 'hover:border-pink-400 hover:shadow-pink-500/20' },
+    { id: 'Technical', name: 'Technical', gradient: 'from-amber-600/20 to-amber-800/20', border: 'border-amber-500/30', text: 'text-amber-400', hover: 'hover:border-amber-400 hover:shadow-amber-500/20' },
   ];
 
   return (
@@ -57,7 +57,7 @@ export function ExamSelection() {
           {/* Left: Logo and Company Name */}
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <BrandLogo variant="nav" className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
-            <span className="font-bold text-sm sm:text-lg tracking-tight truncate hidden xs:block">Railway Study Point</span>
+            <span className="font-bold text-xs sm:text-lg tracking-tight truncate text-white">Railway Study Point</span>
           </div>
 
           {/* Right: Premium, Settings */}
@@ -197,10 +197,10 @@ export function ExamSelection() {
               <button
                 key={cat.id}
                 onClick={() => navigate(`/exams/${cat.id}`)}
-                className={`rounded-xl sm:rounded-2xl border-2 p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all hover:scale-105 active:scale-95 ${cat.color} aspect-[4/3] sm:aspect-square`}
+                className={`bg-gradient-to-br ${cat.gradient} rounded-xl sm:rounded-2xl border-2 ${cat.border} ${cat.hover} p-3 sm:p-4 flex flex-col items-center justify-center text-center transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl`}
               >
-                <span className="font-bold text-sm sm:text-lg leading-tight">{cat.name}</span>
-                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 mt-2 sm:mt-4 opacity-50" />
+                <span className={`font-bold text-xs sm:text-sm md:text-base leading-tight ${cat.text} line-clamp-2`}>{cat.name}</span>
+                <ChevronRight className={`w-4 h-5 mt-1 sm:mt-2 ${cat.text} opacity-60 group-hover:opacity-100 transition-opacity`} />
               </button>
             ))}
           </div>
