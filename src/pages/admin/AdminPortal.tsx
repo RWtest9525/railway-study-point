@@ -6,13 +6,14 @@ import {
   PlusCircle, 
   DollarSign, 
   LogOut, 
-  Settings, 
   Users, 
   MessageSquare, 
-  Database,
   LayoutDashboard,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X,
+  CreditCard
 } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionBank } from './QuestionBank';
@@ -21,34 +22,19 @@ import { RevenueTracker } from './RevenueTracker';
 import { PremiumSettings } from './PremiumSettings';
 import { UserManagement } from './UserManagement';
 import { SupportInbox } from './SupportInbox';
-import { loadDemoData } from '../../lib/demoData';
+import { SubscriptionManagement } from './SubscriptionManagement';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
   const { navigate } = useRouter();
   const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'system'
-  >('questions');
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoMessage, setDemoMessage] = useState('');
+    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription'
+  >('users');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
-  };
-
-  const handleLoadDemo = async () => {
-    if (!profile?.id) return;
-    if (!confirm('This will add sample questions and exams to your database. Continue?')) return;
-    setDemoLoading(true);
-    const res = await loadDemoData(profile.id);
-    setDemoLoading(false);
-    if (res.success) {
-      setDemoMessage('Demo data loaded successfully! Refreshing...');
-      setTimeout(() => window.location.reload(), 2000);
-    } else {
-      setDemoMessage('Failed to load demo data.');
-    }
   };
 
   const mainTabs = [
@@ -61,14 +47,45 @@ export function AdminPortal() {
     { id: 'revenue' as const, name: 'Revenue', icon: DollarSign, desc: 'Track Payments' },
     { id: 'users' as const, name: 'Users', icon: Users, desc: 'Manage All Students' },
     { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
-    { id: 'system' as const, name: 'System', icon: Settings, desc: 'Maintenance' },
+    { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
   ];
 
+  const handleTabClick = (tabId: typeof activeTab) => {
+    setActiveTab(tabId);
+    setIsMenuOpen(false); // Close menu on mobile after selection
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-gray-900 flex flex-col md:flex-row relative">
+      {/* Mobile Header with Hamburger */}
+      <div className="md:hidden bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between sticky top-0 z-[150]">
+        <div className="flex items-center gap-3">
+          <BrandLogo variant="nav" className="bg-white/5 ring-1 ring-white/10 shadow-md w-8 h-8" />
+          <span className="text-sm font-bold text-white">Railway Admin</span>
+        </div>
+        <button 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="p-2 text-gray-400 hover:text-white transition"
+        >
+          {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </div>
+
+      {/* Overlay for mobile menu */}
+      {isMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-[140] md:hidden"
+          onClick={() => setIsMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="w-full md:w-64 bg-gray-800 border-r border-gray-700 flex flex-col shrink-0 z-[100]">
-        <div className="p-6 border-b border-gray-700 flex items-center gap-3">
+      <aside className={`
+        fixed inset-y-0 left-0 w-64 bg-gray-800 border-r border-gray-700 flex flex-col shrink-0 z-[150] transition-transform duration-300 transform
+        ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0 md:static md:z-[100]
+      `}>
+        <div className="p-6 border-b border-gray-700 hidden md:flex items-center gap-3">
           <BrandLogo variant="nav" className="bg-white/5 ring-1 ring-white/10 shadow-md w-8 h-8" />
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold text-white leading-tight truncate">Railway Admin</span>
@@ -84,7 +101,7 @@ export function AdminPortal() {
               {mainTabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabClick(tab.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${
                     activeTab === tab.id 
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
@@ -106,7 +123,7 @@ export function AdminPortal() {
               {managementTabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabClick(tab.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${
                     activeTab === tab.id 
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
@@ -157,56 +174,7 @@ export function AdminPortal() {
             {activeTab === 'premium' && <PremiumSettings />}
             {activeTab === 'users' && <UserManagement />}
             {activeTab === 'support' && <SupportInbox />}
-            
-            {activeTab === 'system' && (
-              <div className="max-w-2xl space-y-8">
-                <div>
-                  <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                    <Database className="w-8 h-8 text-amber-400" />
-                    System Maintenance
-                  </h2>
-                  <p className="text-gray-400 text-sm">Perform administrative tasks and database maintenance.</p>
-                </div>
-
-                <div className="bg-gray-800 rounded-2xl border border-gray-700 p-8 space-y-6">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-white mb-1">Load Demo Content</h3>
-                      <p className="text-gray-400 text-sm leading-relaxed">
-                        Populate your database with sample questions and exams for categories like ALP, NTPC, and Group-D. 
-                        Useful for testing the student dashboard appearance.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleLoadDemo}
-                      disabled={demoLoading}
-                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-6 py-3 rounded-xl disabled:opacity-50 transition shadow-lg shadow-amber-900/20 shrink-0"
-                    >
-                      {demoLoading ? 'Loading...' : 'Load Demo Data'}
-                    </button>
-                  </div>
-
-                  {demoMessage && (
-                    <div className={`p-4 rounded-xl text-sm font-medium ${
-                      demoMessage.includes('success') ? 'bg-green-600/10 text-green-400 border border-green-500/20' : 'bg-red-600/10 text-red-400 border border-red-500/20'
-                    }`}>
-                      {demoMessage}
-                    </div>
-                  )}
-
-                  <div className="pt-6 border-t border-gray-700/50">
-                    <h3 className="text-lg font-bold text-white mb-2">Platform Version</h3>
-                    <div className="bg-gray-900/50 rounded-xl p-4 flex items-center justify-between">
-                      <span className="text-gray-500 text-xs font-bold uppercase tracking-widest">Railway Study Point v2.0</span>
-                      <span className="text-green-500 text-xs font-bold uppercase tracking-widest flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                        System Online
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {activeTab === 'subscription' && <SubscriptionManagement />}
           </div>
         </div>
       </main>

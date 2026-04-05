@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
-import { Plus, Trash2, Clock, FileText, Users } from 'lucide-react';
+import { Plus, Trash2, Clock, FileText, Tag, BookOpen } from 'lucide-react';
 
 type Exam = Database['public']['Tables']['exams']['Row'];
 type Question = Database['public']['Tables']['questions']['Row'];
@@ -17,13 +17,19 @@ export function ExamCreator() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const categories = ['Group-D', 'ALP', 'Technician', 'BSED', 'NTPC', 'Technical'];
+
   const [formData, setFormData] = useState({
     title: '',
-    category: 'ALP' as 'ALP' | 'NTPC' | 'Group-D',
+    category: 'ALP',
+    subject: 'Math',
+    topics: [] as string[],
     duration_minutes: 60,
     is_premium: false,
     selected_questions: [] as string[],
   });
+
+  const [newTopic, setNewTopic] = useState('');
 
   useEffect(() => {
     loadExams();
@@ -31,9 +37,9 @@ export function ExamCreator() {
 
   useEffect(() => {
     if (showForm) {
-      loadQuestions(formData.category);
+      loadQuestions(formData.category, formData.subject);
     }
-  }, [showForm, formData.category]);
+  }, [showForm, formData.category, formData.subject]);
 
   const loadExams = async () => {
     setLoading(true);
@@ -53,12 +59,13 @@ export function ExamCreator() {
     }
   };
 
-  const loadQuestions = async (category: 'ALP' | 'NTPC' | 'Group-D') => {
+  const loadQuestions = async (category: string, subject: string) => {
     try {
       const { data, error } = await supabase
         .from('questions')
         .select('*')
         .eq('category', category)
+        .eq('subject', subject)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -66,6 +73,23 @@ export function ExamCreator() {
     } catch (error) {
       console.error('Error loading questions:', error);
     }
+  };
+
+  const addTopic = () => {
+    if (newTopic.trim() && !formData.topics.includes(newTopic.trim())) {
+      setFormData({
+        ...formData,
+        topics: [...formData.topics, newTopic.trim()]
+      });
+      setNewTopic('');
+    }
+  };
+
+  const removeTopic = (topicToRemove: string) => {
+    setFormData({
+      ...formData,
+      topics: formData.topics.filter(topic => topic !== topicToRemove)
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,6 +105,7 @@ export function ExamCreator() {
     const examData = {
       title: formData.title.trim(),
       category: formData.category,
+      subject: formData.subject,
       duration_minutes: formData.duration_minutes,
       is_premium: formData.is_premium,
       question_ids: formData.selected_questions,
@@ -117,6 +142,8 @@ export function ExamCreator() {
     setFormData({
       title: exam.title,
       category: exam.category,
+      subject: exam.subject || 'Math',
+      topics: [],
       duration_minutes: exam.duration_minutes,
       is_premium: exam.is_premium,
       selected_questions: exam.question_ids as string[],
@@ -151,6 +178,8 @@ export function ExamCreator() {
     setFormData({
       title: '',
       category: 'ALP',
+      subject: 'Math',
+      topics: [],
       duration_minutes: 60,
       is_premium: false,
       selected_questions: [],
@@ -222,16 +251,80 @@ export function ExamCreator() {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        category: e.target.value as 'ALP' | 'NTPC' | 'Group-D',
+                        category: e.target.value,
                         selected_questions: [],
                       })
                     }
                     className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="ALP">ALP</option>
-                    <option value="NTPC">NTPC</option>
-                    <option value="Group-D">Group-D</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Subject
+                  </label>
+                  <select
+                    value={formData.subject}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        subject: e.target.value,
+                        selected_questions: [],
+                      })
+                    }
+                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Math">Math</option>
+                    <option value="Reasoning">Reasoning</option>
+                    <option value="Science">Science</option>
+                    <option value="General Awareness">General Awareness</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Topics
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newTopic}
+                        onChange={(e) => setNewTopic(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addTopic()}
+                        placeholder="Add a topic..."
+                        className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={addTopic}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.topics.map((topic, index) => (
+                        <span
+                          key={index}
+                          className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                        >
+                          {topic}
+                          <button
+                            type="button"
+                            onClick={() => removeTopic(topic)}
+                            className="hover:text-blue-300"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div>

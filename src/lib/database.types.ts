@@ -107,7 +107,8 @@ export interface Database {
       questions: {
         Row: {
           id: string
-          category: 'ALP' | 'NTPC' | 'Group-D'
+          category: string
+          subject: string | null
           question_text: string
           options: string[]
           correct_answer: number
@@ -117,7 +118,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          category: 'ALP' | 'NTPC' | 'Group-D'
+          category: string
+          subject?: string | null
           question_text: string
           options: string[]
           correct_answer: number
@@ -127,7 +129,8 @@ export interface Database {
         }
         Update: {
           id?: string
-          category?: 'ALP' | 'NTPC' | 'Group-D'
+          category?: string
+          subject?: string | null
           question_text?: string
           options?: string[]
           correct_answer?: number
@@ -141,7 +144,8 @@ export interface Database {
         Row: {
           id: string
           title: string
-          category: 'ALP' | 'NTPC' | 'Group-D'
+          category: string
+          subject: string | null
           question_ids: string[]
           duration_minutes: number
           is_premium: boolean
@@ -151,7 +155,8 @@ export interface Database {
         Insert: {
           id?: string
           title: string
-          category: 'ALP' | 'NTPC' | 'Group-D'
+          category: string
+          subject?: string | null
           question_ids?: string[]
           duration_minutes?: number
           is_premium?: boolean
@@ -161,7 +166,8 @@ export interface Database {
         Update: {
           id?: string
           title?: string
-          category?: 'ALP' | 'NTPC' | 'Group-D'
+          category?: string
+          subject?: string | null
           question_ids?: string[]
           duration_minutes?: number
           is_premium?: boolean

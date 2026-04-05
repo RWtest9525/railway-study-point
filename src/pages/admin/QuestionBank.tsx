@@ -8,8 +8,10 @@ type Question = Database['public']['Tables']['questions']['Row'];
 
 export function QuestionBank() {
   const { profile } = useAuth();
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<'ALP' | 'NTPC' | 'Group-D'>('ALP');
+  const categories = ['Group-D', 'ALP', 'Technician', 'BSED', 'NTPC', 'Technical'];
+  const subjects = ['Math', 'Reasoning', 'Science', 'General Awareness'];
+
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALP');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,6 +20,7 @@ export function QuestionBank() {
 
   const [formData, setFormData] = useState({
     category: selectedCategory,
+    subject: 'Math',
     question_text: '',
     option1: '',
     option2: '',
@@ -57,6 +60,7 @@ export function QuestionBank() {
 
     const questionData = {
       category: formData.category,
+      subject: formData.subject,
       question_text: formData.question_text.trim(),
       options: [formData.option1.trim(), formData.option2.trim(), formData.option3.trim(), formData.option4.trim()],
       correct_answer: formData.correct_answer,
@@ -94,6 +98,7 @@ export function QuestionBank() {
     const options = question.options as string[];
     setFormData({
       category: question.category,
+      subject: question.subject || 'Math',
       question_text: question.question_text,
       option1: options[0] || '',
       option2: options[1] || '',
@@ -122,6 +127,7 @@ export function QuestionBank() {
   const resetForm = () => {
     setFormData({
       category: selectedCategory,
+      subject: 'Math',
       question_text: '',
       option1: '',
       option2: '',
@@ -150,15 +156,15 @@ export function QuestionBank() {
         </button>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        {(['ALP', 'NTPC', 'Group-D'] as const).map((category) => (
+      <div className="flex flex-wrap gap-2 mb-6">
+        {categories.map((category) => (
           <button
             key={category}
             onClick={() => setSelectedCategory(category)}
-            className={`px-6 py-2 rounded-lg font-semibold transition ${
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
               selectedCategory === category
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 border border-gray-700'
             }`}
           >
             {category}
@@ -184,24 +190,42 @@ export function QuestionBank() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Category
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      category: e.target.value as 'ALP' | 'NTPC' | 'Group-D',
-                    })
-                  }
-                  className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="ALP">ALP</option>
-                  <option value="NTPC">NTPC</option>
-                  <option value="Group-D">Group-D</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        category: e.target.value,
+                      })
+                    }
+                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Subject
+                  </label>
+                  <select
+                    value={formData.subject}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        subject: e.target.value,
+                      })
+                    }
+                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -312,7 +336,7 @@ export function QuestionBank() {
                   Question
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                  Category
+                  Subject
                 </th>
                 <th className="px-6 py-3 text-right text-sm font-semibold text-gray-300">
                   Actions
@@ -327,8 +351,13 @@ export function QuestionBank() {
                     {question.question_text.length > 100 ? '...' : ''}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="bg-blue-900 text-blue-300 px-3 py-1 rounded-full text-sm">
+                    <span className="bg-blue-900/50 text-blue-300 border border-blue-500/30 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
                       {question.category}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="bg-purple-900/50 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                      {question.subject || 'General'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">

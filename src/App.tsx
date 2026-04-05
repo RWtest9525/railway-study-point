@@ -3,7 +3,8 @@ import { useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
-import { StudentDashboard } from './pages/StudentDashboard';
+import { ExamSelection } from './pages/ExamSelection';
+import { SubjectSelection } from './pages/SubjectSelection';
 import { ExamInterface } from './pages/ExamInterface';
 import { Results } from './pages/Results';
 import { Upgrade } from './pages/Upgrade';
@@ -68,7 +69,6 @@ function AppContent() {
 
   // ADMIN OVERRIDE: If admin, prioritize Admin Portal
   if (isAdmin) {
-    // Admins can still visit specific student pages if they want, but default to AdminPortal
     if (
       currentPath === '/dashboard' ||
       currentPath === '/' ||
@@ -86,7 +86,16 @@ function AppContent() {
   if (currentPath === '/dashboard' || currentPath === '/') {
     return (
       <ProtectedRoute>
-        <StudentDashboard />
+        <ExamSelection />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath.startsWith('/exams/')) {
+    const categoryId = currentPath.replace('/exams/', '');
+    return (
+      <ProtectedRoute>
+        <SubjectSelection categoryId={categoryId} />
       </ProtectedRoute>
     );
   }
