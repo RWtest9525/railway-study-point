@@ -15,7 +15,8 @@ import {
   FlaskConical,
   Globe,
   Crown,
-  Lock
+  Lock,
+  ChevronRight
 } from 'lucide-react';
 
 type Exam = {
@@ -232,40 +233,78 @@ export function ExamDetailSelection({ categoryId }: { categoryId: string }) {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-        {/* Section Tabs */}
-        <div className="flex bg-gray-800 rounded-xl p-1 border border-gray-700">
+        {/* Section Buttons - Column Layout */}
+        <div className="space-y-4">
           <button
             onClick={() => setSelectedSection('mock')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
-              selectedSection === 'mock' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-400 hover:text-gray-200'
+            className={`w-full flex items-center justify-between p-5 rounded-xl border-2 transition-all duration-300 ${
+              selectedSection === 'mock'
+                ? 'bg-gradient-to-r from-blue-600/30 to-blue-800/30 border-blue-500 shadow-lg shadow-blue-500/20'
+                : 'bg-gray-800 border-gray-700 hover:border-blue-500/50 hover:bg-gray-800/80'
             }`}
           >
-            <FileText className="w-5 h-5" />
-            Full Mock Tests
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                selectedSection === 'mock' ? 'bg-blue-600' : 'bg-blue-600/20'
+              }`}>
+                <FileText className={`w-6 h-6 ${selectedSection === 'mock' ? 'text-white' : 'text-blue-400'}`} />
+              </div>
+              <div className="text-left">
+                <h3 className={`font-bold text-lg ${selectedSection === 'mock' ? 'text-white' : 'text-gray-200'}`}>
+                  Full Mock Tests
+                </h3>
+                <p className="text-gray-500 text-sm">Complete syllabus tests</p>
+              </div>
+            </div>
+            <ChevronRight className={`w-6 h-6 ${selectedSection === 'mock' ? 'text-blue-400' : 'text-gray-600'}`} />
           </button>
+
           <button
             onClick={() => setSelectedSection('subject')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
-              selectedSection === 'subject' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-400 hover:text-gray-200'
+            className={`w-full flex items-center justify-between p-5 rounded-xl border-2 transition-all duration-300 ${
+              selectedSection === 'subject'
+                ? 'bg-gradient-to-r from-green-600/30 to-green-800/30 border-green-500 shadow-lg shadow-green-500/20'
+                : 'bg-gray-800 border-gray-700 hover:border-green-500/50 hover:bg-gray-800/80'
             }`}
           >
-            <BookOpen className="w-5 h-5" />
-            Subject Quizzes
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                selectedSection === 'subject' ? 'bg-green-600' : 'bg-green-600/20'
+              }`}>
+                <BookOpen className={`w-6 h-6 ${selectedSection === 'subject' ? 'text-white' : 'text-green-400'}`} />
+              </div>
+              <div className="text-left">
+                <h3 className={`font-bold text-lg ${selectedSection === 'subject' ? 'text-white' : 'text-gray-200'}`}>
+                  Subject Quizzes
+                </h3>
+                <p className="text-gray-500 text-sm">Topic-wise practice</p>
+              </div>
+            </div>
+            <ChevronRight className={`w-6 h-6 ${selectedSection === 'subject' ? 'text-green-400' : 'text-gray-600'}`} />
           </button>
+
           <button
             onClick={() => setSelectedSection('previous')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
-              selectedSection === 'previous' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-400 hover:text-gray-200'
+            className={`w-full flex items-center justify-between p-5 rounded-xl border-2 transition-all duration-300 ${
+              selectedSection === 'previous'
+                ? 'bg-gradient-to-r from-amber-600/30 to-amber-800/30 border-amber-500 shadow-lg shadow-amber-500/20'
+                : 'bg-gray-800 border-gray-700 hover:border-amber-500/50 hover:bg-gray-800/80'
             }`}
           >
-            <History className="w-5 h-5" />
-            Previous Year Papers
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                selectedSection === 'previous' ? 'bg-amber-600' : 'bg-amber-600/20'
+              }`}>
+                <History className={`w-6 h-6 ${selectedSection === 'previous' ? 'text-white' : 'text-amber-400'}`} />
+              </div>
+              <div className="text-left">
+                <h3 className={`font-bold text-lg ${selectedSection === 'previous' ? 'text-white' : 'text-gray-200'}`}>
+                  Previous Year Papers
+                </h3>
+                <p className="text-gray-500 text-sm">Past exam papers</p>
+              </div>
+            </div>
+            <ChevronRight className={`w-6 h-6 ${selectedSection === 'previous' ? 'text-amber-400' : 'text-gray-600'}`} />
           </button>
         </div>
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
-import { Check } from 'lucide-react';
+import { Check, Crown, Zap, BookOpen, Trophy, BarChart3, X, ArrowLeft } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 
 function computePremiumUntil(
@@ -206,73 +206,133 @@ export function Upgrade() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 py-12">
-      <div className="max-w-2xl mx-auto px-4">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="text-blue-400 hover:text-blue-300 mb-8 transition"
-        >
-          ← Back to Dashboard
-        </button>
+    <div className="min-h-screen bg-gray-950 overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-yellow-600/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/2 -left-40 w-60 h-60 bg-blue-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+      </div>
 
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border border-gray-700">
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <BrandLogo variant="hero" className="w-24 h-24 sm:w-28 sm:h-28 drop-shadow-lg" />
-            </div>
-            <h1 className="text-4xl font-bold text-white mb-2">
-              Go Premium
-            </h1>
-            <p className="text-gray-400">
-              Unlock unlimited access to all premium exams
-            </p>
-          </div>
-
-          <div className="bg-gray-700 rounded-xl p-8 mb-8 text-center">
-            <div className="text-5xl font-bold text-white mb-2">
-              ₹{displayRupees}
-            </div>
-            <p className="text-gray-300">
-              {settingsLoaded
-                ? `Includes ${validityDays} day${validityDays === 1 ? '' : 's'} of premium access (set by admin)`
-                : 'Loading pricing…'}
-            </p>
-          </div>
-
-          <div className="space-y-4 mb-8">
-            {[
-              'Access all premium exams',
-              'Unlimited practice tests',
-              'Detailed explanations',
-              'Performance analytics',
-              'No ads or interruptions',
-            ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                <span className="text-gray-300">{feature}</span>
-              </div>
-            ))}
-          </div>
-
-          {error && (
-            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6 text-sm">
-              {error}
-            </div>
-          )}
-
-          <button
-            onClick={handleUpgrade}
-            disabled={loading || !settingsLoaded}
-            className="w-full bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-bold py-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+      {/* Header */}
+      <header className="relative bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="p-2 hover:bg-gray-800 rounded-full transition"
           >
-            {loading ? 'Processing…' : `Upgrade Now — ₹${displayRupees}`}
+            <ArrowLeft className="w-5 h-5 text-gray-300" />
           </button>
+          <h1 className="font-bold text-lg text-white">Go Premium</h1>
+        </div>
+      </header>
 
-          <p className="text-center text-gray-400 text-sm mt-4">
-            Secure payment powered by Razorpay
+      <main className="relative max-w-4xl mx-auto px-4 py-8">
+        {/* Hero Section */}
+        <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-700 mb-6 shadow-lg shadow-yellow-500/30">
+            <Crown className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4">
+            Unlock <span className="text-yellow-400">Premium</span> Access
+          </h1>
+          <p className="text-gray-400 text-lg max-w-md mx-auto">
+            Get unlimited access to all premium exams and features
           </p>
         </div>
-      </div>
+
+        {/* Pricing Card */}
+        <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-8 border-2 border-yellow-500/30 shadow-2xl shadow-yellow-500/10 mb-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+          {/* Glow effect */}
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent rounded-3xl pointer-events-none" />
+          
+          <div className="relative">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-2 bg-yellow-600/20 border border-yellow-500/30 rounded-full px-4 py-1 mb-6">
+                <Zap className="w-4 h-4 text-yellow-400" />
+                <span className="text-yellow-400 text-sm font-bold uppercase tracking-wider">Limited Time Offer</span>
+              </div>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-2xl text-gray-400">₹</span>
+                <span className="text-6xl font-bold text-white">{displayRupees}</span>
+              </div>
+              <p className="text-gray-400 mt-4">
+                {settingsLoaded
+                  ? `${validityDays} days of unlimited premium access`
+                  : 'Loading pricing…'}
+              </p>
+            </div>
+
+            {/* Features Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+              {[
+                { icon: BookOpen, text: 'All Premium Exams', color: 'text-blue-400', bg: 'bg-blue-600/20' },
+                { icon: Zap, text: 'Unlimited Tests', color: 'text-yellow-400', bg: 'bg-yellow-600/20' },
+                { icon: Trophy, text: 'Performance Analytics', color: 'text-green-400', bg: 'bg-green-600/20' },
+                { icon: BarChart3, text: 'Detailed Solutions', color: 'text-purple-400', bg: 'bg-purple-600/20' },
+              ].map((feature, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-700/30 border border-gray-600/30">
+                  <div className={`w-10 h-10 rounded-lg ${feature.bg} flex items-center justify-center shrink-0`}>
+                    <feature.icon className={`w-5 h-5 ${feature.color}`} />
+                  </div>
+                  <span className="text-gray-200 font-medium">{feature.text}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Additional Features */}
+            <div className="space-y-3 mb-8">
+              {[
+                'Priority support access',
+                'Ad-free experience',
+                'Access on all devices',
+              ].map((feature, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-green-600/20 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 text-green-400" />
+                  </div>
+                  <span className="text-gray-400">{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            {error && (
+              <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-4 mb-6 flex items-center gap-3">
+                <X className="w-5 h-5 text-red-400 shrink-0" />
+                <span className="text-red-200 text-sm">{error}</span>
+              </div>
+            )}
+
+            <button
+              onClick={handleUpgrade}
+              disabled={loading || !settingsLoaded}
+              className="w-full bg-gradient-to-r from-yellow-600 via-yellow-500 to-yellow-600 hover:from-yellow-500 hover:via-yellow-400 hover:to-yellow-500 text-white font-bold py-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50 active:scale-[0.98] animate-pulse-slow"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Processing…
+                </span>
+              ) : (
+                `Upgrade Now — ₹${displayRupees}`
+              )}
+            </button>
+
+            <p className="text-center text-gray-500 text-sm mt-4 flex items-center justify-center gap-2">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+              Secure payment powered by Razorpay
+            </p>
+          </div>
+        </div>
+
+        {/* Money Back Guarantee */}
+        <div className="text-center">
+          <div className="inline-flex items-center gap-2 bg-gray-800/50 rounded-full px-4 py-2 border border-gray-700">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-gray-400 text-sm">30-day money-back guarantee</span>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

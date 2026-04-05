@@ -55,13 +55,14 @@ export function ExamSelection() {
       <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between">
           {/* Left: Logo and Company Name */}
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <BrandLogo variant="nav" className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
-            <span className="font-bold text-xs sm:text-lg tracking-tight truncate text-white">Railway Study Point</span>
+            <span className="font-bold text-xs sm:text-base tracking-tight truncate text-white hidden md:block">Railway Study Point</span>
+            <span className="font-bold text-xs tracking-tight truncate text-white md:hidden">RSP</span>
           </div>
 
           {/* Right: Premium, Settings */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
             {/* Premium Button / Badge */}
             {isPremium ? (
               <div className="bg-yellow-600/20 text-yellow-500 border border-yellow-500/30 px-2 sm:px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
