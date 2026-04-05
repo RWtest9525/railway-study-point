@@ -16,10 +16,37 @@ import { ContactSupport } from './pages/ContactSupport';
 import { AdminPortal } from './pages/admin/AdminPortal';
 
 function AppContent() {
-  const { currentPath } = useRouter();
-  const { user, loading, effectiveRole } = useAuth();
+  const { currentPath, navigate } = useRouter();
+  const { user, loading, effectiveRole, isBanned, signOut } = useAuth();
 
-  // HIGH PRIORITY: If we are logged in as an admin, show the Admin Portal regardless of the path (unless it's a specific action)
+  // 1. BANNED CHECK: Highest Priority
+  if (isBanned) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
+        <div className="bg-gray-800 border border-red-500/30 rounded-2xl p-8 max-w-md text-center shadow-2xl">
+          <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl text-red-500">🚫</span>
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">Account Banned</h1>
+          <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+            Your access to Railway Study Point has been suspended by an administrator. 
+            Please contact support if you believe this is an error.
+          </p>
+          <button
+            onClick={() => {
+              signOut();
+              navigate('/login');
+            }}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-red-900/20"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. ADMIN OVERRIDE
   const isAdmin = effectiveRole === 'admin';
 
   if (loading) {

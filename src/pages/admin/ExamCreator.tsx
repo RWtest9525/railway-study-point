@@ -13,6 +13,9 @@ export function ExamCreator() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const [formData, setFormData] = useState({
     title: '',
@@ -33,6 +36,7 @@ export function ExamCreator() {
   }, [showForm, formData.category]);
 
   const loadExams = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('exams')
@@ -43,6 +47,7 @@ export function ExamCreator() {
       setExams(data || []);
     } catch (error) {
       console.error('Error loading exams:', error);
+      setError('Failed to load exams.');
     } finally {
       setLoading(false);
     }
@@ -65,29 +70,59 @@ export function ExamCreator() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
 
     if (formData.selected_questions.length === 0) {
-      alert('Please select at least one question');
+      setError('Please select at least one question.');
       return;
     }
 
+    const examData = {
+      title: formData.title.trim(),
+      category: formData.category,
+      duration_minutes: formData.duration_minutes,
+      is_premium: formData.is_premium,
+      question_ids: formData.selected_questions,
+      created_by: profile!.id,
+    };
+
     try {
-      const { error } = await supabase.from('exams').insert({
-        title: formData.title,
-        category: formData.category,
-        duration_minutes: formData.duration_minutes,
-        is_premium: formData.is_premium,
-        question_ids: formData.selected_questions,
-        created_by: profile!.id,
-      });
+      if (editingId) {
+        const { error } = await supabase
+          .from('exams')
+          .update(examData)
+          .eq('id', editingId);
 
-      if (error) throw error;
+        if (error) throw error;
+        setSuccess('Exam updated successfully!');
+      } else {
+        const { error } = await supabase.from('exams').insert(examData);
 
-      resetForm();
-      loadExams();
-    } catch (error) {
-      console.error('Error creating exam:', error);
+        if (error) throw error;
+        setSuccess('Exam created successfully!');
+      }
+
+      setTimeout(() => {
+        resetForm();
+        loadExams();
+      }, 1000);
+    } catch (error: any) {
+      console.error('Error saving exam:', error);
+      setError(error.message || 'Error saving exam.');
     }
+  };
+
+  const handleEdit = (exam: Exam) => {
+    setFormData({
+      title: exam.title,
+      category: exam.category,
+      duration_minutes: exam.duration_minutes,
+      is_premium: exam.is_premium,
+      selected_questions: exam.question_ids as string[],
+    });
+    setEditingId(exam.id);
+    setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -120,6 +155,9 @@ export function ExamCreator() {
       is_premium: false,
       selected_questions: [],
     });
+    setEditingId(null);
+    setError('');
+    setSuccess('');
     setShowForm(false);
   };
 
@@ -142,7 +180,20 @@ export function ExamCreator() {
       {showForm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-8 border border-gray-700 my-8">
-            <h2 className="text-2xl font-bold text-white mb-6">Create New Exam</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">
+              {editingId ? 'Edit Exam' : 'Create New Exam'}
+            </h2>
+
+            {error && (
+              <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-2 rounded-lg mb-4 text-sm">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-2 rounded-lg mb-4 text-sm">
+                {success}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
@@ -313,12 +364,20 @@ export function ExamCreator() {
             >
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-lg font-bold text-white">{exam.title}</h3>
-                <button
-                  onClick={() => handleDelete(exam.id)}
-                  className="text-red-400 hover:text-red-300 p-1"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEdit(exam)}
+                    className="text-blue-400 hover:text-blue-300 p-1"
+                  >
+                    <FileText className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(exam.id)}
+                    className="text-red-400 hover:text-red-300 p-1"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2 mb-4">

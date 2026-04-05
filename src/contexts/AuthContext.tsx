@@ -14,8 +14,9 @@ type Profile = Database['public']['Tables']['profiles']['Row'];
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
-  effectiveRole: 'admin' | 'student';
+  effectiveRole: 'admin' | 'student' | 'banned';
   isPremium: boolean;
+  isBanned: boolean;
   canAccessTests: boolean;
   trialExpiredNeedsPremium: boolean;
   loading: boolean;
@@ -134,11 +135,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile, user?.email]);
 
   const isPremium = useMemo(() => hasActivePremium(profile), [profile]);
+  const isBanned = useMemo(() => effectiveRole === 'banned', [effectiveRole]);
 
   const canAccessTests = useMemo(() => {
-    if (loading) return true;
-    return canAccessTestsFn(profile, effectiveRole);
-  }, [profile, effectiveRole, loading]);
+    if (loading || isBanned) return false;
+    return canAccessTestsFn(profile, effectiveRole as 'admin' | 'student');
+  }, [profile, effectiveRole, loading, isBanned]);
 
   const trialExpiredNeedsPremiumFlag = useMemo(() => {
     if (loading || !user) return false;
@@ -202,6 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     effectiveRole,
     isPremium,
+    isBanned,
     canAccessTests,
     trialExpiredNeedsPremium: trialExpiredNeedsPremiumFlag,
     loading,

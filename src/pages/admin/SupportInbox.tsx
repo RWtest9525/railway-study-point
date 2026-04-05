@@ -24,13 +24,21 @@ export function SupportInbox() {
       return;
     }
     setRows(data ?? []);
-    const ids = [...new Set((data ?? []).map((r) => r.user_id))];
-    const map: Record<string, string> = {};
-    for (const uid of ids) {
-      const { data: p } = await supabase.from('profiles').select('email, full_name').eq('id', uid).maybeSingle();
-      if (p) map[uid] = `${p.full_name || 'User'} <${p.email}>`;
+    
+    // Fetch all profiles for these users in one go instead of a loop
+    const userIds = [...new Set((data ?? []).map((r) => r.user_id))];
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', userIds);
+      
+      const map: Record<string, string> = {};
+      profiles?.forEach(p => {
+        map[p.id] = `${p.full_name || 'User'} <${p.email}>`;
+      });
+      setEmails(map);
     }
-    setEmails(map);
     setLoading(false);
   };
 

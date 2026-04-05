@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { supabase } from '../lib/supabase';
-import { loadRazorpayScript } from '../lib/razorpayLoader';
 import { Check } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 
@@ -56,9 +55,20 @@ export function Upgrade() {
   const handleUpgrade = async () => {
     if (!profile) return;
 
+    // 1. Explicit Key Loading and Verification
     const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
+    console.log('Razorpay Key Verification:', key ? `${key.substring(0, 8)}...` : 'MISSING');
+
     if (!key || String(key).trim() === '') {
       setError('Razorpay is not configured. Add VITE_RAZORPAY_KEY_ID in your environment.');
+      return;
+    }
+
+    // 2. Script Verification
+    const RazorpayConstructor = (window as any).Razorpay;
+    if (!RazorpayConstructor) {
+      alert('Razorpay SDK not loaded. Please check your internet connection and reload the page.');
+      setError('Razorpay SDK is not loaded. Please refresh the page.');
       return;
     }
 
@@ -66,11 +76,17 @@ export function Upgrade() {
     setError('');
 
     try {
+      // 3. Amount Formatting: Ensuring it is in paise (Price * 100 if stored in rupees)
+      // Since pricePaise is stored in paise (e.g., 3900 for ₹39), we use it directly.
+      // We will log it to confirm the amount being sent.
+      const finalAmount = pricePaise; 
+      console.log('Processing payment for amount (paise):', finalAmount);
+
       const { data: transactionData, error: transactionError } = await supabase
         .from('transactions')
         .insert({
           user_id: profile.id,
-          amount: pricePaise,
+          amount: finalAmount,
           status: 'pending',
         })
         .select()
@@ -78,20 +94,16 @@ export function Upgrade() {
 
       if (transactionError) throw transactionError;
 
-      await loadRazorpayScript();
-
-      const RazorpayConstructor = (window as any).Razorpay;
-      if (!RazorpayConstructor) {
-        throw new Error('Razorpay failed to initialize');
-      }
-
-      const options: Record<string, unknown> = {
-        key,
-        amount: pricePaise,
+      // 4. Reconstruct Options Object
+      const options = {
+        key: key,
+        amount: finalAmount,
         currency: 'INR',
         name: 'Railway Study Point',
-        description: `Premium — ${validityDays} day${validityDays === 1 ? '' : 's'}`,
-        handler: async (response: { razorpay_payment_id?: string }) => {
+        description: `Premium Access — ${validityDays} Days`,
+        image: '/railway-study-point-logo.png',
+        handler: async (response: any) => {
+          console.log('Payment successful! Response:', response);
           try {
             const paymentId = response.razorpay_payment_id;
             const { error: updateError } = await supabase
@@ -105,14 +117,9 @@ export function Upgrade() {
             if (updateError) throw updateError;
 
             const newUntil = computePremiumUntil(profile.premium_until, validityDays);
-
-            const wasActive =
-              profile.premium_until && new Date(profile.premium_until) > new Date();
-            const premiumPatch: {
-              is_premium: boolean;
-              premium_until: string;
-              premium_started_at?: string;
-            } = {
+            const wasActive = profile.premium_until && new Date(profile.premium_until) > new Date();
+            
+            const premiumPatch: any = {
               is_premium: true,
               premium_until: newUntil,
             };
@@ -130,7 +137,7 @@ export function Upgrade() {
             await refreshProfile();
             navigate('/dashboard');
           } catch (err) {
-            console.error(err);
+            console.error('Error updating profile after payment:', err);
             setError('Payment recorded but updating your account failed. Contact support with your payment ID.');
           } finally {
             setLoading(false);
@@ -144,18 +151,22 @@ export function Upgrade() {
           color: '#2563eb',
         },
         modal: {
-          ondismiss: () => setLoading(false),
+          ondismiss: () => {
+            console.log('Razorpay modal closed by user');
+            setLoading(false);
+          },
         },
       };
 
-      const razorpay = new RazorpayConstructor(options);
-      razorpay.on('payment.failed', () => {
-        setError('Payment failed or was cancelled. You can try again.');
+      const rzp = new RazorpayConstructor(options);
+      rzp.on('payment.failed', (response: any) => {
+        console.error('Payment failed:', response.error);
+        setError(`Payment failed: ${response.error.description}`);
         setLoading(false);
       });
-      razorpay.open();
+      rzp.open();
     } catch (err) {
-      console.error(err);
+      console.error('Razorpay initialization error:', err);
       setError('Could not start payment. Check your connection and Razorpay key.');
       setLoading(false);
     }

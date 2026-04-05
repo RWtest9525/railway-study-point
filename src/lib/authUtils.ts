@@ -21,14 +21,21 @@ export function isSuperAdminEmail(email: string | undefined | null): boolean {
 export function getEffectiveRole(
   profile: Profile | null,
   authEmail: string | undefined | null
-): 'admin' | 'student' {
+): 'admin' | 'student' | 'banned' {
   const normAuthEmail = normalizeEmail(authEmail);
   const normProfileEmail = normalizeEmail(profile?.email);
   
+  // 1. Check for Banned Status first (highest priority)
+  if (profile?.role === 'banned') {
+    return 'banned';
+  }
+
+  // 2. Check for Super Admin
   if (isSuperAdminEmail(normAuthEmail) || isSuperAdminEmail(normProfileEmail)) {
     return 'admin';
   }
   
+  // 3. Check for Database Admin
   if (profile?.role === 'admin') return 'admin';
   
   return 'student';
@@ -46,7 +53,8 @@ export function hasActivePremium(profile: Profile | null): boolean {
 
 /** First 7 days after signup: full access without premium. */
 export function isWithinFreeTrial(profile: Profile | null): boolean {
-  if (!profile?.created_at) return false;
+  if (!profile) return true; // If loading or newly created, assume in trial
+  if (!profile.created_at) return true; // Default to trial for new users
   const start = new Date(profile.created_at);
   const end = new Date(start);
   end.setDate(end.getDate() + FREE_TRIAL_DAYS);

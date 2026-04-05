@@ -13,6 +13,8 @@ export function QuestionBank() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const [formData, setFormData] = useState({
     category: selectedCategory,
@@ -30,6 +32,7 @@ export function QuestionBank() {
   }, [selectedCategory]);
 
   const loadQuestions = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('questions')
@@ -41,6 +44,7 @@ export function QuestionBank() {
       setQuestions(data || []);
     } catch (error) {
       console.error('Error loading questions:', error);
+      setError('Failed to load questions.');
     } finally {
       setLoading(false);
     }
@@ -48,13 +52,15 @@ export function QuestionBank() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
 
     const questionData = {
       category: formData.category,
-      question_text: formData.question_text,
-      options: [formData.option1, formData.option2, formData.option3, formData.option4],
+      question_text: formData.question_text.trim(),
+      options: [formData.option1.trim(), formData.option2.trim(), formData.option3.trim(), formData.option4.trim()],
       correct_answer: formData.correct_answer,
-      explanation: formData.explanation,
+      explanation: formData.explanation.trim(),
       created_by: profile!.id,
     };
 
@@ -66,16 +72,21 @@ export function QuestionBank() {
           .eq('id', editingId);
 
         if (error) throw error;
+        setSuccess('Question updated successfully!');
       } else {
         const { error } = await supabase.from('questions').insert(questionData);
 
         if (error) throw error;
+        setSuccess('Question added successfully!');
       }
 
-      resetForm();
-      loadQuestions();
-    } catch (error) {
+      setTimeout(() => {
+        resetForm();
+        loadQuestions();
+      }, 1000);
+    } catch (error: any) {
       console.error('Error saving question:', error);
+      setError(error.message || 'Error saving question.');
     }
   };
 
@@ -161,6 +172,16 @@ export function QuestionBank() {
             <h2 className="text-2xl font-bold text-white mb-6">
               {editingId ? 'Edit Question' : 'Add New Question'}
             </h2>
+            {error && (
+              <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-2 rounded-lg mb-4 text-sm">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-2 rounded-lg mb-4 text-sm">
+                {success}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
