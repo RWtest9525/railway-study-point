@@ -41,17 +41,6 @@ export function BottomNav({ onNotificationClick }: BottomNavProps) {
               <span className="text-[10px] font-medium">Leaderboard</span>
             </button>
 
-            {/* Home */}
-            <button
-              onClick={() => navigate('/dashboard')}
-              className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${
-                isActive('/dashboard') ? 'text-blue-400' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <Home className="w-5 h-5 mb-1" />
-              <span className="text-[10px] font-medium">Home</span>
-            </button>
-
             {/* Help */}
             <button
               onClick={() => navigate('/support')}
@@ -61,6 +50,17 @@ export function BottomNav({ onNotificationClick }: BottomNavProps) {
             >
               <HelpCircle className="w-5 h-5 mb-1" />
               <span className="text-[10px] font-medium">Help</span>
+            </button>
+
+            {/* Home */}
+            <button
+              onClick={() => navigate('/dashboard')}
+              className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${
+                isActive('/dashboard') ? 'text-blue-400' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              <Home className="w-5 h-5 mb-1" />
+              <span className="text-[10px] font-medium">Home</span>
             </button>
 
             {/* Premium */}
@@ -81,9 +81,9 @@ export function BottomNav({ onNotificationClick }: BottomNavProps) {
 
             {/* Settings */}
             <button
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate('/settings')}
               className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${
-                isActive('/profile') || isActive('/membership') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300'
+                isActive('/settings') || isActive('/profile') || isActive('/membership') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300'
               }`}
             >
               <Settings className="w-5 h-5 mb-1" />

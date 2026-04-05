@@ -16,6 +16,10 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Membership } from './pages/Membership';
 import { ContactSupport } from './pages/ContactSupport';
 import { Notifications } from './pages/Notifications';
+import Settings from './pages/Settings';
+import MockTests from './pages/MockTests';
+import SubjectQuizzes from './pages/SubjectQuizzes';
+import PreviousYearPapers from './pages/PreviousYearPapers';
 import { AdminPortal } from './pages/admin/AdminPortal';
 import { StudentDashboard } from './pages/StudentDashboard';
 
@@ -165,6 +169,38 @@ function AppContent() {
     return (
       <ProtectedRoute>
         <Notifications />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/settings') {
+    return (
+      <ProtectedRoute>
+        <Settings />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath.startsWith('/mock-tests/')) {
+    return (
+      <ProtectedRoute>
+        <MockTests />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath.startsWith('/subject-quizzes/')) {
+    return (
+      <ProtectedRoute>
+        <SubjectQuizzes />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath.startsWith('/previous-year-papers/')) {
+    return (
+      <ProtectedRoute>
+        <PreviousYearPapers />
       </ProtectedRoute>
     );
   }
