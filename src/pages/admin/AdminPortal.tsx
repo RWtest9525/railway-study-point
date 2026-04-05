@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Menu,
   X,
-  CreditCard
+  CreditCard,
+  Folder
 } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionBank } from './QuestionBank';
@@ -23,12 +24,13 @@ import { PremiumSettings } from './PremiumSettings';
 import { UserManagement } from './UserManagement';
 import { SupportInbox } from './SupportInbox';
 import { SubscriptionManagement } from './SubscriptionManagement';
+import { CategoryManagement } from './CategoryManagement';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
   const { navigate } = useRouter();
   const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription'
+    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'categories'
   >('users');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -48,6 +50,7 @@ export function AdminPortal() {
     { id: 'users' as const, name: 'Users', icon: Users, desc: 'Manage All Students' },
     { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
     { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
+    { id: 'categories' as const, name: 'Categories', icon: Folder, desc: 'Exam Categories' },
   ];
 
   const handleTabClick = (tabId: typeof activeTab) => {
@@ -175,6 +178,7 @@ export function AdminPortal() {
             {activeTab === 'users' && <UserManagement />}
             {activeTab === 'support' && <SupportInbox />}
             {activeTab === 'subscription' && <SubscriptionManagement />}
+            {activeTab === 'categories' && <CategoryManagement />}
           </div>
         </div>
       </main>

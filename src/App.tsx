@@ -5,6 +5,7 @@ import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { ExamSelection } from './pages/ExamSelection';
 import { SubjectSelection } from './pages/SubjectSelection';
+import { ExamDetailSelection } from './pages/ExamDetailSelection';
 import { ExamInterface } from './pages/ExamInterface';
 import { Results } from './pages/Results';
 import { Upgrade } from './pages/Upgrade';
@@ -15,6 +16,7 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Membership } from './pages/Membership';
 import { ContactSupport } from './pages/ContactSupport';
 import { AdminPortal } from './pages/admin/AdminPortal';
+import { StudentDashboard } from './pages/StudentDashboard';
 
 function AppContent() {
   const { currentPath, navigate } = useRouter();
@@ -95,7 +97,7 @@ function AppContent() {
     const categoryId = currentPath.replace('/exams/', '');
     return (
       <ProtectedRoute>
-        <SubjectSelection categoryId={categoryId} />
+        <ExamDetailSelection categoryId={categoryId} />
       </ProtectedRoute>
     );
   }

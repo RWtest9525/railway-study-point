@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
-import { Plus, Trash2, Clock, FileText, Tag, BookOpen } from 'lucide-react';
+import { Plus, Trash2, Clock, FileText, Upload, BookOpen } from 'lucide-react';
+import { PDFUploader } from '../../components/PDFUploader';
 
 type Exam = Database['public']['Tables']['exams']['Row'];
 type Question = Database['public']['Tables']['questions']['Row'];
@@ -30,6 +31,9 @@ export function ExamCreator() {
   });
 
   const [newTopic, setNewTopic] = useState('');
+  const [showPDFUpload, setShowPDFUpload] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [extractedText, setExtractedText] = useState('');
 
   useEffect(() => {
     loadExams();
@@ -90,6 +94,114 @@ export function ExamCreator() {
       ...formData,
       topics: formData.topics.filter(topic => topic !== topicToRemove)
     });
+  };
+
+  const handlePDFSelect = (file: File) => {
+    setPdfFile(file);
+  };
+
+  const handleTextExtraction = (text: string) => {
+    setExtractedText(text);
+    // Parse the extracted text to create questions
+    parseQuestionsFromText(text);
+  };
+
+  const parseQuestionsFromText = (text: string) => {
+    // Simple parsing logic - this would need to be more sophisticated for real use
+    const lines = text.split('\n');
+    const questions = [];
+    let currentQuestion: any = null;
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Match question pattern (e.g., "1. Question text")
+      const questionMatch = trimmedLine.match(/^\d+\.\s+(.+)$/);
+      if (questionMatch && !currentQuestion) {
+        currentQuestion = {
+          question_text: questionMatch[1],
+          options: [],
+          correct_answer: 0,
+          explanation: '',
+          category: formData.category,
+          subject: formData.subject
+        };
+        continue;
+      }
+      
+      // Match options pattern (e.g., "A) Option text")
+      const optionMatch = trimmedLine.match(/^[A-D]\)\s+(.+)$/);
+      if (optionMatch && currentQuestion) {
+        currentQuestion.options.push(optionMatch[1]);
+        continue;
+      }
+      
+      // Match correct answer pattern
+      const answerMatch = trimmedLine.match(/Correct Answer:\s*([A-D])/i);
+      if (answerMatch && currentQuestion) {
+        const answerIndex = answerMatch[1].charCodeAt(0) - 65; // Convert A-D to 0-3
+        currentQuestion.correct_answer = answerIndex;
+        continue;
+      }
+      
+      // If we have a complete question and encounter a new question or end
+      if (currentQuestion && (questionMatch || trimmedLine === '')) {
+        if (currentQuestion.options.length === 4) {
+          questions.push(currentQuestion);
+        }
+        currentQuestion = questionMatch ? {
+          question_text: questionMatch[1],
+          options: [],
+          correct_answer: 0,
+          explanation: '',
+          category: formData.category,
+          subject: formData.subject
+        } : null;
+      }
+    }
+    
+    // Add the last question if it exists
+    if (currentQuestion && currentQuestion.options.length === 4) {
+      questions.push(currentQuestion);
+    }
+    
+    // Create questions in database
+    if (questions.length > 0) {
+      createQuestionsFromPDF(questions);
+    }
+  };
+
+  const createQuestionsFromPDF = async (questions: any[]) => {
+    try {
+      const questionsWithCreator = questions.map(q => ({
+        ...q,
+        created_by: profile!.id,
+      }));
+
+      const { data: createdQuestions, error } = await supabase
+        .from('questions')
+        .insert(questionsWithCreator)
+        .select();
+
+      if (error) throw error;
+      
+      if (createdQuestions) {
+        // Add new questions to selected questions
+        const newQuestionIds = createdQuestions.map(q => q.id);
+        setFormData(prev => ({
+          ...prev,
+          selected_questions: [...prev.selected_questions, ...newQuestionIds]
+        }));
+        
+        // Reload questions to show the new ones
+        loadQuestions(formData.category, formData.subject);
+        
+        setSuccess(`Successfully created ${createdQuestions.length} questions from PDF`);
+      }
+    } catch (error) {
+      console.error('Error creating questions from PDF:', error);
+      setError('Failed to create questions from PDF');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -188,6 +300,9 @@ export function ExamCreator() {
     setError('');
     setSuccess('');
     setShowForm(false);
+    setPdfFile(null);
+    setExtractedText('');
+    setShowPDFUpload(false);
   };
 
   return (
@@ -209,9 +324,20 @@ export function ExamCreator() {
       {showForm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-8 border border-gray-700 my-8">
-            <h2 className="text-2xl font-bold text-white mb-6">
-              {editingId ? 'Edit Exam' : 'Create New Exam'}
-            </h2>
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-white">
+                  {editingId ? 'Edit Exam' : 'Create New Exam'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowPDFUpload(!showPDFUpload)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload PDF
+                </button>
+              </div>
 
             {error && (
               <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-2 rounded-lg mb-4 text-sm">
@@ -221,6 +347,25 @@ export function ExamCreator() {
             {success && (
               <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-2 rounded-lg mb-4 text-sm">
                 {success}
+              </div>
+            )}
+
+            {/* PDF Upload Section */}
+            {showPDFUpload && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white">Upload Questions from PDF</h3>
+                <PDFUploader
+                  onFileSelect={handlePDFSelect}
+                  onExtractedText={handleTextExtraction}
+                />
+                {extractedText && (
+                  <div className="bg-gray-700/50 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-gray-300 mb-2">Extracted Text Preview:</h4>
+                    <pre className="text-xs text-gray-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                      {extractedText.substring(0, 500)}...
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
 
@@ -436,6 +581,7 @@ export function ExamCreator() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

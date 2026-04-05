@@ -23,13 +23,40 @@ export function PremiumSettings() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
-      if (data) {
-        setPriceRupees(String(data.premium_price_paise / 100));
-        setValidityDays(data.premium_validity_days);
-        if (typeof data.trial_nudge_interval_seconds === 'number') {
-          setNudgeIntervalSec(data.trial_nudge_interval_seconds);
+      try {
+        const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+        
+        if (error) {
+          // Table might not exist, try to create it
+          console.error('Site settings error:', error);
+          setError('Database schema not updated. Please run migrations first.');
+          setLoading(false);
+          return;
         }
+        
+        if (data) {
+          setPriceRupees(String(data.premium_price_paise / 100));
+          setValidityDays(data.premium_validity_days);
+          if (typeof data.trial_nudge_interval_seconds === 'number') {
+            setNudgeIntervalSec(data.trial_nudge_interval_seconds);
+          }
+        } else {
+          // Insert default settings
+          const { error: insertError } = await supabase.from('site_settings').insert({
+            id: 1,
+            premium_price_paise: 3900,
+            premium_validity_days: 365,
+            trial_nudge_interval_seconds: 10
+          });
+          
+          if (insertError) {
+            console.error('Failed to create default settings:', insertError);
+            setError('Failed to initialize settings. Please check database permissions.');
+          }
+        }
+      } catch (err) {
+        console.error('Settings load error:', err);
+        setError('Failed to load settings. Database connection issue.');
       }
       setLoading(false);
     })();
@@ -62,22 +89,49 @@ export function PremiumSettings() {
       return;
     }
     try {
-      const { error: uErr } = await supabase
+      const { data: existingData, error: checkError } = await supabase
         .from('site_settings')
-        .update({
-          premium_price_paise: paise,
-          premium_validity_days: days,
-          trial_nudge_interval_seconds: nudgeSec,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', 1);
-      if (uErr) throw uErr;
+        .select('id')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (checkError) {
+        throw new Error('Database access error: ' + checkError.message);
+      }
+
+      const updateData = {
+        premium_price_paise: paise,
+        premium_validity_days: days,
+        trial_nudge_interval_seconds: nudgeSec,
+        updated_at: new Date().toISOString(),
+      };
+
+      let result;
+      if (existingData) {
+        result = await supabase
+          .from('site_settings')
+          .update(updateData)
+          .eq('id', 1);
+      } else {
+        result = await supabase
+          .from('site_settings')
+          .insert({ ...updateData, id: 1 });
+      }
+
+      if (result.error) throw result.error;
+      
       setValidityDays(days);
       setCustomDays('');
-      setMessage('Premium pricing saved.');
-    } catch (e) {
+      setMessage('Premium pricing saved successfully.');
+    } catch (e: any) {
       console.error(e);
-      setError('Save failed. Ensure the site_settings migration ran and you are admin.');
+      if (e.message?.includes('relation "site_settings" does not exist')) {
+        setError('Database schema not updated. Please run the migration files first.');
+      } else if (e.message?.includes('permission denied')) {
+        setError('Permission denied. Ensure you are logged in as an admin.');
+      } else {
+        setError('Save failed: ' + (e.message || 'Unknown error'));
+      }
     } finally {
       setSaving(false);
     }
