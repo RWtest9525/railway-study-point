@@ -53,11 +53,17 @@ export function ExamCreator() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setExams(data || []);
+      if (error) {
+        console.error('Error loading exams:', error);
+        setError('Failed to load exams.');
+        setExams([]); // Set empty array instead of failing
+      } else {
+        setExams(data || []);
+      }
     } catch (error) {
       console.error('Error loading exams:', error);
       setError('Failed to load exams.');
+      setExams([]); // Set empty array instead of failing
     } finally {
       setLoading(false);
     }
@@ -209,8 +215,9 @@ export function ExamCreator() {
     setError('');
     setSuccess('');
 
-    if (formData.selected_questions.length === 0) {
-      setError('Please select at least one question.');
+    // Remove requirement for selected questions - PDF will handle this
+    if (formData.selected_questions.length === 0 && !pdfFile) {
+      setError('Please upload a PDF file with questions or select questions manually.');
       return;
     }
 
@@ -329,15 +336,27 @@ export function ExamCreator() {
                 <h2 className="text-2xl font-bold text-white">
                   {editingId ? 'Edit Exam' : 'Create New Exam'}
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => setShowPDFUpload(!showPDFUpload)}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition"
-                >
-                  <Upload className="w-4 h-4" />
-                  Upload PDF
-                </button>
               </div>
+
+            {/* PDF Upload Section - Always Visible */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Upload className="w-5 h-5 text-green-500" />
+                Upload Questions from PDF (Required)
+              </h3>
+              <PDFUploader
+                onFileSelect={handlePDFSelect}
+                onExtractedText={handleTextExtraction}
+              />
+              {extractedText && (
+                <div className="bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-300 mb-2">Extracted Text Preview:</h4>
+                  <pre className="text-xs text-gray-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                    {extractedText.substring(0, 500)}...
+                  </pre>
+                </div>
+              )}
+            </div>
 
             {error && (
               <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-2 rounded-lg mb-4 text-sm">
@@ -347,25 +366,6 @@ export function ExamCreator() {
             {success && (
               <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-2 rounded-lg mb-4 text-sm">
                 {success}
-              </div>
-            )}
-
-            {/* PDF Upload Section */}
-            {showPDFUpload && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white">Upload Questions from PDF</h3>
-                <PDFUploader
-                  onFileSelect={handlePDFSelect}
-                  onExtractedText={handleTextExtraction}
-                />
-                {extractedText && (
-                  <div className="bg-gray-700/50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-300 mb-2">Extracted Text Preview:</h4>
-                    <pre className="text-xs text-gray-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                      {extractedText.substring(0, 500)}...
-                    </pre>
-                  </div>
-                )}
               </div>
             )}
 
@@ -564,10 +564,10 @@ export function ExamCreator() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex gap-4 mt-8">
                 <button
                   type="submit"
-                  disabled={formData.selected_questions.length === 0}
+                  disabled={!pdfFile}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create Exam

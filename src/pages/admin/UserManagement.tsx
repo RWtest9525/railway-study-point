@@ -51,10 +51,17 @@ export function UserManagement() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (qErr) throw qErr;
-      setUsers(data || []);
+      if (qErr) {
+        console.error('Error loading users:', qErr);
+        setError('Failed to load users.');
+        setUsers([]); // Set empty array instead of failing
+      } else {
+        setUsers(data || []);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error loading users:', err);
+      setError('Failed to load users.');
+      setUsers([]); // Set empty array instead of failing
     } finally {
       setListLoading(false);
     }
