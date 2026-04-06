@@ -61,14 +61,14 @@ export function AdminPortal() {
 
   const handleTabClick = (tabId: typeof activeTab) => {
     setActiveTab(tabId);
-    setIsMenuOpen(false); // Close menu on mobile after selection
+    setIsMenuOpen(false);
   };
 
   return (
     <div className={`min-h-screen flex flex-col md:flex-row relative ${
       theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'
     }`}>
-      {/* Mobile Header with Hamburger */}
+      {/* Mobile Header */}
       <div className={`md:hidden ${
         theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
       } border-b p-4 flex items-center justify-between sticky top-0 z-[150]`}>
@@ -78,20 +78,12 @@ export function AdminPortal() {
             Railway Admin
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className={`p-2 ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition md:hidden`}
-          >
-            {isSidebarCollapsed ? <Menu className="w-6 h-6" /> : <X className="w-6 h-6" />}
-          </button>
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className={`p-2 ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition`}
-          >
-            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </div>
+        <button 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className={`p-2 ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition`}
+        >
+          {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
       </div>
 
       {/* Overlay for mobile menu */}
@@ -104,7 +96,7 @@ export function AdminPortal() {
 
       {/* Sidebar Navigation */}
       <aside className={`
-        fixed inset-y-0 left-0 ${isSidebarCollapsed ? 'w-0 md:w-20' : 'w-64'} 
+        fixed inset-y-0 left-0 ${isSidebarCollapsed && !isMenuOpen ? 'md:w-20' : 'w-64'} 
         ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} 
         border-r flex flex-col shrink-0 z-[150] transition-all duration-300 transform
         ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -128,11 +120,7 @@ export function AdminPortal() {
         {/* Collapse Toggle Button (Desktop Only) */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`hidden md:flex items-center justify-center p-2 mx-2 my-2 rounded-lg transition ${
-            theme === 'dark' 
-              ? 'hover:bg-gray-700 text-gray-400 hover:text-white' 
-              : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-          }`}
+          className="hidden md:flex items-center justify-center p-2 mx-2 my-2 rounded-lg transition hover:bg-gray-700/50 text-gray-400 hover:text-white"
         >
           {isSidebarCollapsed ? (
             <ChevronRight className="w-5 h-5" />
@@ -256,7 +244,6 @@ export function AdminPortal() {
       {/* Main Content Area */}
       <main className={`flex-1 overflow-y-auto ${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-100'}`}>
         <div className="max-w-6xl mx-auto p-4 sm:p-8 lg:p-12">
-          {/* Active Tab Component */}
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             {activeTab === 'questions' && <QuestionBank />}
             {activeTab === 'exams' && <ExamCreator />}

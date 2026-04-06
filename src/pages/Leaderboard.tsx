@@ -93,7 +93,7 @@ export function Leaderboard() {
       <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-4">
           <button 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => window.history.back()}
             className="p-2 hover:bg-gray-800 rounded-full transition"
           >
             <ArrowLeft className="w-5 h-5 text-gray-300" />
