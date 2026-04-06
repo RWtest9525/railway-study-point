@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { Check, Crown, Zap, BookOpen, Trophy, BarChart3, X, ArrowLeft } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
@@ -20,6 +21,8 @@ function computePremiumUntil(
 export function Upgrade() {
   const { profile, refreshProfile, loading: authLoading } = useAuth();
   const { navigate } = useRouter();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pricePaise, setPricePaise] = useState(3900);
@@ -79,7 +82,7 @@ export function Upgrade() {
 
   if (authLoading || !settingsLoaded) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center`}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -206,7 +209,7 @@ export function Upgrade() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 overflow-hidden pb-24">
+    <div className={`min-h-screen overflow-hidden pb-24 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-yellow-600/10 rounded-full blur-3xl animate-pulse" />
@@ -215,15 +218,15 @@ export function Upgrade() {
       </div>
 
       {/* Header */}
-      <header className="relative bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+      <header className={`relative ${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-4">
           <button 
             onClick={() => window.history.back()}
-            className="p-2 hover:bg-gray-800 rounded-full transition"
+            className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
           >
-            <ArrowLeft className="w-5 h-5 text-gray-300" />
+            <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
           </button>
-          <h1 className="font-bold text-lg text-white">Go Premium</h1>
+          <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Go Premium</h1>
         </div>
       </header>
 
@@ -233,28 +236,28 @@ export function Upgrade() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-700 mb-4 shadow-lg shadow-yellow-500/30">
             <Crown className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
             Unlock <span className="text-yellow-400">Premium</span>
           </h1>
-          <p className="text-gray-400 text-sm">Get unlimited access to all features</p>
+          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>Get unlimited access to all features</p>
         </div>
 
         {/* Pricing Card */}
-        <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 border border-yellow-500/30 shadow-xl shadow-yellow-500/10">
+        <div className={`relative rounded-2xl p-6 border shadow-xl ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-yellow-500/30 shadow-yellow-500/10' : 'bg-white border-yellow-300 shadow-yellow-100'}`}>
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent rounded-2xl pointer-events-none" />
           
           <div className="relative">
             {/* Price */}
             <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-yellow-600/20 border border-yellow-500/30 rounded-full px-3 py-1 mb-4">
-                <Zap className="w-3 h-3 text-yellow-400" />
-                <span className="text-yellow-400 text-xs font-bold uppercase tracking-wider">Limited Offer</span>
+              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 border ${isDark ? 'bg-yellow-600/20 border-yellow-500/30' : 'bg-yellow-100 border-yellow-300'}`}>
+                <Zap className={`w-3 h-3 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} />
+                <span className={`${isDark ? 'text-yellow-400' : 'text-yellow-700'} text-xs font-bold uppercase tracking-wider`}>Limited Offer</span>
               </div>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-xl text-gray-400">₹</span>
-                <span className="text-5xl font-bold text-white">{displayRupees}</span>
+                <span className={`text-xl ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>₹</span>
+                <span className={`text-5xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{displayRupees}</span>
               </div>
-              <p className="text-gray-400 text-sm mt-2">
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mt-2`}>
                 {settingsLoaded ? `${validityDays} days access` : 'Loading...'}
               </p>
             </div>
@@ -267,9 +270,9 @@ export function Upgrade() {
                 { icon: Trophy, text: 'Analytics', color: 'text-green-400' },
                 { icon: BarChart3, text: 'Solutions', color: 'text-purple-400' },
               ].map((feature, i) => (
-                <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/30">
+                <div key={i} className={`flex items-center gap-2 p-2 rounded-lg ${isDark ? 'bg-gray-700/30' : 'bg-gray-100'}`}>
                   <feature.icon className={`w-4 h-4 ${feature.color}`} />
-                  <span className="text-gray-200 text-sm">{feature.text}</span>
+                  <span className={`${isDark ? 'text-gray-200' : 'text-gray-700'} text-sm`}>{feature.text}</span>
                 </div>
               ))}
             </div>
@@ -278,18 +281,18 @@ export function Upgrade() {
             <div className="space-y-2 mb-6">
               {['Priority support', 'Ad-free experience', 'All devices'].map((feature, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-green-600/20 flex items-center justify-center">
-                    <Check className="w-2 h-2 text-green-400" />
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center ${isDark ? 'bg-green-600/20' : 'bg-green-100'}`}>
+                    <Check className={`w-2 h-2 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
                   </div>
-                  <span className="text-gray-400 text-sm">{feature}</span>
+                  <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>{feature}</span>
                 </div>
               ))}
             </div>
 
             {error && (
-              <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-3 mb-4 flex items-center gap-2">
-                <X className="w-4 h-4 text-red-400 shrink-0" />
-                <span className="text-red-200 text-sm">{error}</span>
+              <div className={`${isDark ? 'bg-red-900/30 border-red-500/50 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} rounded-lg p-3 mb-4 flex items-center gap-2 border`}>
+                <X className={`w-4 h-4 ${isDark ? 'text-red-400' : 'text-red-600'} shrink-0`} />
+                <span className="text-sm">{error}</span>
               </div>
             )}
 
@@ -302,7 +305,7 @@ export function Upgrade() {
               {loading ? 'Processing…' : `Upgrade Now — ₹${displayRupees}`}
             </button>
 
-            <p className="text-center text-gray-500 text-xs mt-3 flex items-center justify-center gap-1">
+            <p className={`text-center text-xs mt-3 flex items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
               Secure payment via Razorpay
             </p>
@@ -311,9 +314,9 @@ export function Upgrade() {
 
         {/* Guarantee */}
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 bg-gray-800/50 rounded-full px-3 py-1.5 border border-gray-700">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-gray-400 text-xs">30-day money-back guarantee</span>
+          <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 border ${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-100 border-gray-200'}`}>
+            <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDark ? 'bg-green-500' : 'bg-green-600'}`} />
+            <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-xs`}>30-day money-back guarantee</span>
           </div>
         </div>
       </main>

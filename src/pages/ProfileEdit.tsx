@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { User as UserIcon, Mail, Phone, KeyRound, ArrowLeft } from 'lucide-react';
 import { getAuthRedirectOrigin } from '../lib/authRedirect';
 import { BottomNav } from '../components/BottomNav';
 
 export function ProfileEdit() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const { profile, user, refreshProfile } = useAuth();
   const { navigate } = useRouter();
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
@@ -84,57 +87,57 @@ export function ProfileEdit() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-24">
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Header with back arrow */}
-      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+      <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
         <div className="max-w-lg mx-auto px-4 h-16 flex items-center gap-4">
           <button 
             onClick={() => window.history.back()}
-            className="p-2 hover:bg-gray-800 rounded-full transition"
+            className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
           >
-            <ArrowLeft className="w-5 h-5 text-gray-300" />
+            <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
           </button>
-          <h1 className="font-bold text-lg text-white">Profile</h1>
+          <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Profile</h1>
         </div>
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-8">
-        <div className="bg-gray-800 rounded-2xl border border-gray-700 p-5 sm:p-8 shadow-xl">
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-5 sm:p-8 ${isDark ? 'shadow-xl' : 'shadow-lg'}`}>
           <div className="flex items-center gap-4 mb-8">
             <div className="w-12 h-12 sm:w-14 sm:h-14 bg-blue-600 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-900/20">
               <UserIcon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Profile & Security</h1>
-              <p className="text-gray-500 text-xs sm:text-sm">Manage your personal information</p>
+              <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Profile & Security</h1>
+              <p className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-xs sm:text-sm`}>Manage your personal information</p>
             </div>
           </div>
 
           {message && (
-            <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <div className={`${isDark ? 'bg-green-900/40 border-green-600 text-green-200' : 'bg-green-50 border-green-200 text-green-700'} px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-2 border`}>
+              <div className={`w-2 h-2 rounded-full animate-pulse ${isDark ? 'bg-green-500' : 'bg-green-600'}`} />
               {message}
             </div>
           )}
           {error && (
-            <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full" />
+            <div className={`${isDark ? 'bg-red-900/40 border-red-600 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-2 border`}>
+              <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-red-500' : 'bg-red-600'}`} />
               {error}
             </div>
           )}
 
           <form onSubmit={handleSave} className="space-y-6">
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+              <label className={`block text-xs font-bold uppercase tracking-widest ml-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Full Name</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <UserIcon className="h-5 w-5 text-gray-500 group-focus-within:text-blue-500 transition" />
+                  <UserIcon className={`h-5 w-5 ${isDark ? 'text-gray-500' : 'text-gray-400'} group-focus-within:text-blue-500 transition`} />
                 </div>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-gray-700/50 text-white pl-11 pr-4 py-3.5 rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-gray-700 transition"
+                  className={`w-full pl-11 pr-4 py-3.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${isDark ? 'bg-gray-700/50 text-white border-gray-600 focus:bg-gray-700' : 'bg-white text-gray-900 border-gray-300 focus:bg-gray-50'}`}
                   placeholder="Your full name"
                   required
                 />
@@ -142,36 +145,36 @@ export function ProfileEdit() {
             </div>
 
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
+              <label className={`block text-xs font-bold uppercase tracking-widest ml-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Phone Number</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-gray-500 group-focus-within:text-blue-500 transition" />
+                  <Phone className={`h-5 w-5 ${isDark ? 'text-gray-500' : 'text-gray-400'} group-focus-within:text-blue-500 transition`} />
                 </div>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-gray-700/50 text-white pl-11 pr-4 py-3.5 rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-gray-700 transition"
+                  className={`w-full pl-11 pr-4 py-3.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${isDark ? 'bg-gray-700/50 text-white border-gray-600 focus:bg-gray-700' : 'bg-white text-gray-900 border-gray-300 focus:bg-gray-50'}`}
                   placeholder="+91 …"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Email Address</label>
+              <label className={`block text-xs font-bold uppercase tracking-widest ml-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Email Address</label>
               <div className="relative group opacity-60">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-500" />
+                  <Mail className={`h-5 w-5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
                 </div>
                 <input
                   type="email"
                   value={user?.email ?? ''}
                   disabled
                   readOnly
-                  className="w-full bg-gray-800/80 text-gray-400 pl-11 pr-4 py-3.5 rounded-xl border border-gray-700 cursor-not-allowed"
+                  className={`w-full pl-11 pr-4 py-3.5 rounded-xl border cursor-not-allowed ${isDark ? 'bg-gray-800/80 text-gray-400 border-gray-700' : 'bg-gray-100 text-gray-500 border-gray-200'}`}
                 />
               </div>
-              <p className="text-gray-500 text-[10px] ml-1 italic">
+              <p className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-[10px] ml-1 italic`}>
                 Email cannot be changed as it is your login ID.
               </p>
             </div>
@@ -190,26 +193,26 @@ export function ProfileEdit() {
             </button>
           </form>
 
-          <div className="mt-12 pt-8 border-t border-gray-700/50">
+          <div className={`mt-12 pt-8 border-t ${isDark ? 'border-gray-700/50' : 'border-gray-200'}`}>
             <div className="flex items-center gap-2 mb-4">
               <KeyRound className="w-5 h-5 text-amber-500" />
-              <h2 className="text-lg font-bold text-white">Security</h2>
+              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Security</h2>
             </div>
             
-            <div className="bg-amber-600/10 border border-amber-500/20 rounded-2xl p-4 sm:p-5 mb-6">
-              <p className="text-gray-300 text-sm leading-relaxed">
+            <div className={`${isDark ? 'bg-amber-600/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'} rounded-2xl p-4 sm:p-5 mb-6 border`}>
+              <p className={`${isDark ? 'text-gray-300' : 'text-gray-700'} text-sm leading-relaxed`}>
                 Need to change your password? Click below and we'll send a secure reset link to your registered email.
               </p>
             </div>
 
             {pwMessage && (
-              <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <div className={`${isDark ? 'bg-green-900/40 border-green-600 text-green-200' : 'bg-green-50 border-green-200 text-green-700'} px-4 py-3 rounded-xl mb-4 text-sm flex items-center gap-2 border`}>
+                <div className={`w-2 h-2 rounded-full animate-pulse ${isDark ? 'bg-green-500' : 'bg-green-600'}`} />
                 {pwMessage}
               </div>
             )}
             {pwError && (
-              <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-3 rounded-xl mb-4 text-sm">
+              <div className={`${isDark ? 'bg-red-900/40 border-red-600 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} px-4 py-3 rounded-xl mb-4 text-sm border`}>
                 {pwError}
               </div>
             )}
@@ -218,7 +221,7 @@ export function ProfileEdit() {
               type="button"
               onClick={sendPasswordResetEmail}
               disabled={pwLoading || !user?.email}
-              className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 rounded-xl transition disabled:opacity-50 border border-gray-600 active:scale-95"
+              className={`w-full font-bold py-4 rounded-xl transition disabled:opacity-50 active:scale-95 border ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border-gray-300'}`}
             >
               {pwLoading ? 'Sending Link...' : 'Send Password Reset Link'}
             </button>

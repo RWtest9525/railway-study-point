@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Settings } from 'lucide-react';
 
 const PRESETS: { label: string; days: number }[] = [
@@ -12,6 +13,8 @@ const NUDGE_MIN_SEC = 3;
 const NUDGE_MAX_SEC = 3600;
 
 export function PremiumSettings() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [priceRupees, setPriceRupees] = useState('39');
   const [validityDays, setValidityDays] = useState(365);
   const [customDays, setCustomDays] = useState('');
@@ -187,46 +190,46 @@ export function PremiumSettings() {
   };
 
   if (loading) {
-    return <p className="text-gray-400">Loading settings…</p>;
+    return <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading settings…</p>;
   }
 
   return (
     <div className="max-w-xl">
       <div className="flex items-center gap-2 mb-6">
-        <Settings className="w-6 h-6 text-blue-400" />
-        <h2 className="text-2xl font-bold text-white">Premium pricing</h2>
+        <Settings className={`w-6 h-6 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+        <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Premium pricing</h2>
       </div>
-      <p className="text-gray-400 text-sm mb-6">
+      <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mb-6`}>
         Price in rupees and how many days of premium access a successful payment grants. Existing
         subscribers get new days added from their current expiry when they pay again.
       </p>
 
       {message && (
-        <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-2 rounded-lg mb-4 text-sm">
+        <div className={`${isDark ? 'bg-green-900/40 border-green-600 text-green-200' : 'bg-green-50 border-green-200 text-green-700'} px-4 py-2 rounded-lg mb-4 text-sm border`}>
           {message}
         </div>
       )}
       {error && (
-        <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-2 rounded-lg mb-4 text-sm">
+        <div className={`${isDark ? 'bg-red-900/40 border-red-600 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} px-4 py-2 rounded-lg mb-4 text-sm border`}>
           {error}
         </div>
       )}
 
-      <div className="space-y-4 bg-gray-800/80 rounded-xl p-6 border border-gray-700">
+      <div className={`space-y-4 rounded-xl p-6 border ${isDark ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200'}`}>
         <div>
-          <label className="block text-sm text-gray-300 mb-2">Price (₹)</label>
+          <label className={`block text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Price (₹)</label>
           <input
             type="number"
             min="1"
             step="0.01"
             value={priceRupees}
             onChange={(e) => setPriceRupees(e.target.value)}
-            className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600"
+            className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
           />
         </div>
 
         <div>
-          <span className="block text-sm text-gray-300 mb-2">Validity preset</span>
+          <span className={`block text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Validity preset</span>
           <div className="flex flex-wrap gap-2">
             {PRESETS.map((p) => (
               <button
@@ -239,7 +242,9 @@ export function PremiumSettings() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                   validityDays === p.days && customDays === ''
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : isDark
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {p.label}
@@ -249,23 +254,23 @@ export function PremiumSettings() {
         </div>
 
         <div>
-          <label className="block text-sm text-gray-300 mb-2">Custom validity (days)</label>
+          <label className={`block text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Custom validity (days)</label>
           <input
             type="number"
             min="1"
             placeholder={`Using ${validityDays} days — override here`}
             value={customDays}
             onChange={(e) => setCustomDays(e.target.value)}
-            className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600"
+            className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
           />
         </div>
 
-        <div className="pt-2 border-t border-gray-600">
-          <label className="block text-sm text-gray-300 mb-2">
+        <div className={`pt-2 border-t ${isDark ? 'border-gray-600' : 'border-gray-300'}`}>
+          <label className={`block text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
             Premium reminder popup (seconds)
           </label>
-          <p className="text-gray-500 text-xs mb-2">
-            After a user&apos;s free trial ends, the extra upgrade popup appears again every this many
+          <p className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-xs mb-2`}>
+            After a user's free trial ends, the extra upgrade popup appears again every this many
             seconds (default 10). Range {NUDGE_MIN_SEC}–{NUDGE_MAX_SEC}.
           </p>
           <input
@@ -274,7 +279,7 @@ export function PremiumSettings() {
             max={NUDGE_MAX_SEC}
             value={nudgeIntervalSec}
             onChange={(e) => setNudgeIntervalSec(Number(e.target.value))}
-            className="w-full max-w-xs bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600"
+            className={`w-full max-w-xs px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
           />
         </div>
 

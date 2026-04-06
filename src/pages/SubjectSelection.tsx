@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { 
@@ -20,6 +21,8 @@ type Exam = Database['public']['Tables']['exams']['Row'];
 export function SubjectSelection({ categoryId }: { categoryId: string }) {
   const { isPremium, canAccessTests } = useAuth();
   const { navigate } = useRouter();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,16 +55,16 @@ export function SubjectSelection({ categoryId }: { categoryId: string }) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white pb-24">
-      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center gap-4">
           <button 
             onClick={() => window.history.back()}
-            className="p-2 hover:bg-gray-800 rounded-full transition"
+            className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className={`w-6 h-6 ${isDark ? 'text-white' : 'text-gray-600'}`} />
           </button>
-          <h1 className="font-bold text-lg">{categoryId} Subjects</h1>
+          <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>{categoryId} Subjects</h1>
         </div>
       </header>
 
@@ -74,16 +77,16 @@ export function SubjectSelection({ categoryId }: { categoryId: string }) {
                 <div className={`p-2 rounded-lg ${sub.bg}`}>
                   <sub.icon className={`w-5 h-5 ${sub.color}`} />
                 </div>
-                <h2 className="font-bold text-lg">{sub.name}</h2>
+                <h2 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>{sub.name}</h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {loading ? (
                   [1, 2].map(i => (
-                    <div key={i} className="h-32 bg-gray-900 animate-pulse rounded-2xl border border-gray-800" />
+                    <div key={i} className={`h-32 animate-pulse rounded-2xl border ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-200 border-gray-300'}`} />
                   ))
                 ) : exams.length === 0 ? (
-                  <p className="text-gray-500 text-sm px-2">No exams found for this subject yet.</p>
+                  <p className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-sm px-2`}>No exams found for this subject yet.</p>
                 ) : (
                   exams
                     .filter(e => e.title.toLowerCase().includes(sub.id) || sub.id === 'math' || true) // Simplified filtering
@@ -101,16 +104,20 @@ export function SubjectSelection({ categoryId }: { categoryId: string }) {
                         }
                         navigate(`/exam/${exam.id}`);
                       }}
-                      className="bg-gray-900 border border-gray-800 hover:border-blue-500/50 rounded-2xl p-5 flex flex-col text-left transition-all group"
+                      className={`${isDark ? 'bg-gray-900 border-gray-800 hover:border-blue-500/50' : 'bg-white border-gray-200 hover:border-blue-400'} rounded-2xl p-5 flex flex-col text-left transition-all group border`}
                     >
                       <div className="flex justify-between items-start mb-4">
-                        <h3 className="font-bold text-gray-200 group-hover:text-white transition">{exam.title}</h3>
+                        <h3 className={`font-bold ${isDark ? 'text-gray-200 group-hover:text-white' : 'text-gray-700 group-hover:text-gray-900'} transition`}>{exam.title}</h3>
                         {exam.is_premium && <Crown className="w-4 h-4 text-yellow-500" />}
                       </div>
                       
-                      <div className="flex items-center gap-4 text-xs text-gray-500 mt-auto">
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {exam.duration_minutes}m</span>
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {(exam.question_ids as string[]).length} Qs</span>
+                      <div className="flex items-center gap-4 text-xs mt-auto">
+                        <span className={`flex items-center gap-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                          <Clock className="w-3 h-3" /> {exam.duration_minutes}m
+                        </span>
+                        <span className={`flex items-center gap-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                          <Users className="w-3 h-3" /> {(exam.question_ids as string[]).length} Qs
+                        </span>
                       </div>
                     </button>
                   ))

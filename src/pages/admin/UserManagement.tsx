@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { 
   UserPlus, 
   Search, 
@@ -31,6 +32,8 @@ type Profile = {
 
 export function UserManagement() {
   const { profile: currentAdmin } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [users, setUsers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [premiumFilter, setPremiumFilter] = useState<'all' | 'premium' | 'free'>('all');
@@ -272,41 +275,41 @@ export function UserManagement() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-            <UserPlus className="w-8 h-8 text-blue-400" />
+          <h2 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} flex items-center gap-3`}>
+            <UserPlus className={`w-8 h-8 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
             User Management
           </h2>
-          <p className="text-gray-400 text-sm mt-1">Manage permissions, subscriptions, and account security</p>
+          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mt-1`}>Manage permissions, subscriptions, and account security</p>
         </div>
       </div>
 
       {message && (
-        <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-3 rounded-xl flex items-center gap-2 animate-in slide-in-from-top-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+        <div className={`${isDark ? 'bg-green-900/40 border-green-600 text-green-200' : 'bg-green-50 border-green-200 text-green-700'} px-4 py-3 rounded-xl flex items-center gap-2 animate-in slide-in-from-top-2 border`}>
+          <div className={`w-2 h-2 rounded-full animate-pulse ${isDark ? 'bg-green-500' : 'bg-green-600'}`} />
           {message}
         </div>
       )}
       {error && (
-        <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-3 rounded-xl text-sm">
+        <div className={`${isDark ? 'bg-red-900/40 border-red-600 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} px-4 py-3 rounded-xl text-sm border`}>
           {error}
         </div>
       )}
 
-      <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
-        <div className="p-4 sm:p-6 border-b border-gray-700 bg-gray-700/30 flex flex-col lg:flex-row items-center gap-4">
+      <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border overflow-hidden ${isDark ? 'shadow-2xl' : 'shadow-lg'}`}>
+        <div className={`p-4 sm:p-6 border-b ${isDark ? 'border-gray-700 bg-gray-700/30' : 'border-gray-200 bg-gray-50'} flex flex-col lg:flex-row items-center gap-4`}>
           <div className="relative w-full lg:flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
             <input
               type="text"
               placeholder="Search by name or email…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-800 text-white pl-12 pr-4 py-3 rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              className={`w-full pl-12 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${isDark ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
             />
           </div>
           <div className="flex items-center gap-3 w-full lg:w-auto">
-            <Filter className="w-5 h-5 text-gray-400 shrink-0" />
-            <div className="flex bg-gray-800 rounded-xl p-1 border border-gray-600 w-full lg:w-auto">
+            <Filter className={`w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-500'} shrink-0`} />
+            <div className={`flex ${isDark ? 'bg-gray-800 border-gray-600' : 'bg-gray-100 border-gray-300'} rounded-xl p-1 border w-full lg:w-auto`}>
               {(['all', 'premium', 'free'] as const).map((f) => (
                 <button
                   key={f}
@@ -314,7 +317,9 @@ export function UserManagement() {
                   className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
                     premiumFilter === f 
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                      : 'text-gray-400 hover:text-gray-200'
+                      : isDark
+                        ? 'text-gray-400 hover:text-gray-200'
+                        : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   {f}
@@ -326,16 +331,16 @@ export function UserManagement() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-700/50">
+            <thead className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
               <tr>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">User</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Subscription</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Joined At</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Role/Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                <th className={`px-6 py-4 text-xs font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>User</th>
+                <th className={`px-6 py-4 text-xs font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'} hidden lg:table-cell`}>Subscription</th>
+                <th className={`px-6 py-4 text-xs font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'} hidden md:table-cell`}>Joined At</th>
+                <th className={`px-6 py-4 text-xs font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Role/Status</th>
+                <th className={`px-6 py-4 text-xs font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'} text-right`}>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700/50">
+            <tbody className={`divide-y ${isDark ? 'divide-gray-700/50' : 'divide-gray-200'}`}>
               {listLoading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
@@ -344,7 +349,7 @@ export function UserManagement() {
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={5} className={`px-6 py-12 text-center ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                     No users found matching your search.
                   </td>
                 </tr>
@@ -352,23 +357,23 @@ export function UserManagement() {
                 filteredUsers.map((u) => {
                   const isPremium = u.is_premium && u.premium_until && new Date(u.premium_until) > new Date();
                   return (
-                    <tr key={u.id} className="hover:bg-gray-700/30 transition group">
+                    <tr key={u.id} className={`${isDark ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50'} transition group`}>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            <span className="text-white font-bold">{u.full_name || 'Student'}</span>
+                            <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-bold`}>{u.full_name || 'Student'}</span>
                             {isSuperAdminEmail(u.email) && (
-                              <span className="bg-amber-500/20 text-amber-500 text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border border-amber-500/20 flex items-center gap-1">
+                              <span className={`${isDark ? 'bg-amber-500/20 text-amber-500 border-amber-500/20' : 'bg-amber-100 text-amber-700 border-amber-300'} text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border flex items-center gap-1`}>
                                 <ShieldAlert className="w-2 h-2" /> Super Admin
                               </span>
                             )}
                             {u.id === currentAdmin?.id && (
-                              <span className="bg-blue-500/20 text-blue-400 text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border border-blue-500/20">
+                              <span className={`${isDark ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-blue-100 text-blue-700 border-blue-300'} text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border`}>
                                 You
                               </span>
                             )}
                           </div>
-                          <span className="text-gray-500 text-xs flex items-center gap-1">
+                          <span className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-xs flex items-center gap-1`}>
                             <Mail className="w-3 h-3" />
                             {u.email}
                           </span>
@@ -377,27 +382,27 @@ export function UserManagement() {
                       <td className="px-6 py-4 hidden lg:table-cell">
                         {isPremium ? (
                           <div className="flex flex-col gap-1">
-                            <span className="flex items-center gap-1.5 text-yellow-500 font-bold text-xs uppercase tracking-wider">
+                            <span className={`flex items-center gap-1.5 ${isDark ? 'text-yellow-500' : 'text-yellow-600'} font-bold text-xs uppercase tracking-wider`}>
                               <Crown className="w-3.5 h-3.5" />
                               Premium Active
                             </span>
-                            <span className="text-gray-500 text-[10px] flex items-center gap-1">
+                            <span className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-[10px] flex items-center gap-1`}>
                               <Calendar className="w-2.5 h-2.5" />
                               Ends: {new Date(u.premium_until!).toLocaleDateString()}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-gray-600 text-xs font-medium italic">Free Plan</span>
+                          <span className={`${isDark ? 'text-gray-600' : 'text-gray-500'} text-xs font-medium italic`}>Free Plan</span>
                         )}
                       </td>
                       <td className="px-6 py-4 hidden md:table-cell">
-                        <div className="flex flex-col text-gray-400 text-xs">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-gray-500" />
+                        <div className="flex flex-col">
+                          <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs`}>
+                            <Calendar className="w-3 h-3 inline mr-1" />
                             {new Date(u.created_at).toLocaleDateString()}
                           </span>
-                          <span className="flex items-center gap-1 mt-0.5 text-gray-600">
-                            <Clock className="w-3 h-3 text-gray-700" />
+                          <span className={`${isDark ? 'text-gray-600' : 'text-gray-400'} text-xs mt-0.5`}>
+                            <Clock className="w-3 h-3 inline mr-1" />
                             {new Date(u.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
@@ -405,14 +410,14 @@ export function UserManagement() {
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
                           <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border w-fit ${
-                            u.role === 'admin' ? 'bg-red-600/20 text-red-400 border-red-500/30' :
-                            u.role === 'banned' ? 'bg-gray-900 text-gray-500 border-gray-700' :
-                            'bg-blue-600/20 text-blue-400 border-blue-500/30'
+                            u.role === 'admin' ? `${isDark ? 'bg-red-600/20 text-red-400 border-red-500/30' : 'bg-red-100 text-red-700 border-red-300'}` :
+                            u.role === 'banned' ? `${isDark ? 'bg-gray-900 text-gray-500 border-gray-700' : 'bg-gray-100 text-gray-500 border-gray-300'}` :
+                            `${isDark ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-blue-100 text-blue-700 border-blue-300'}`
                           }`}>
                             {u.role}
                           </span>
                           {u.role === 'banned' && (
-                            <span className="text-[9px] text-red-500 font-bold italic flex items-center gap-1">
+                            <span className={`text-[9px] ${isDark ? 'text-red-500' : 'text-red-600'} font-bold italic flex items-center gap-1`}>
                               <Ban className="w-2 h-2" /> ACCESS DENIED
                             </span>
                           )}
@@ -426,7 +431,7 @@ export function UserManagement() {
                                 <button
                                   onClick={() => demote(u.id, u.email)}
                                   disabled={loading === u.id}
-                                  className="p-2 text-orange-400 hover:bg-orange-600/10 rounded-lg transition"
+                                  className={`p-2 ${isDark ? 'text-orange-400 hover:bg-orange-600/10' : 'text-orange-600 hover:bg-orange-100'} rounded-lg transition`}
                                   title="Demote to Student"
                                 >
                                   <UserMinus className="w-5 h-5" />
@@ -435,7 +440,7 @@ export function UserManagement() {
                                 <button
                                   onClick={() => promote(u.id, u.email)}
                                   disabled={u.role === 'banned' || loading === u.id}
-                                  className="p-2 text-green-400 hover:bg-green-600/10 rounded-lg transition disabled:opacity-20"
+                                  className={`p-2 ${isDark ? 'text-green-400 hover:bg-green-600/10' : 'text-green-600 hover:bg-green-100'} rounded-lg transition disabled:opacity-20`}
                                   title="Promote to Admin"
                                 >
                                   <ShieldCheck className="w-5 h-5" />
@@ -445,7 +450,9 @@ export function UserManagement() {
                               <button
                                 onClick={() => banUser(u.id, u.email, u.role === 'banned')}
                                 className={`p-2 rounded-lg transition ${
-                                  u.role === 'banned' ? 'text-blue-400 hover:bg-blue-600/10' : 'text-orange-400 hover:bg-orange-600/10'
+                                  u.role === 'banned' 
+                                    ? `${isDark ? 'text-blue-400 hover:bg-blue-600/10' : 'text-blue-600 hover:bg-blue-100'}`
+                                    : `${isDark ? 'text-orange-400 hover:bg-orange-600/10' : 'text-orange-600 hover:bg-orange-100'}`
                                 }`}
                                 title={u.role === 'banned' ? 'Unban User' : 'Ban User'}
                               >
@@ -454,7 +461,7 @@ export function UserManagement() {
                               
                               <button
                                 onClick={() => deleteUser(u.id, u.email)}
-                                className="p-2 text-red-400 hover:bg-red-600/10 rounded-lg transition"
+                                className={`p-2 ${isDark ? 'text-red-400 hover:bg-red-600/10' : 'text-red-600 hover:bg-red-100'} rounded-lg transition`}
                                 title="Delete Profile"
                               >
                                 <Trash2 className="w-5 h-5" />
@@ -467,8 +474,8 @@ export function UserManagement() {
                             disabled={loading === u.id || isSuperAdminEmail(u.email)}
                             className={`p-2 rounded-lg transition ${
                               isPremium 
-                                ? 'text-yellow-400 hover:bg-yellow-600/10' 
-                                : 'text-green-400 hover:bg-green-600/10'
+                                ? `${isDark ? 'text-yellow-400 hover:bg-yellow-600/10' : 'text-yellow-600 hover:bg-yellow-100'}`
+                                : `${isDark ? 'text-green-400 hover:bg-green-600/10' : 'text-green-600 hover:bg-green-100'}`
                             } disabled:opacity-20`}
                             title={isPremium ? 'Revoke Premium' : 'Grant Premium (30 days)'}
                           >
@@ -477,7 +484,7 @@ export function UserManagement() {
                           
                           <button
                             onClick={() => sendResetPassword(u.email)}
-                            className="p-2 text-amber-400 hover:bg-amber-600/10 rounded-lg transition"
+                            className={`p-2 ${isDark ? 'text-amber-400 hover:bg-amber-600/10' : 'text-amber-600 hover:bg-amber-100'} rounded-lg transition`}
                             title="Send Password Reset"
                           >
                             <KeyRound className="w-5 h-5" />
