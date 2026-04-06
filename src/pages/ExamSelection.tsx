@@ -119,7 +119,7 @@ export function ExamSelection() {
         {/* Today Live Section */}
         <section>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold flex items-center gap-2">
+            <h2 className={`text-xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
               Today Live
               <span className="flex items-center gap-1 bg-red-600/20 text-red-500 border border-red-500/30 px-2 py-0.5 rounded text-[10px] uppercase font-black animate-pulse">
                 <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
@@ -132,13 +132,13 @@ export function ExamSelection() {
             {[1, 2, 3].map((i) => (
               <div 
                 key={i}
-                className="min-w-[280px] bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4"
+                className={`min-w-[280px] rounded-2xl p-5 space-y-4 border-2 transition-all duration-300 hover:scale-[1.02] ${isDark ? 'bg-gray-900 border-gray-800 hover:border-blue-500/50' : 'bg-white border-gray-200 hover:border-blue-400'} shadow-sm`}
               >
                 <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">NTPC Stage 1</span>
-                  <span className="text-[10px] text-gray-500">Starts in 2h</span>
+                  <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Starts in 2h</span>
                 </div>
-                <h3 className="font-bold text-lg leading-snug">Full Mock Test #0{i}</h3>
+                <h3 className={`font-bold text-lg leading-snug ${isDark ? 'text-white' : 'text-gray-900'}`}>Full Mock Test #0{i}</h3>
                 <div className="flex items-center gap-4 text-xs text-gray-500">
                   <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> 90 min</span>
                   <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> 100 Qs</span>
