@@ -72,7 +72,7 @@ export function ExamCreator() {
             .order('created_at', { ascending: false });
           
           if (fallbackError) {
-            setError('Failed to load exams. Please run migration 20260405000000_fix_schema_issues.sql');
+            setError('Failed to load exams. Please ensure the database schema is properly set up.');
             setExams([]);
           } else {
             const examsWithSubject = (fallbackData || []).map(e => ({
@@ -103,7 +103,7 @@ export function ExamCreator() {
       }
     } catch (error: any) {
       console.error('Error loading exams:', error);
-      setError(`Failed to load exams: ${error.message || 'Unknown error'}. Please run migration 20260405000000_fix_schema_issues.sql`);
+      setError(`Failed to load exams: ${error.message || 'Unknown error'}. Please run the master migration script.`);
       setExams([]);
     } finally {
       setLoading(false);

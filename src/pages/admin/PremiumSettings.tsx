@@ -44,7 +44,7 @@ export function PremiumSettings() {
           } else if (error.message?.includes('column') || error.message?.includes('does not exist')) {
             // Schema issue - missing column
             console.error('Schema issue detected:', error.message);
-            setError('Database schema needs update. Please run the migration: 20260405000000_fix_schema_issues.sql in your Supabase SQL editor.');
+            setError('Database connection error. Please ensure the database schema is properly set up.');
             setLoading(false);
             return;
           } else {
@@ -178,7 +178,7 @@ export function PremiumSettings() {
     } catch (e: any) {
       console.error(e);
       if (e.message?.includes('relation "site_settings" does not exist')) {
-        setError('Database schema not updated. Please run the migration files first.');
+        setError('Database tables not found. Please run the master migration script.');
       } else if (e.message?.includes('permission denied')) {
         setError('Permission denied. Ensure you are logged in as an admin.');
       } else {

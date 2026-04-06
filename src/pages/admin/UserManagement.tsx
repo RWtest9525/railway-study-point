@@ -74,7 +74,7 @@ export function UserManagement() {
             .limit(100);
           
           if (fallbackError) {
-            setError(`Failed to load users: ${fallbackError.message}. Please run migration 20260405000000_fix_schema_issues.sql in Supabase.`);
+            setError(`Failed to load users: ${fallbackError.message}. Please ensure the database schema is properly set up.`);
             setUsers([]);
           } else {
             // Add a dummy created_at for display purposes
@@ -97,7 +97,7 @@ export function UserManagement() {
       }
     } catch (err: any) {
       console.error('Error loading users:', err);
-      setError(`Failed to load users: ${err.message || 'Unknown error'}. Please run migration 20260405000000_fix_schema_issues.sql`);
+      setError(`Failed to load users: ${err.message || 'Unknown error'}. Please run the master migration script.`);
       setUsers([]);
     } finally {
       setListLoading(false);

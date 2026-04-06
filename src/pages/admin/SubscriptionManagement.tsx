@@ -70,7 +70,7 @@ export function SubscriptionManagement() {
       setUsers(data || []);
     } catch (err) {
       console.error(err);
-      setError('Failed to load subscription data. Please run migration 20260405000000_fix_schema_issues.sql');
+      setError('Failed to load subscription data. Please ensure the database schema is properly set up.');
     } finally {
       setListLoading(false);
     }
