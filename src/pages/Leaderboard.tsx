@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { useRouter } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { Trophy, ArrowLeft } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 
@@ -13,8 +13,9 @@ type Row = {
 };
 
 export function Leaderboard() {
-  const { navigate } = useRouter();
   const { profile } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -88,17 +89,17 @@ export function Leaderboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-24">
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
       {/* Header with back arrow */}
-      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+      <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-4">
           <button 
             onClick={() => window.history.back()}
-            className="p-2 hover:bg-gray-800 rounded-full transition"
+            className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
           >
-            <ArrowLeft className="w-5 h-5 text-gray-300" />
+            <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
           </button>
-          <h1 className="font-bold text-lg text-white">Leaderboard</h1>
+          <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Leaderboard</h1>
         </div>
       </header>
 
@@ -110,37 +111,39 @@ export function Leaderboard() {
         )}
 
         {error && (
-          <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-3">
+          <div className={`${isDark ? 'bg-red-900/40 border-red-600 text-red-200' : 'bg-red-100 border-red-300 text-red-700'} px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-3 border`}>
             <div className="w-2 h-2 bg-red-500 rounded-full shrink-0" />
             {error}
           </div>
         )}
 
         {!loading && !error && rows.length === 0 && (
-          <div className="bg-gray-800/50 rounded-2xl border border-gray-700 p-12 text-center">
-            <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-4 opacity-20" />
-            <p className="text-gray-500 text-sm">No results yet. Complete an exam to appear here!</p>
+          <div className={`${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-12 text-center`}>
+            <Trophy className={`w-12 h-12 mx-auto mb-4 opacity-20 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
+            <p className={`${isDark ? 'text-gray-500' : 'text-gray-600'} text-sm`}>No results yet. Complete an exam to appear here!</p>
           </div>
         )}
 
         {!loading && rows.length > 0 && (
-          <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
+          <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border overflow-hidden shadow-2xl`}>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-700/50">
+                <thead className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
                   <tr>
-                    <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest">Rank</th>
-                    <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest">Student</th>
-                    <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest hidden xs:table-cell text-center">Exams</th>
-                    <th className="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Total Score</th>
+                    <th className={`px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Rank</th>
+                    <th className={`px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Student</th>
+                    <th className={`px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest hidden xs:table-cell text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Exams</th>
+                    <th className={`px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest text-right ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Total Score</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-700/50">
+                <tbody className={`${isDark ? 'divide-y divide-gray-700/50' : 'divide-y divide-gray-200'}`}>
                   {rows.map((r, i) => (
                     <tr
                       key={r.user_id}
-                      className={`hover:bg-gray-700/30 transition-colors ${
-                        profile?.id === r.user_id ? 'bg-amber-500/10' : ''
+                      className={`transition-colors ${
+                        profile?.id === r.user_id 
+                          ? (isDark ? 'bg-amber-500/10' : 'bg-amber-50') 
+                          : (isDark ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50')
                       }`}
                     >
                       <td className="px-4 sm:px-6 py-4">
@@ -148,7 +151,7 @@ export function Leaderboard() {
                           i === 0 ? 'bg-amber-500 text-amber-950 shadow-lg shadow-amber-500/20' :
                           i === 1 ? 'bg-gray-300 text-gray-900' :
                           i === 2 ? 'bg-orange-400 text-orange-950' :
-                          'text-gray-500'
+                          (isDark ? 'text-gray-500' : 'text-gray-400')
                         }`}>
                           {i + 1}
                         </div>
@@ -156,7 +159,9 @@ export function Leaderboard() {
                       <td className="px-4 sm:px-6 py-4 min-w-[120px]">
                         <div className="flex items-center gap-2">
                           <span className={`text-sm sm:text-base font-medium truncate ${
-                            profile?.id === r.user_id ? 'text-amber-400 font-bold' : 'text-gray-200'
+                            profile?.id === r.user_id 
+                              ? (isDark ? 'text-amber-400 font-bold' : 'text-amber-600 font-bold') 
+                              : (isDark ? 'text-gray-200' : 'text-gray-700')
                           }`}>
                             {r.full_name}
                           </span>
@@ -168,7 +173,7 @@ export function Leaderboard() {
                         </div>
                       </td>
                       <td className="px-4 sm:px-6 py-4 text-center hidden xs:table-cell">
-                        <span className="text-xs sm:text-sm text-gray-400 bg-gray-700/50 px-2 py-1 rounded-md border border-gray-600/30">
+                        <span className={`text-xs sm:text-sm px-2 py-1 rounded-md border ${isDark ? 'text-gray-400 bg-gray-700/50 border-gray-600/30' : 'text-gray-500 bg-gray-100 border-gray-200'}`}>
                           {r.exams_taken}
                         </span>
                       </td>

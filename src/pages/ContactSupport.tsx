@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { useRouter } from '../contexts/RouterContext';
-import { MessageSquare, PhoneCall, ChevronRight, Clock, User as UserIcon, ArrowLeft } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { MessageSquare, PhoneCall, Clock, User as UserIcon, ArrowLeft } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { BottomNav } from '../components/BottomNav';
 
@@ -17,7 +17,8 @@ const TOPICS = [
 
 export function ContactSupport() {
   const { profile } = useAuth();
-  const { navigate } = useRouter();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [method, setMethod] = useState<'chat' | 'call' | null>(null);
   const [topic, setTopic] = useState('');
   const [message, setMessage] = useState('');
@@ -101,41 +102,41 @@ export function ContactSupport() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-24">
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
       {/* Header with back arrow */}
-      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+      <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
         <div className="max-w-lg mx-auto px-4 h-16 flex items-center gap-4">
           <button 
             onClick={() => window.history.back()}
-            className="p-2 hover:bg-gray-800 rounded-full transition"
+            className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
           >
-            <ArrowLeft className="w-5 h-5 text-gray-300" />
+            <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
           </button>
-          <h1 className="font-bold text-lg text-white">Help & Support</h1>
+          <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Help & Support</h1>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6 sm:p-8 mb-8">
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-6 sm:p-8 mb-8`}>
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-blue-600/20 rounded-lg">
-              <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
+            <div className={`p-2 rounded-lg ${isDark ? 'bg-blue-600/20' : 'bg-blue-100'}`}>
+              <MessageSquare className={`w-6 h-6 sm:w-8 sm:h-8 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Help & Support</h1>
+            <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Help & Support</h1>
           </div>
           
-          <p className="text-gray-400 text-sm mb-8">
+          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mb-8`}>
             Choose how you'd like to get assistance from our team.
           </p>
 
           {feedback && (
-            <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2">
+            <div className={`${isDark ? 'bg-green-900/40 border-green-600 text-green-200' : 'bg-green-100 border-green-300 text-green-700'} px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2 border`}>
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               {feedback}
             </div>
           )}
           {error && (
-            <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-3 rounded-xl mb-6 text-sm">
+            <div className={`${isDark ? 'bg-red-900/40 border-red-600 text-red-200' : 'bg-red-100 border-red-300 text-red-700'} px-4 py-3 rounded-xl mb-6 text-sm border`}>
               {error}
             </div>
           )}
@@ -144,24 +145,24 @@ export function ContactSupport() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
                 onClick={() => setMethod('chat')}
-                className="flex flex-col items-center justify-center p-6 bg-gray-700/50 hover:bg-gray-700 border border-gray-600 hover:border-blue-500 rounded-2xl transition-all group"
+                className={`flex flex-col items-center justify-center p-6 border rounded-2xl transition-all group ${isDark ? 'bg-gray-700/50 hover:bg-gray-700 border-gray-600 hover:border-blue-500' : 'bg-gray-50 hover:bg-gray-100 border-gray-200 hover:border-blue-400'}`}
               >
-                <div className="w-12 h-12 bg-blue-600/20 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition">
-                  <MessageSquare className="w-6 h-6 text-blue-400" />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition ${isDark ? 'bg-blue-600/20' : 'bg-blue-100'}`}>
+                  <MessageSquare className={`w-6 h-6 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                 </div>
-                <span className="text-white font-bold mb-1">Help via Chat</span>
-                <span className="text-gray-400 text-xs text-center">Instant support via messaging</span>
+                <span className={`font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>Help via Chat</span>
+                <span className={`text-xs text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Instant support via messaging</span>
               </button>
 
               <button
                 onClick={() => setMethod('call')}
-                className="flex flex-col items-center justify-center p-6 bg-gray-700/50 hover:bg-gray-700 border border-gray-600 hover:border-amber-500 rounded-2xl transition-all group"
+                className={`flex flex-col items-center justify-center p-6 border rounded-2xl transition-all group ${isDark ? 'bg-gray-700/50 hover:bg-gray-700 border-gray-600 hover:border-amber-500' : 'bg-gray-50 hover:bg-gray-100 border-gray-200 hover:border-amber-400'}`}
               >
-                <div className="w-12 h-12 bg-amber-600/20 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition">
-                  <PhoneCall className="w-6 h-6 text-amber-400" />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition ${isDark ? 'bg-amber-600/20' : 'bg-amber-100'}`}>
+                  <PhoneCall className={`w-6 h-6 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
                 </div>
-                <span className="text-white font-bold mb-1">Help via Call</span>
-                <span className="text-gray-400 text-xs text-center">Schedule a call with admin</span>
+                <span className={`font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>Help via Call</span>
+                <span className={`text-xs text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Schedule a call with admin</span>
               </button>
             </div>
           ) : method === 'chat' ? (
@@ -170,7 +171,7 @@ export function ContactSupport() {
                 <button 
                   type="button" 
                   onClick={() => setMethod(null)}
-                  className="text-gray-400 hover:text-white text-xs flex items-center gap-1"
+                  className={`text-xs flex items-center gap-1 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   ← Change Method
                 </button>
@@ -178,7 +179,7 @@ export function ContactSupport() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Select Topic</label>
+                <label className={`block text-xs font-bold uppercase tracking-widest mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Select Topic</label>
                 <div className="grid grid-cols-2 gap-2">
                   {TOPICS.map((t) => (
                     <button
@@ -188,7 +189,7 @@ export function ContactSupport() {
                       className={`px-3 py-2 rounded-lg text-xs font-medium border transition ${
                         topic === t 
                           ? 'bg-blue-600 border-blue-500 text-white' 
-                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
+                          : (isDark ? 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500' : 'bg-gray-100 border-gray-200 text-gray-700 hover:border-gray-400')
                       }`}
                     >
                       {t}
@@ -198,12 +199,12 @@ export function ContactSupport() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Describe Problem</label>
+                <label className={`block text-xs font-bold uppercase tracking-widest mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Describe Problem</label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={4}
-                  className="w-full bg-gray-700 text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                  className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
                   placeholder="Tell us what's wrong…"
                   required
                   minLength={5}
@@ -224,7 +225,7 @@ export function ContactSupport() {
                 <button 
                   type="button" 
                   onClick={() => setMethod(null)}
-                  className="text-gray-400 hover:text-white text-xs flex items-center gap-1"
+                  className={`text-xs flex items-center gap-1 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   ← Change Method
                 </button>
@@ -232,7 +233,7 @@ export function ContactSupport() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                <label className={`block text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                   <PhoneCall className="w-3 h-3" />
                   Your Phone Number
                 </label>
@@ -240,21 +241,21 @@ export function ContactSupport() {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-gray-700 text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
+                  className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm sm:text-base appearance-none ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
                   placeholder="+91 …"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                <label className={`block text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                   <Clock className="w-3 h-3" />
                   Preferred Call Time
                 </label>
                 <select
                   value={preferredTime}
                   onChange={(e) => setPreferredTime(e.target.value)}
-                  className="w-full bg-gray-700 text-white px-4 py-3 rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm sm:text-base appearance-none"
+                  className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm sm:text-base appearance-none ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
                   required
                 >
                   <option value="">Choose a time window…</option>
@@ -271,7 +272,7 @@ export function ContactSupport() {
               >
                 {loading ? 'Scheduling…' : 'Schedule Callback'}
               </button>
-              <p className="text-[10px] text-gray-500 text-center italic">
+              <p className={`text-[10px] text-center italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                 Note: Our team usually calls back within 4-6 hours.
               </p>
             </form>
@@ -279,8 +280,8 @@ export function ContactSupport() {
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white">Your Requests History</h2>
-          <div className="h-px flex-1 bg-gray-800 mx-4" />
+          <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Your Requests History</h2>
+          <div className={`h-px flex-1 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} mx-4`} />
         </div>
 
         {listLoading ? (
@@ -288,49 +289,49 @@ export function ContactSupport() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
           </div>
         ) : items.length === 0 ? (
-          <div className="bg-gray-800/50 rounded-2xl border border-gray-700 p-8 text-center">
-            <p className="text-gray-500 text-sm">No support requests found.</p>
+          <div className={`${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-8 text-center`}>
+            <p className={`${isDark ? 'text-gray-500' : 'text-gray-600'} text-sm`}>No support requests found.</p>
           </div>
         ) : (
           <div className="space-y-4">
             {items.map((q) => (
               <div
                 key={q.id}
-                className="bg-gray-800 border border-gray-700 rounded-2xl p-5 hover:border-gray-600 transition"
+                className={`${isDark ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-gray-200 hover:border-gray-300'} rounded-2xl border p-5 transition`}
               >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex flex-col">
-                    <span className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">
+                    <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-[10px] uppercase tracking-widest font-bold`}>
                       {new Date(q.created_at).toLocaleDateString()} at {new Date(q.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <span className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${
                       q.status === 'open' ? 'text-amber-400' : 
-                      q.status === 'replied' ? 'text-green-400' : 'text-gray-400'
+                      q.status === 'replied' ? 'text-green-400' : (isDark ? 'text-gray-400' : 'text-gray-500')
                     }`}>
                       Status: {q.status}
                     </span>
                   </div>
                   {q.message.startsWith('[CALL') ? (
-                    <PhoneCall className="w-4 h-4 text-amber-400" />
+                    <PhoneCall className={`w-4 h-4 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
                   ) : (
-                    <MessageSquare className="w-4 h-4 text-blue-400" />
+                    <MessageSquare className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                   )}
                 </div>
                 
-                <p className="text-gray-200 text-sm whitespace-pre-wrap line-clamp-3 mb-4">{q.message}</p>
+                <p className={`${isDark ? 'text-gray-200' : 'text-gray-700'} text-sm whitespace-pre-wrap line-clamp-3 mb-4`}>{q.message}</p>
                 
                 {q.admin_reply ? (
-                  <div className="bg-blue-900/20 border border-blue-700/50 rounded-xl p-4 mt-2">
+                  <div className={`${isDark ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'} rounded-xl border p-4 mt-2`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
                         <UserIcon className="w-3 h-3 text-white" />
                       </div>
-                      <span className="text-blue-300 text-xs font-bold">Admin Response</span>
+                      <span className={`${isDark ? 'text-blue-300' : 'text-blue-600'} text-xs font-bold`}>Admin Response</span>
                     </div>
-                    <p className="text-gray-200 text-sm whitespace-pre-wrap">{q.admin_reply}</p>
+                    <p className={`${isDark ? 'text-gray-200' : 'text-gray-700'} text-sm whitespace-pre-wrap`}>{q.admin_reply}</p>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-gray-500 text-[10px] italic">
+                  <div className={`flex items-center gap-2 text-[10px] italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                     <Clock className="w-3 h-3" />
                     Waiting for an administrator to review your request...
                   </div>

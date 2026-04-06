@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -6,9 +6,7 @@ import {
   Trophy, 
   Clock, 
   Shield, 
-  Crown,
   ChevronRight,
-  Zap,
   BookOpen,
   Bell
 } from 'lucide-react';

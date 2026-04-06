@@ -6,15 +6,10 @@ import {
   Home, 
   HelpCircle, 
   Crown, 
-  Settings,
-  Bell
+  Settings
 } from 'lucide-react';
 
-interface BottomNavProps {
-  onNotificationClick?: () => void;
-}
-
-export function BottomNav({ onNotificationClick }: BottomNavProps) {
+export function BottomNav() {
   const { navigate, currentPath } = useRouter();
   const { isPremium } = useAuth();
   const { theme } = useTheme();
