@@ -50,6 +50,69 @@ export interface Database {
         }
         Relationships: EmptyRel[]
       }
+      categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          icon: string | null
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          icon?: string | null
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          icon?: string | null
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: EmptyRel[]
+      }
+      login_history: {
+        Row: {
+          id: string
+          user_id: string
+          login_at: string
+          logout_at: string | null
+          duration_seconds: number | null
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          login_at?: string
+          logout_at?: string | null
+          duration_seconds?: number | null
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          login_at?: string
+          logout_at?: string | null
+          duration_seconds?: number | null
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Relationships: EmptyRel[]
+      }
       support_queries: {
         Row: {
           id: string
@@ -107,6 +170,7 @@ export interface Database {
       questions: {
         Row: {
           id: string
+          category_id: string | null
           category: string
           subject: string | null
           question_text: string
@@ -118,6 +182,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          category_id?: string | null
           category: string
           subject?: string | null
           question_text: string
@@ -129,6 +194,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          category_id?: string | null
           category?: string
           subject?: string | null
           question_text?: string
@@ -143,6 +209,7 @@ export interface Database {
       exams: {
         Row: {
           id: string
+          category_id: string | null
           title: string
           category: string
           subject: string | null
@@ -154,6 +221,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          category_id?: string | null
           title: string
           category: string
           subject?: string | null
@@ -165,6 +233,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          category_id?: string | null
           title?: string
           category?: string
           subject?: string | null

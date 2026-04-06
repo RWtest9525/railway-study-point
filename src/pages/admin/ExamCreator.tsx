@@ -12,7 +12,7 @@ type Question = Database['public']['Tables']['questions']['Row'];
 export function ExamCreator() {
   const { profile } = useAuth();
   const { theme } = useTheme();
-  const [exams, setExams] = useState<(Exam & { subject?: string | null })[]>([]);
+  const [exams, setExams] = useState<(Exam & { subject?: string | null; category_id?: string | null })[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,6 @@ export function ExamCreator() {
   });
 
   const [newTopic, setNewTopic] = useState('');
-  const [showPDFUpload, setShowPDFUpload] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [extractedText, setExtractedText] = useState('');
 
@@ -77,7 +76,8 @@ export function ExamCreator() {
           } else {
             const examsWithSubject = (fallbackData || []).map(e => ({
               ...e,
-              subject: 'General' as string | null
+              subject: 'General' as string | null,
+              category_id: null as string | null
             }));
             setExams(examsWithSubject);
           }
@@ -90,7 +90,8 @@ export function ExamCreator() {
           if (!fallbackError && fallbackData) {
             const examsWithDate = fallbackData.map(e => ({
               ...e,
-              created_at: new Date().toISOString()
+              created_at: new Date().toISOString(),
+              category_id: null as string | null
             }));
             setExams(examsWithDate);
           }
@@ -99,7 +100,12 @@ export function ExamCreator() {
           setExams([]);
         }
       } else {
-        setExams(data || []);
+        // Add category_id to the data if it doesn't have it
+        const examsWithData = (data || []).map(e => ({
+          ...e,
+          category_id: (e as any).category_id || null
+        }));
+        setExams(examsWithData);
       }
     } catch (error: any) {
       console.error('Error loading exams:', error);
@@ -339,7 +345,6 @@ export function ExamCreator() {
     setShowForm(false);
     setPdfFile(null);
     setExtractedText('');
-    setShowPDFUpload(false);
   };
 
   const toggleExamExpand = (examId: string) => {

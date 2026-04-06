@@ -295,6 +295,63 @@ export function UserManagement() {
         </div>
       )}
 
+      {/* Stats Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-4 border ${isDark ? '' : 'shadow-lg'}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center">
+              <UserPlus className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{users.length}</p>
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Total Users</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-4 border ${isDark ? '' : 'shadow-lg'}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-600/20 rounded-lg flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {users.filter(u => u.role === 'admin').length}
+              </p>
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Total Admins</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-4 border ${isDark ? '' : 'shadow-lg'}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-yellow-600/20 rounded-lg flex items-center justify-center">
+              <Crown className="w-5 h-5 text-yellow-400" />
+            </div>
+            <div>
+              <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {users.filter(u => u.is_premium && u.premium_until && new Date(u.premium_until) > new Date()).length}
+              </p>
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Premium Users</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-4 border ${isDark ? '' : 'shadow-lg'}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-600/20 rounded-lg flex items-center justify-center">
+              <Ban className="w-5 h-5 text-gray-400" />
+            </div>
+            <div>
+              <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {users.filter(u => u.role === 'banned').length}
+              </p>
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Banned</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border overflow-hidden ${isDark ? 'shadow-2xl' : 'shadow-lg'}`}>
         <div className={`p-4 sm:p-6 border-b ${isDark ? 'border-gray-700 bg-gray-700/30' : 'border-gray-200 bg-gray-50'} flex flex-col lg:flex-row items-center gap-4`}>
           <div className="relative w-full lg:flex-1">

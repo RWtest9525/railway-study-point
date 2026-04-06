@@ -1,6 +1,7 @@
 -- =====================================================
 -- MASTER SCHEMA - Exam Prep Application
 -- Created: 2026-04-06
+-- Fixed: 2026-04-06 (Zero-Recursion RLS + New Tables)
 -- This is the single source of truth for database schema
 -- =====================================================
 
@@ -22,6 +23,45 @@ CREATE TABLE IF NOT EXISTS profiles (
     role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('admin', 'student', 'banned')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =====================================================
+-- TABLE: categories
+-- Stores exam categories (Group-D, ALP, Technician, etc.)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    icon TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Insert default categories
+INSERT INTO categories (name, description, icon, sort_order) VALUES
+('Group-D', 'Group D Exam Preparation', '📚', 1),
+('ALP', 'Assistant Loco Pilot Exam', '🚂', 2),
+('Technician', 'Technician Exam Preparation', '🔧', 3),
+('BSED', 'Bihar Secondary Education Board', '📖', 4),
+('NTPC', 'Non-Technical Popular Categories', '💼', 5),
+('Technical', 'Technical Exam Preparation', '⚙️', 6)
+ON CONFLICT (name) DO NOTHING;
+
+-- =====================================================
+-- TABLE: login_history
+-- Tracks user login sessions
+-- =====================================================
+CREATE TABLE IF NOT EXISTS login_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    login_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    logout_at TIMESTAMPTZ,
+    duration_seconds INTEGER,
+    ip_address INET,
+    user_agent TEXT
 );
 
 -- =====================================================
@@ -47,6 +87,7 @@ ON CONFLICT (id) DO NOTHING;
 -- =====================================================
 CREATE TABLE IF NOT EXISTS questions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     category TEXT NOT NULL,
     subject TEXT,
     question_text TEXT NOT NULL,
@@ -63,6 +104,7 @@ CREATE TABLE IF NOT EXISTS questions (
 -- =====================================================
 CREATE TABLE IF NOT EXISTS exams (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     category TEXT NOT NULL,
     subject TEXT,
@@ -123,12 +165,19 @@ CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 CREATE INDEX IF NOT EXISTS idx_profiles_is_premium ON profiles(is_premium);
 
+CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
+CREATE INDEX IF NOT EXISTS idx_categories_is_active ON categories(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_login_history_user_id ON login_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_login_history_login_at ON login_history(login_at);
+
 CREATE INDEX IF NOT EXISTS idx_questions_category ON questions(category);
+CREATE INDEX IF NOT EXISTS idx_questions_category_id ON questions(category_id);
 CREATE INDEX IF NOT EXISTS idx_questions_subject ON questions(subject);
 CREATE INDEX IF NOT EXISTS idx_questions_created_by ON questions(created_by);
 
 CREATE INDEX IF NOT EXISTS idx_exams_category ON exams(category);
-CREATE INDEX IF NOT EXISTS idx_exams_subject ON exams(subject);
+CREATE INDEX IF NOT EXISTS idx_exams_category_id ON exams(category_id);
 CREATE INDEX IF NOT EXISTS idx_exams_is_premium ON exams(is_premium);
 CREATE INDEX IF NOT EXISTS idx_exams_created_by ON exams(created_by);
 
@@ -148,6 +197,8 @@ CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
 
 -- Enable RLS on all tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE login_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exams ENABLE ROW LEVEL SECURITY;
@@ -156,250 +207,222 @@ ALTER TABLE support_queries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 
 -- =====================================================
--- PROFILES POLICIES
+-- DROP ALL EXISTING POLICIES (Clean Slate)
 -- =====================================================
 
--- Users can read their own profile
-CREATE POLICY "Users can read own profile" ON profiles
-    FOR SELECT
+-- Drop all policies on profiles
+DROP POLICY IF EXISTS "profiles_select_own" ON profiles;
+DROP POLICY IF EXISTS "profiles_update_own" ON profiles;
+DROP POLICY IF EXISTS "profiles_select_admin" ON profiles;
+DROP POLICY IF EXISTS "profiles_update_admin" ON profiles;
+DROP POLICY IF EXISTS "profiles_insert_service" ON profiles;
+DROP POLICY IF EXISTS "Users can read own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Admins can read all profiles" ON profiles;
+DROP POLICY IF EXISTS "Admins can update all profiles" ON profiles;
+
+-- Drop all policies on categories
+DROP POLICY IF EXISTS "categories_select_public" ON categories;
+DROP POLICY IF EXISTS "categories_admin_all" ON categories;
+
+-- Drop all policies on login_history
+DROP POLICY IF EXISTS "login_history_select_own" ON login_history;
+DROP POLICY IF EXISTS "login_history_admin_all" ON login_history;
+DROP POLICY IF EXISTS "login_history_insert_own" ON login_history;
+
+-- Drop all policies on site_settings
+DROP POLICY IF EXISTS "site_settings_select_public" ON site_settings;
+DROP POLICY IF EXISTS "site_settings_update_admin" ON site_settings;
+DROP POLICY IF EXISTS "Anyone can read site settings" ON site_settings;
+DROP POLICY IF EXISTS "Admins can update site settings" ON site_settings;
+
+-- Drop all policies on questions
+DROP POLICY IF EXISTS "questions_select_authenticated" ON questions;
+DROP POLICY IF EXISTS "questions_select_public" ON questions;
+DROP POLICY IF EXISTS "questions_admin_all" ON questions;
+DROP POLICY IF EXISTS "Authenticated users can read questions" ON questions;
+DROP POLICY IF EXISTS "Admins can insert questions" ON questions;
+DROP POLICY IF EXISTS "Admins can update questions" ON questions;
+DROP POLICY IF EXISTS "Admins can delete questions" ON questions;
+
+-- Drop all policies on exams
+DROP POLICY IF EXISTS "exams_select_authenticated" ON exams;
+DROP POLICY IF EXISTS "exams_select_public" ON exams;
+DROP POLICY IF EXISTS "exams_admin_all" ON exams;
+DROP POLICY IF EXISTS "Authenticated users can read exams" ON exams;
+DROP POLICY IF EXISTS "Admins can insert exams" ON exams;
+DROP POLICY IF EXISTS "Admins can update exams" ON exams;
+DROP POLICY IF EXISTS "Admins can delete exams" ON exams;
+
+-- Drop all policies on results
+DROP POLICY IF EXISTS "results_select_own" ON results;
+DROP POLICY IF EXISTS "results_insert_own" ON results;
+DROP POLICY IF EXISTS "results_admin_all" ON results;
+DROP POLICY IF EXISTS "Users can read own results" ON results;
+DROP POLICY IF EXISTS "Users can insert own results" ON results;
+DROP POLICY IF EXISTS "Admins can read all results" ON results;
+
+-- Drop all policies on support_queries
+DROP POLICY IF EXISTS "support_queries_select_own" ON support_queries;
+DROP POLICY IF EXISTS "support_queries_insert_own" ON support_queries;
+DROP POLICY IF EXISTS "support_queries_update_own" ON support_queries;
+DROP POLICY IF EXISTS "support_queries_admin_all" ON support_queries;
+DROP POLICY IF EXISTS "Users can read own support queries" ON support_queries;
+DROP POLICY IF EXISTS "Users can insert own support queries" ON support_queries;
+DROP POLICY IF EXISTS "Users can update own support queries" ON support_queries;
+DROP POLICY IF EXISTS "Admins can read all support queries" ON support_queries;
+DROP POLICY IF EXISTS "Admins can update all support queries" ON support_queries;
+
+-- Drop all policies on transactions
+DROP POLICY IF EXISTS "transactions_select_own" ON transactions;
+DROP POLICY IF EXISTS "transactions_insert_own" ON transactions;
+DROP POLICY IF EXISTS "transactions_admin_all" ON transactions;
+DROP POLICY IF EXISTS "Users can read own transactions" ON transactions;
+DROP POLICY IF EXISTS "Users can insert own transactions" ON transactions;
+DROP POLICY IF EXISTS "Admins can read all transactions" ON transactions;
+DROP POLICY IF EXISTS "Admins can update all transactions" ON transactions;
+
+-- =====================================================
+-- HELPER FUNCTION: Zero-Recursion Admin Check
+-- Uses SECURITY DEFINER to bypass RLS and check role
+-- =====================================================
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+DECLARE
+  user_role TEXT;
+BEGIN
+  -- Direct query with SECURITY DEFINER to avoid RLS recursion
+  SELECT p.role INTO user_role 
+  FROM profiles p 
+  WHERE p.id = auth.uid() 
+  LIMIT 1;
+  
+  RETURN user_role = 'admin';
+EXCEPTION
+  WHEN NO_DATA_FOUND THEN
+    RETURN false;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- =====================================================
+-- ZERO-RECURSION RLS POLICIES
+-- =====================================================
+
+-- ---- PROFILES POLICIES ----
+-- Users can read/update their own profile (direct check, no recursion)
+CREATE POLICY "profiles_select_own" ON profiles FOR SELECT
     USING (auth.uid() = id);
 
--- Users can update their own profile
-CREATE POLICY "Users can update own profile" ON profiles
-    FOR UPDATE
+CREATE POLICY "profiles_update_own" ON profiles FOR UPDATE
     USING (auth.uid() = id)
     WITH CHECK (auth.uid() = id);
 
--- Admins can read all profiles
-CREATE POLICY "Admins can read all profiles" ON profiles
-    FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- Admins can do everything on profiles (uses SECURITY DEFINER function)
+CREATE POLICY "profiles_admin_all" ON profiles FOR ALL
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
 
--- Admins can update all profiles
-CREATE POLICY "Admins can update all profiles" ON profiles
-    FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    )
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- Allow profile creation during signup
+CREATE POLICY "profiles_insert_service" ON profiles FOR INSERT
+    WITH CHECK (auth.uid() = id);
 
--- =====================================================
--- SITE_SETTINGS POLICIES
--- =====================================================
-
--- Anyone can read site settings
-CREATE POLICY "Anyone can read site settings" ON site_settings
-    FOR SELECT
-    USING (true);
-
--- Only admins can update site settings
-CREATE POLICY "Admins can update site settings" ON site_settings
-    FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    )
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
-
--- =====================================================
--- QUESTIONS POLICIES
--- =====================================================
-
--- Authenticated users can read questions
-CREATE POLICY "Authenticated users can read questions" ON questions
-    FOR SELECT
+-- ---- CATEGORIES POLICIES ----
+-- Everyone authenticated can read categories
+CREATE POLICY "categories_select_public" ON categories FOR SELECT
     USING (auth.role() = 'authenticated');
 
--- Admins can insert questions
-CREATE POLICY "Admins can insert questions" ON questions
-    FOR INSERT
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- Admins can do everything on categories
+CREATE POLICY "categories_admin_all" ON categories FOR ALL
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
 
--- Admins can update questions
-CREATE POLICY "Admins can update questions" ON questions
-    FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    )
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- ---- LOGIN_HISTORY POLICIES ----
+-- Users can read their own login history
+CREATE POLICY "login_history_select_own" ON login_history FOR SELECT
+    USING (auth.uid() = user_id);
 
--- Admins can delete questions
-CREATE POLICY "Admins can delete questions" ON questions
-    FOR DELETE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- Users can insert their own login records
+CREATE POLICY "login_history_insert_own" ON login_history FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
 
--- =====================================================
--- EXAMS POLICIES
--- =====================================================
+-- Admins can read all login history
+CREATE POLICY "login_history_admin_all" ON login_history FOR ALL
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
 
--- Authenticated users can read exams
-CREATE POLICY "Authenticated users can read exams" ON exams
-    FOR SELECT
+-- ---- SITE_SETTINGS POLICIES ----
+-- Everyone authenticated can read site settings
+CREATE POLICY "site_settings_select_public" ON site_settings FOR SELECT
     USING (auth.role() = 'authenticated');
 
--- Admins can insert exams
-CREATE POLICY "Admins can insert exams" ON exams
-    FOR INSERT
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- Admins can update site settings
+CREATE POLICY "site_settings_update_admin" ON site_settings FOR UPDATE
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
 
--- Admins can update exams
-CREATE POLICY "Admins can update exams" ON exams
-    FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    )
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- ---- QUESTIONS POLICIES ----
+-- Everyone authenticated can read questions
+CREATE POLICY "questions_select_public" ON questions FOR SELECT
+    USING (auth.role() = 'authenticated');
 
--- Admins can delete exams
-CREATE POLICY "Admins can delete exams" ON exams
-    FOR DELETE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- Admins can do everything on questions
+CREATE POLICY "questions_admin_all" ON questions FOR ALL
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
 
--- =====================================================
--- RESULTS POLICIES
--- =====================================================
+-- ---- EXAMS POLICIES ----
+-- Everyone authenticated can read exams
+CREATE POLICY "exams_select_public" ON exams FOR SELECT
+    USING (auth.role() = 'authenticated');
 
+-- Admins can do everything on exams
+CREATE POLICY "exams_admin_all" ON exams FOR ALL
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
+
+-- ---- RESULTS POLICIES ----
 -- Users can read their own results
-CREATE POLICY "Users can read own results" ON results
-    FOR SELECT
+CREATE POLICY "results_select_own" ON results FOR SELECT
     USING (auth.uid() = user_id);
 
 -- Users can insert their own results
-CREATE POLICY "Users can insert own results" ON results
-    FOR INSERT
+CREATE POLICY "results_insert_own" ON results FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
 -- Admins can read all results
-CREATE POLICY "Admins can read all results" ON results
-    FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+CREATE POLICY "results_admin_all" ON results FOR SELECT
+    USING (public.is_admin());
 
--- =====================================================
--- SUPPORT_QUERIES POLICIES
--- =====================================================
-
--- Users can read their own support queries
-CREATE POLICY "Users can read own support queries" ON support_queries
-    FOR SELECT
+-- ---- SUPPORT_QUERIES POLICIES ----
+-- Users can manage their own support queries
+CREATE POLICY "support_queries_select_own" ON support_queries FOR SELECT
     USING (auth.uid() = user_id);
 
--- Users can insert their own support queries
-CREATE POLICY "Users can insert own support queries" ON support_queries
-    FOR INSERT
+CREATE POLICY "support_queries_insert_own" ON support_queries FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
--- Users can update their own support queries
-CREATE POLICY "Users can update own support queries" ON support_queries
-    FOR UPDATE
+CREATE POLICY "support_queries_update_own" ON support_queries FOR UPDATE
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
--- Admins can read all support queries
-CREATE POLICY "Admins can read all support queries" ON support_queries
-    FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- Admins can do everything on support queries
+CREATE POLICY "support_queries_admin_all" ON support_queries FOR ALL
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
 
--- Admins can update all support queries
-CREATE POLICY "Admins can update all support queries" ON support_queries
-    FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    )
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
-
--- =====================================================
--- TRANSACTIONS POLICIES
--- =====================================================
-
+-- ---- TRANSACTIONS POLICIES ----
 -- Users can read their own transactions
-CREATE POLICY "Users can read own transactions" ON transactions
-    FOR SELECT
+CREATE POLICY "transactions_select_own" ON transactions FOR SELECT
     USING (auth.uid() = user_id);
 
 -- Users can insert their own transactions
-CREATE POLICY "Users can insert own transactions" ON transactions
-    FOR INSERT
+CREATE POLICY "transactions_insert_own" ON transactions FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
--- Admins can read all transactions
-CREATE POLICY "Admins can read all transactions" ON transactions
-    FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
-
--- Admins can update all transactions
-CREATE POLICY "Admins can update all transactions" ON transactions
-    FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    )
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
+-- Admins can do everything on transactions
+CREATE POLICY "transactions_admin_all" ON transactions FOR ALL
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
 
 -- =====================================================
 -- FUNCTIONS
@@ -441,7 +464,7 @@ BEGIN
     VALUES (
         NEW.id,
         NEW.email,
-        NEW.raw_user_meta_data->>'full_name',
+        COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
         COALESCE(NEW.raw_user_meta_data->>'role', 'student')
     );
     RETURN NEW;
@@ -471,12 +494,24 @@ CREATE TRIGGER update_profiles_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Apply updated_at trigger to categories
+DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
+CREATE TRIGGER update_categories_updated_at
+    BEFORE UPDATE ON categories
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Apply updated_at trigger to support_queries
 DROP TRIGGER IF EXISTS update_support_queries_updated_at ON support_queries;
 CREATE TRIGGER update_support_queries_updated_at
     BEFORE UPDATE ON support_queries
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- =====================================================
+-- SCHEMA RELOAD NOTIFICATION
+-- =====================================================
+NOTIFY pgrst, 'reload schema';
 
 -- =====================================================
 -- SCHEMA COMPLETE

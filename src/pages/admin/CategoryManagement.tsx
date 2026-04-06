@@ -1,219 +1,167 @@
 import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Plus, Trash2, Edit2, Folder, Tag } from 'lucide-react';
 
-// Define types locally since tables don't exist in database yet
 type Category = {
   id: string;
   name: string;
-  display_name: string;
-  description?: string;
-  icon?: string;
-  is_active: boolean;
-  sort_order: number;
-  created_at: string;
-};
-
-type SubCategory = {
-  id: string;
-  category_id: string;
-  name: string;
-  display_name: string;
-  description?: string;
+  description: string | null;
+  icon: string | null;
   is_active: boolean;
   sort_order: number;
   created_at: string;
 };
 
 export function CategoryManagement() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
-  const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [showCategoryForm, setShowCategoryForm] = useState(false);
-  const [showSubCategoryForm, setShowSubCategoryForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [editingSubCategory, setEditingSubCategory] = useState<SubCategory | null>(null);
-  const [useLocalStorage, setUseLocalStorage] = useState(true); // Fallback mode
 
   const [categoryForm, setCategoryForm] = useState({
     name: '',
-    display_name: '',
     description: '',
-    icon: 'Folder',
-    is_active: true,
-    sort_order: 0
-  });
-
-  const [subCategoryForm, setSubCategoryForm] = useState({
-    category_id: '',
-    name: '',
-    display_name: '',
-    description: '',
+    icon: '📁',
     is_active: true,
     sort_order: 0
   });
 
   useEffect(() => {
-    loadData();
+    loadCategories();
   }, []);
 
-  const loadData = async () => {
+  const loadCategories = async () => {
     setLoading(true);
+    setError('');
     try {
-      // Use localStorage fallback since database tables don't exist yet
-      const storedCategories = localStorage.getItem('exam_categories');
-      const storedSubCategories = localStorage.getItem('exam_subcategories');
-      
-      if (storedCategories) {
-        setCategories(JSON.parse(storedCategories));
-      } else {
-        // Default categories
-        const defaultCategories = [
-          { id: '1', name: 'Group-D', display_name: 'Group D', description: 'Group D Railway Exams', icon: 'Users', is_active: true, sort_order: 1, created_at: new Date().toISOString() },
-          { id: '2', name: 'ALP', display_name: 'ALP', description: 'Assistant Loco Pilot', icon: 'Train', is_active: true, sort_order: 2, created_at: new Date().toISOString() },
-          { id: '3', name: 'Technician', display_name: 'Technician', description: 'Technical Posts', icon: 'Wrench', is_active: true, sort_order: 3, created_at: new Date().toISOString() },
-          { id: '4', name: 'BSED', display_name: 'BSED', description: 'BSED Exams', icon: 'Book', is_active: true, sort_order: 4, created_at: new Date().toISOString() },
-          { id: '5', name: 'NTPC', display_name: 'NTPC', description: 'Non-Technical Popular Categories', icon: 'Clock', is_active: true, sort_order: 5, created_at: new Date().toISOString() },
-          { id: '6', name: 'Technical', display_name: 'Technical (Electrician/Fitter/Welder)', description: 'Technical Trades', icon: 'Zap', is_active: true, sort_order: 6, created_at: new Date().toISOString() }
-        ];
-        setCategories(defaultCategories);
-        localStorage.setItem('exam_categories', JSON.stringify(defaultCategories));
-      }
+      const { data, error: fetchError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
 
-      if (storedSubCategories) {
-        setSubCategories(JSON.parse(storedSubCategories));
+      if (fetchError) throw fetchError;
+      
+      if (data && data.length > 0) {
+        setCategories(data);
       } else {
-        // Default subcategories
-        const defaultSubCategories = [
-          { id: '1', category_id: '1', name: 'Math', display_name: 'Math Question', description: 'Mathematics Questions', is_active: true, sort_order: 1, created_at: new Date().toISOString() },
-          { id: '2', category_id: '1', name: 'Reasoning', display_name: 'Reasoning Question', description: 'Reasoning Questions', is_active: true, sort_order: 2, created_at: new Date().toISOString() },
-          { id: '3', category_id: '1', name: 'Science', display_name: 'Science Question', description: 'Science Questions', is_active: true, sort_order: 3, created_at: new Date().toISOString() },
-          { id: '4', category_id: '1', name: 'GK', display_name: 'General Knowledge', description: 'General Knowledge', is_active: true, sort_order: 4, created_at: new Date().toISOString() }
+        // No categories exist, create defaults
+        const defaultCategories = [
+          { name: 'Group-D', description: 'Group D Railway Exams', icon: '📚', is_active: true, sort_order: 1 },
+          { name: 'ALP', description: 'Assistant Loco Pilot', icon: '🚂', is_active: true, sort_order: 2 },
+          { name: 'Technician', description: 'Technical Posts', icon: '🔧', is_active: true, sort_order: 3 },
+          { name: 'BSED', description: 'BSED Exams', icon: '📖', is_active: true, sort_order: 4 },
+          { name: 'NTPC', description: 'Non-Technical Popular Categories', icon: '💼', is_active: true, sort_order: 5 },
+          { name: 'Technical', description: 'Technical Trades', icon: '⚙️', is_active: true, sort_order: 6 }
         ];
-        setSubCategories(defaultSubCategories);
-        localStorage.setItem('exam_subcategories', JSON.stringify(defaultSubCategories));
+
+        const { data: inserted, error: insertError } = await supabase
+          .from('categories')
+          .insert(defaultCategories)
+          .select();
+
+        if (insertError) throw insertError;
+        if (inserted) setCategories(inserted);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading categories:', err);
-      setError('Failed to load categories');
+      setError('Failed to load categories: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
   };
 
   const saveCategory = async () => {
+    if (!categoryForm.name.trim()) {
+      setError('Category name is required');
+      return;
+    }
+
     try {
-      let updatedCategories;
       if (editingCategory) {
-        updatedCategories = categories.map(cat => 
-          cat.id === editingCategory.id ? { ...categoryForm, id: editingCategory.id } : cat
-        );
+        // Update existing category
+        const { error: updateError } = await supabase
+          .from('categories')
+          .update({
+            name: categoryForm.name,
+            description: categoryForm.description || null,
+            icon: categoryForm.icon,
+            is_active: categoryForm.is_active,
+            sort_order: categoryForm.sort_order,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingCategory.id);
+
+        if (updateError) throw updateError;
         setMessage('Category updated successfully');
       } else {
-        const newCategory = {
-          ...categoryForm,
-          id: Date.now().toString(),
-          created_at: new Date().toISOString()
-        };
-        updatedCategories = [...categories, newCategory];
-        setMessage('Category added successfully');
-      }
-      
-      setCategories(updatedCategories);
-      localStorage.setItem('exam_categories', JSON.stringify(updatedCategories));
-      resetCategoryForm();
-    } catch (err: any) {
-      console.error(err);
-      setError('Failed to save category');
-    }
-  };
+        // Create new category
+        const { data: newCategory, error: insertError } = await supabase
+          .from('categories')
+          .insert({
+            name: categoryForm.name,
+            description: categoryForm.description || null,
+            icon: categoryForm.icon,
+            is_active: categoryForm.is_active,
+            sort_order: categoryForm.sort_order
+          })
+          .select()
+          .single();
 
-  const saveSubCategory = async () => {
-    try {
-      let updatedSubCategories;
-      if (editingSubCategory) {
-        updatedSubCategories = subCategories.map(sub => 
-          sub.id === editingSubCategory.id ? { ...subCategoryForm, id: editingSubCategory.id } : sub
-        );
-        setMessage('Subcategory updated successfully');
-      } else {
-        const newSubCategory = {
-          ...subCategoryForm,
-          id: Date.now().toString(),
-          created_at: new Date().toISOString()
-        };
-        updatedSubCategories = [...subCategories, newSubCategory];
-        setMessage('Subcategory added successfully');
+        if (insertError) throw insertError;
+        if (newCategory) {
+          setCategories([...categories, newCategory]);
+          setMessage('Category added successfully');
+        }
       }
       
-      setSubCategories(updatedSubCategories);
-      localStorage.setItem('exam_subcategories', JSON.stringify(updatedSubCategories));
-      resetSubCategoryForm();
+      resetCategoryForm();
+      loadCategories();
     } catch (err: any) {
-      console.error(err);
-      setError('Failed to save subcategory');
+      console.error('Error saving category:', err);
+      setError('Failed to save category: ' + (err.message || 'Unknown error'));
     }
   };
 
   const deleteCategory = async (id: string) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
+    
     try {
-      const updatedCategories = categories.filter(cat => cat.id !== id);
-      setCategories(updatedCategories);
-      localStorage.setItem('exam_categories', JSON.stringify(updatedCategories));
-      setMessage('Category deleted successfully');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to delete category');
-    }
-  };
+      const { error: deleteError } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
 
-  const deleteSubCategory = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this subcategory?')) return;
-    try {
-      const updatedSubCategories = subCategories.filter(sub => sub.id !== id);
-      setSubCategories(updatedSubCategories);
-      localStorage.setItem('exam_subcategories', JSON.stringify(updatedSubCategories));
-      setMessage('Subcategory deleted successfully');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to delete subcategory');
+      if (deleteError) throw deleteError;
+      setMessage('Category deleted successfully');
+      loadCategories();
+    } catch (err: any) {
+      console.error('Error deleting category:', err);
+      setError('Failed to delete category: ' + (err.message || 'Unknown error'));
     }
   };
 
   const resetCategoryForm = () => {
     setCategoryForm({
       name: '',
-      display_name: '',
       description: '',
-      icon: 'Folder',
+      icon: '📁',
       is_active: true,
-      sort_order: 0
+      sort_order: categories.length + 1
     });
     setEditingCategory(null);
     setShowCategoryForm(false);
   };
 
-  const resetSubCategoryForm = () => {
-    setSubCategoryForm({
-      category_id: '',
-      name: '',
-      display_name: '',
-      description: '',
-      is_active: true,
-      sort_order: 0
-    });
-    setEditingSubCategory(null);
-    setShowSubCategoryForm(false);
-  };
-
   const editCategory = (category: Category) => {
     setCategoryForm({
       name: category.name,
-      display_name: category.display_name,
       description: category.description || '',
-      icon: category.icon || 'Folder',
+      icon: category.icon || '📁',
       is_active: category.is_active,
       sort_order: category.sort_order
     });
@@ -221,94 +169,76 @@ export function CategoryManagement() {
     setShowCategoryForm(true);
   };
 
-  const editSubCategory = (subCategory: SubCategory) => {
-    setSubCategoryForm({
-      category_id: subCategory.category_id,
-      name: subCategory.name,
-      display_name: subCategory.display_name,
-      description: subCategory.description || '',
-      is_active: subCategory.is_active,
-      sort_order: subCategory.sort_order
-    });
-    setEditingSubCategory(subCategory);
-    setShowSubCategoryForm(true);
-  };
-
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Folder className="w-8 h-8 text-blue-400" />
+          <h2 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} flex items-center gap-3`}>
+            <Folder className={`w-8 h-8 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
             Category Management
           </h2>
-          <p className="text-gray-400 text-sm mt-1">Manage exam categories and subcategories</p>
-          <div className="mt-2">
-            <span className="text-xs text-amber-400 bg-amber-600/20 px-2 py-1 rounded">
-              Using local storage (Database tables not created yet)
-            </span>
-          </div>
+          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mt-1`}>Manage exam categories</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowCategoryForm(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-          >
-            <Plus className="w-4 h-4" /> Add Category
-          </button>
-          <button
-            onClick={() => setShowSubCategoryForm(true)}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition"
-          >
-            <Tag className="w-4 h-4" /> Add Subcategory
-          </button>
-        </div>
+        <button
+          onClick={() => setShowCategoryForm(true)}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition font-semibold"
+        >
+          <Plus className="w-4 h-4" /> Add Category
+        </button>
       </div>
 
       {message && (
-        <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-3 rounded-xl">
+        <div className={`${isDark ? 'bg-green-900/40 border-green-600 text-green-200' : 'bg-green-50 border-green-200 text-green-700'} px-4 py-3 rounded-xl border`}>
           {message}
         </div>
       )}
       {error && (
-        <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-3 rounded-xl">
+        <div className={`${isDark ? 'bg-red-900/40 border-red-600 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} px-4 py-3 rounded-xl border`}>
           {error}
         </div>
       )}
 
       {/* Categories Section */}
-      <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6">
-        <h3 className="text-xl font-bold text-white mb-4">Exam Categories</h3>
+      <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-6 ${isDark ? '' : 'shadow-lg'}`}>
+        <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-4`}>Exam Categories</h3>
         
         {loading ? (
-          <div className="text-center text-gray-400 py-8">Loading categories...</div>
+          <div className={`text-center ${isDark ? 'text-gray-400' : 'text-gray-600'} py-8`}>Loading categories...</div>
+        ) : categories.length === 0 ? (
+          <div className={`text-center ${isDark ? 'text-gray-400' : 'text-gray-600'} py-8`}>No categories found. Add your first category!</div>
         ) : (
           <div className="space-y-3">
             {categories.map((category) => (
-              <div key={category.id} className="bg-gray-700/50 rounded-lg p-4 flex items-center justify-between">
+              <div 
+                key={category.id} 
+                className={`${isDark ? 'bg-gray-700/50 hover:bg-gray-700' : 'bg-gray-50 hover:bg-gray-100'} rounded-lg p-4 flex items-center justify-between transition`}
+              >
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${category.is_active ? 'bg-blue-600/20' : 'bg-gray-600/20'}`}>
-                    <Folder className={`w-5 h-5 ${category.is_active ? 'text-blue-400' : 'text-gray-500'}`} />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${category.is_active ? (isDark ? 'bg-blue-600/20' : 'bg-blue-100') : (isDark ? 'bg-gray-600/20' : 'bg-gray-200')}`}>
+                    {category.icon || '📁'}
                   </div>
                   <div>
-                    <h4 className="text-white font-semibold">{category.display_name}</h4>
-                    <p className="text-gray-400 text-sm">{category.description}</p>
-                    <p className="text-gray-500 text-xs">Code: {category.name}</p>
+                    <h4 className={`${isDark ? 'text-white' : 'text-gray-900'} font-semibold`}>{category.name}</h4>
+                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>{category.description || 'No description'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded text-xs ${category.is_active ? 'bg-green-600/20 text-green-400' : 'bg-gray-600/20 text-gray-400'}`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    category.is_active 
+                      ? (isDark ? 'bg-green-600/20 text-green-400' : 'bg-green-100 text-green-700')
+                      : (isDark ? 'bg-gray-600/20 text-gray-400' : 'bg-gray-200 text-gray-600')
+                  }`}>
                     {category.is_active ? 'Active' : 'Inactive'}
                   </span>
                   <button
                     onClick={() => editCategory(category)}
-                    className="p-2 text-blue-400 hover:bg-blue-600/10 rounded-lg transition"
+                    className={`p-2 ${isDark ? 'text-blue-400 hover:bg-blue-600/10' : 'text-blue-600 hover:bg-blue-100'} rounded-lg transition`}
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => deleteCategory(category.id)}
-                    className="p-2 text-red-400 hover:bg-red-600/10 rounded-lg transition"
+                    className={`p-2 ${isDark ? 'text-red-400 hover:bg-red-600/10' : 'text-red-600 hover:bg-red-100'} rounded-lg transition`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -319,87 +249,51 @@ export function CategoryManagement() {
         )}
       </div>
 
-      {/* Subcategories Section */}
-      <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6">
-        <h3 className="text-xl font-bold text-white mb-4">Subcategories</h3>
-        
-        <div className="space-y-3">
-          {subCategories.map((subCategory) => {
-            const category = categories.find(c => c.id === subCategory.category_id);
-            return (
-              <div key={subCategory.id} className="bg-gray-700/50 rounded-lg p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${subCategory.is_active ? 'bg-green-600/20' : 'bg-gray-600/20'}`}>
-                    <Tag className={`w-5 h-5 ${subCategory.is_active ? 'text-green-400' : 'text-gray-500'}`} />
-                  </div>
-                  <div>
-                    <h4 className="text-white font-semibold">{subCategory.display_name}</h4>
-                    <p className="text-gray-400 text-sm">{subCategory.description}</p>
-                    <p className="text-gray-500 text-xs">Category: {category?.display_name || 'Unknown'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded text-xs ${subCategory.is_active ? 'bg-green-600/20 text-green-400' : 'bg-gray-600/20 text-gray-400'}`}>
-                    {subCategory.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                  <button
-                    onClick={() => editSubCategory(subCategory)}
-                    className="p-2 text-blue-400 hover:bg-blue-600/10 rounded-lg transition"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => deleteSubCategory(subCategory.id)}
-                    className="p-2 text-red-400 hover:bg-red-600/10 rounded-lg transition"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Category Form Modal */}
       {showCategoryForm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-xl max-w-md w-full p-6 border border-gray-700">
-            <h3 className="text-xl font-bold text-white mb-4">
+          <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl max-w-md w-full p-6 border`}>
+            <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-4`}>
               {editingCategory ? 'Edit Category' : 'Add New Category'}
             </h3>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Display Name</label>
-                <input
-                  type="text"
-                  value={categoryForm.display_name}
-                  onChange={(e) => setCategoryForm({...categoryForm, display_name: e.target.value})}
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
-                  placeholder="e.g., Group D"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Code Name</label>
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Category Name</label>
                 <input
                   type="text"
                   value={categoryForm.name}
                   onChange={(e) => setCategoryForm({...categoryForm, name: e.target.value})}
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
+                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'
+                  }`}
                   placeholder="e.g., Group-D"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Description</label>
                 <textarea
                   value={categoryForm.description}
                   onChange={(e) => setCategoryForm({...categoryForm, description: e.target.value})}
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
+                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'
+                  }`}
                   rows={3}
                   placeholder="Category description..."
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Icon (Emoji)</label>
+                <input
+                  type="text"
+                  value={categoryForm.icon}
+                  onChange={(e) => setCategoryForm({...categoryForm, icon: e.target.value})}
+                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'
+                  }`}
+                  placeholder="e.g., 📚"
                 />
               </div>
               
@@ -410,106 +304,35 @@ export function CategoryManagement() {
                   onChange={(e) => setCategoryForm({...categoryForm, is_active: e.target.checked})}
                   className="w-4 h-4 text-blue-600 rounded"
                 />
-                <label className="text-sm text-gray-300">Active</label>
+                <label className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Active</label>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Sort Order</label>
+                <input
+                  type="number"
+                  value={categoryForm.sort_order}
+                  onChange={(e) => setCategoryForm({...categoryForm, sort_order: parseInt(e.target.value) || 0})}
+                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'
+                  }`}
+                  min="0"
+                />
               </div>
             </div>
             
             <div className="flex gap-3 mt-6">
               <button
                 onClick={saveCategory}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition font-semibold"
               >
                 {editingCategory ? 'Update' : 'Create'}
               </button>
               <button
                 onClick={resetCategoryForm}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Subcategory Form Modal */}
-      {showSubCategoryForm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-xl max-w-md w-full p-6 border border-gray-700">
-            <h3 className="text-xl font-bold text-white mb-4">
-              {editingSubCategory ? 'Edit Subcategory' : 'Add New Subcategory'}
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Parent Category</label>
-                <select
-                  value={subCategoryForm.category_id}
-                  onChange={(e) => setSubCategoryForm({...subCategoryForm, category_id: e.target.value})}
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
-                >
-                  <option value="">Select a category</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.display_name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Display Name</label>
-                <input
-                  type="text"
-                  value={subCategoryForm.display_name}
-                  onChange={(e) => setSubCategoryForm({...subCategoryForm, display_name: e.target.value})}
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
-                  placeholder="e.g., Math Question"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Code Name</label>
-                <input
-                  type="text"
-                  value={subCategoryForm.name}
-                  onChange={(e) => setSubCategoryForm({...subCategoryForm, name: e.target.value})}
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
-                  placeholder="e.g., Math"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-                <textarea
-                  value={subCategoryForm.description}
-                  onChange={(e) => setSubCategoryForm({...subCategoryForm, description: e.target.value})}
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600"
-                  rows={3}
-                  placeholder="Subcategory description..."
-                />
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={subCategoryForm.is_active}
-                  onChange={(e) => setSubCategoryForm({...subCategoryForm, is_active: e.target.checked})}
-                  className="w-4 h-4 text-blue-600 rounded"
-                />
-                <label className="text-sm text-gray-300">Active</label>
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={saveSubCategory}
-                disabled={!subCategoryForm.category_id}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition disabled:opacity-50"
-              >
-                {editingSubCategory ? 'Update' : 'Create'}
-              </button>
-              <button
-                onClick={resetSubCategoryForm}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition"
+                className={`flex-1 py-2 rounded-lg transition font-semibold ${
+                  isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+                }`}
               >
                 Cancel
               </button>
