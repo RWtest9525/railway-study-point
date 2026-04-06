@@ -1,5 +1,6 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Trophy, 
   Home, 
@@ -16,6 +17,8 @@ interface BottomNavProps {
 export function BottomNav({ onNotificationClick }: BottomNavProps) {
   const { navigate, currentPath } = useRouter();
   const { isPremium } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
@@ -27,14 +30,16 @@ export function BottomNav({ onNotificationClick }: BottomNavProps) {
   return (
     <>
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-md border-t border-gray-800 z-50 safe-area-pb">
+      <nav className={`fixed bottom-0 left-0 right-0 z-50 safe-area-pb backdrop-blur-md border-t ${isDark ? 'bg-gray-900/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
         <div className="max-w-7xl mx-auto px-2">
           <div className="flex items-center justify-around h-16">
             {/* Leaderboard */}
             <button
               onClick={() => navigate('/leaderboard')}
               className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${
-                isActive('/leaderboard') ? 'text-amber-400' : 'text-gray-500 hover:text-gray-300'
+                isActive('/leaderboard') 
+                  ? (isDark ? 'text-amber-400' : 'text-amber-600') 
+                  : (isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600')
               }`}
             >
               <Trophy className="w-5 h-5 mb-1" />
@@ -45,7 +50,9 @@ export function BottomNav({ onNotificationClick }: BottomNavProps) {
             <button
               onClick={() => navigate('/support')}
               className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${
-                isActive('/support') ? 'text-green-400' : 'text-gray-500 hover:text-gray-300'
+                isActive('/support') 
+                  ? (isDark ? 'text-green-400' : 'text-green-600') 
+                  : (isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600')
               }`}
             >
               <HelpCircle className="w-5 h-5 mb-1" />
@@ -56,7 +63,9 @@ export function BottomNav({ onNotificationClick }: BottomNavProps) {
             <button
               onClick={() => navigate('/dashboard')}
               className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${
-                isActive('/dashboard') ? 'text-blue-400' : 'text-gray-500 hover:text-gray-300'
+                isActive('/dashboard') 
+                  ? (isDark ? 'text-blue-400' : 'text-blue-600') 
+                  : (isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600')
               }`}
             >
               <Home className="w-5 h-5 mb-1" />
@@ -65,14 +74,14 @@ export function BottomNav({ onNotificationClick }: BottomNavProps) {
 
             {/* Premium */}
             {isPremium ? (
-              <div className="flex flex-col items-center justify-center w-full h-full py-2 text-yellow-400">
+              <div className={`flex flex-col items-center justify-center w-full h-full py-2 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
                 <Crown className="w-5 h-5 mb-1" />
                 <span className="text-[10px] font-medium">Premium</span>
               </div>
             ) : (
               <button
                 onClick={() => navigate('/upgrade')}
-                className="flex flex-col items-center justify-center w-full h-full py-2 text-gray-500 hover:text-yellow-400 transition"
+                className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${isDark ? 'text-gray-500 hover:text-yellow-400' : 'text-gray-400 hover:text-yellow-600'}`}
               >
                 <Crown className="w-5 h-5 mb-1" />
                 <span className="text-[10px] font-medium">Premium</span>
@@ -83,7 +92,9 @@ export function BottomNav({ onNotificationClick }: BottomNavProps) {
             <button
               onClick={() => navigate('/settings')}
               className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${
-                isActive('/settings') || isActive('/profile') || isActive('/membership') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300'
+                isActive('/settings') 
+                  ? (isDark ? 'text-purple-400' : 'text-purple-600') 
+                  : (isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600')
               }`}
             >
               <Settings className="w-5 h-5 mb-1" />

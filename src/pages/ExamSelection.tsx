@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Trophy, 
   Clock, 
@@ -30,24 +31,27 @@ export function ExamSelection() {
     { id: 'Technical', name: 'Technical', gradient: 'from-amber-600/20 to-amber-800/20', border: 'border-amber-500/30', text: 'text-amber-400', hover: 'hover:border-amber-400 hover:shadow-amber-500/20' },
   ];
 
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white pb-24">
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
       {/* Header */}
-      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+      <header className={`sticky top-0 z-50 backdrop-blur-md ${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} border-b`}>
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Left: Logo and Company Name */}
           <div className="flex items-center gap-2 min-w-0">
             <BrandLogo variant="nav" className="w-8 h-8 sm:w-10 sm:h-10 shrink-0" />
-            <span className="font-bold text-base sm:text-xl tracking-tight truncate text-white">Railway Study Point</span>
+            <span className={`font-bold text-base sm:text-xl tracking-tight truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>Railway Study Point</span>
           </div>
 
           {/* Right: Notification Bell */}
           <button
             onClick={() => navigate('/notifications')}
-            className="relative p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition shrink-0"
+            className={`relative p-2 rounded-lg transition shrink-0 ${isDark ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
           >
             <Bell className="w-6 h-6" />
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-900" />
+            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 ${isDark ? 'border-gray-900' : 'border-gray-50'}" />
           </button>
         </div>
       </header>
@@ -57,17 +61,17 @@ export function ExamSelection() {
         {!isPremium && effectiveRole !== 'admin' && (
           <>
             {daysLeftTrial !== null && (
-              <div className="bg-amber-600/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                <Clock className="w-5 h-5 text-amber-500 shrink-0" />
-                <p className="text-amber-400 text-sm font-medium">
+              <div className={`${isDark ? 'bg-amber-600/10 border-amber-500/20' : 'bg-amber-100 border-amber-300'} rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2`}>
+                <Clock className={`w-5 h-5 ${isDark ? 'text-amber-500' : 'text-amber-600'} shrink-0`} />
+                <p className={`${isDark ? 'text-amber-400' : 'text-amber-700'} text-sm font-medium`}>
                   Free trial: {daysLeftTrial} day{daysLeftTrial === 1 ? '' : 's'} left
                 </p>
               </div>
             )}
             {trialExpiredNeedsPremium && (
-              <div className="bg-red-600/10 border border-red-500/20 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                <Shield className="w-5 h-5 text-red-500 shrink-0" />
-                <p className="text-red-400 text-sm">Trial expired. Upgrade to unlock exams.</p>
+              <div className={`${isDark ? 'bg-red-600/10 border-red-500/20' : 'bg-red-100 border-red-300'} rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2`}>
+                <Shield className={`w-5 h-5 ${isDark ? 'text-red-500' : 'text-red-600'} shrink-0`} />
+                <p className={`${isDark ? 'text-red-400' : 'text-red-700'} text-sm`}>Trial expired. Upgrade to unlock exams.</p>
               </div>
             )}
           </>
@@ -75,8 +79,8 @@ export function ExamSelection() {
 
         {/* Category Grid */}
         <section>
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-blue-500" />
+          <h2 className={`text-xl font-bold mb-6 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <BookOpen className={`w-5 h-5 ${isDark ? 'text-blue-500' : 'text-blue-600'}`} />
             Select Category
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
@@ -97,18 +101,18 @@ export function ExamSelection() {
         <section className="grid grid-cols-1 gap-4">
           <button
             onClick={() => navigate('/leaderboard')}
-            className="w-full bg-gray-900 border-2 border-amber-500/30 hover:border-amber-500 rounded-2xl p-6 flex items-center justify-between group transition-all"
+            className={`w-full ${isDark ? 'bg-gray-900 border-amber-500/30 hover:border-amber-500' : 'bg-white border-amber-300 hover:border-amber-500'} rounded-2xl p-6 flex items-center justify-between group transition-all shadow-sm`}
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-amber-600/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition">
-                <Trophy className="w-6 h-6 text-amber-400" />
+              <div className={`w-12 h-12 rounded-xl ${isDark ? 'bg-amber-600/20' : 'bg-amber-100'} flex items-center justify-center`}>
+                <Trophy className={`w-6 h-6 ${isDark ? 'text-amber-500' : 'text-amber-600'}`} />
               </div>
               <div className="text-left">
-                <span className="block font-bold text-lg">Leaderboard</span>
-                <span className="text-xs text-gray-500">Top performers ranking</span>
+                <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Leaderboard</h3>
+                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>See where you rank among peers</p>
               </div>
             </div>
-            <ChevronRight className="w-6 h-6 text-gray-600 group-hover:text-amber-400 transition" />
+            <ChevronRight className={`w-6 h-6 ${isDark ? 'text-amber-500' : 'text-amber-600'} group-hover:translate-x-1 transition-transform`} />
           </button>
         </section>
 
