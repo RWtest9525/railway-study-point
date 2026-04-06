@@ -8,4 +8,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Configure persistent storage for the session
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // Use localStorage for persistent sessions across browser restarts
+    storage: localStorage,
+    // Auto-refresh tokens before they expire
+    autoRefreshToken: true,
+    // Persist session even after browser close
+    persistSession: true,
+    // Detect session changes in other tabs
+    detectSessionInUrl: true,
+  },
+});

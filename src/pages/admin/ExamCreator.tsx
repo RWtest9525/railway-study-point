@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
-import { Plus, Trash2, Clock, FileText, Upload, BookOpen } from 'lucide-react';
+import { Plus, Trash2, Clock, FileText, Upload, BookOpen, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { PDFUploader } from '../../components/PDFUploader';
 
 type Exam = Database['public']['Tables']['exams']['Row'];
@@ -10,6 +11,7 @@ type Question = Database['public']['Tables']['questions']['Row'];
 
 export function ExamCreator() {
   const { profile } = useAuth();
+  const { theme } = useTheme();
   const [exams, setExams] = useState<(Exam & { subject?: string | null })[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -17,6 +19,8 @@ export function ExamCreator() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
+  const [selectedQuestionsPreview, setSelectedQuestionsPreview] = useState(0);
 
   const categories = ['Group-D', 'ALP', 'Technician', 'BSED', 'NTPC', 'Technical'];
 
@@ -45,11 +49,14 @@ export function ExamCreator() {
     }
   }, [showForm, formData.category, formData.subject]);
 
+  useEffect(() => {
+    setSelectedQuestionsPreview(formData.selected_questions.length);
+  }, [formData.selected_questions.length]);
+
   const loadExams = async () => {
     setLoading(true);
     setError('');
     try {
-      // Try to load exams with all columns
       const { data, error } = await supabase
         .from('exams')
         .select('id, title, category, subject, question_ids, duration_minutes, is_premium, created_by, created_at')
@@ -58,10 +65,7 @@ export function ExamCreator() {
       if (error) {
         console.error('Error loading exams:', error);
         
-        // Check if it's a column issue
         if (error.message?.includes('subject') || error.message?.includes('does not exist')) {
-          // Try without subject column
-          console.log('Trying without subject column...');
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('exams')
             .select('id, title, category, question_ids, duration_minutes, is_premium, created_by, created_at')
@@ -71,7 +75,6 @@ export function ExamCreator() {
             setError('Failed to load exams. Please run migration 20260405000000_fix_schema_issues.sql');
             setExams([]);
           } else {
-            // Add default subject for display
             const examsWithSubject = (fallbackData || []).map(e => ({
               ...e,
               subject: 'General' as string | null
@@ -79,7 +82,6 @@ export function ExamCreator() {
             setExams(examsWithSubject);
           }
         } else if (error.message?.includes('created_at')) {
-          // Try without ordering by created_at
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('exams')
             .select('id, title, category, subject, question_ids, duration_minutes, is_premium, created_by')
@@ -147,12 +149,10 @@ export function ExamCreator() {
 
   const handleTextExtraction = (text: string) => {
     setExtractedText(text);
-    // Parse the extracted text to create questions
     parseQuestionsFromText(text);
   };
 
   const parseQuestionsFromText = (text: string) => {
-    // Simple parsing logic - this would need to be more sophisticated for real use
     const lines = text.split('\n');
     const questions = [];
     let currentQuestion: any = null;
@@ -160,7 +160,6 @@ export function ExamCreator() {
     for (const line of lines) {
       const trimmedLine = line.trim();
       
-      // Match question pattern (e.g., "1. Question text")
       const questionMatch = trimmedLine.match(/^\d+\.\s+(.+)$/);
       if (questionMatch && !currentQuestion) {
         currentQuestion = {
@@ -174,22 +173,19 @@ export function ExamCreator() {
         continue;
       }
       
-      // Match options pattern (e.g., "A) Option text")
       const optionMatch = trimmedLine.match(/^[A-D]\)\s+(.+)$/);
       if (optionMatch && currentQuestion) {
         currentQuestion.options.push(optionMatch[1]);
         continue;
       }
       
-      // Match correct answer pattern
       const answerMatch = trimmedLine.match(/Correct Answer:\s*([A-D])/i);
       if (answerMatch && currentQuestion) {
-        const answerIndex = answerMatch[1].charCodeAt(0) - 65; // Convert A-D to 0-3
+        const answerIndex = answerMatch[1].charCodeAt(0) - 65;
         currentQuestion.correct_answer = answerIndex;
         continue;
       }
       
-      // If we have a complete question and encounter a new question or end
       if (currentQuestion && (questionMatch || trimmedLine === '')) {
         if (currentQuestion.options.length === 4) {
           questions.push(currentQuestion);
@@ -205,12 +201,10 @@ export function ExamCreator() {
       }
     }
     
-    // Add the last question if it exists
     if (currentQuestion && currentQuestion.options.length === 4) {
       questions.push(currentQuestion);
     }
     
-    // Create questions in database
     if (questions.length > 0) {
       createQuestionsFromPDF(questions);
     }
@@ -231,14 +225,12 @@ export function ExamCreator() {
       if (error) throw error;
       
       if (createdQuestions) {
-        // Add new questions to selected questions
         const newQuestionIds = createdQuestions.map(q => q.id);
         setFormData(prev => ({
           ...prev,
           selected_questions: [...prev.selected_questions, ...newQuestionIds]
         }));
         
-        // Reload questions to show the new ones
         loadQuestions(formData.category, formData.subject);
         
         setSuccess(`Successfully created ${createdQuestions.length} questions from PDF`);
@@ -254,7 +246,6 @@ export function ExamCreator() {
     setError('');
     setSuccess('');
 
-    // Remove requirement for selected questions - PDF will handle this
     if (formData.selected_questions.length === 0 && !pdfFile) {
       setError('Please upload a PDF file with questions or select questions manually.');
       return;
@@ -351,331 +342,414 @@ export function ExamCreator() {
     setShowPDFUpload(false);
   };
 
+  const toggleExamExpand = (examId: string) => {
+    setExpandedExamId(expandedExamId === examId ? null : examId);
+  };
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className={theme === 'dark' ? '' : 'text-gray-900'}>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Exam Creator</h1>
-          <p className="text-gray-400">Create and manage exams</p>
+          <h1 className={`text-2xl sm:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-2`}>
+            Exam Creator
+          </h1>
+          <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+            Create and manage exams
+          </p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition"
+          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition self-start sm:self-auto"
         >
           <Plus className="w-5 h-5" />
           Create Exam
         </button>
       </div>
 
+      {/* Create/Edit Exam Modal - Redesigned for Mobile */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-8 border border-gray-700 my-8">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">
-                  {editingId ? 'Edit Exam' : 'Create New Exam'}
-                </h2>
-              </div>
-
-            {/* PDF Upload Section - Always Visible */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Upload className="w-5 h-5 text-green-500" />
-                Upload Questions from PDF (Required)
-              </h3>
-              <PDFUploader
-                onFileSelect={handlePDFSelect}
-                onExtractedText={handleTextExtraction}
-              />
-              {extractedText && (
-                <div className="bg-gray-700/50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-300 mb-2">Extracted Text Preview:</h4>
-                  <pre className="text-xs text-gray-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                    {extractedText.substring(0, 500)}...
-                  </pre>
-                </div>
-              )}
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto">
+          <div className={`w-full max-w-4xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} sm:rounded-xl sm:max-h-[90vh] overflow-y-auto sm:my-8`}>
+            <div className="sticky top-0 z-10 flex items-center justify-between p-4 sm:p-6 border-b ${theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}">
+              <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {editingId ? 'Edit Exam' : 'Create New Exam'}
+              </h2>
+              <button
+                onClick={resetForm}
+                className={`p-2 rounded-lg transition ${
+                  theme === 'dark' ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
+                }`}
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
 
-            {error && (
-              <div className="bg-red-900/40 border border-red-600 text-red-200 px-4 py-2 rounded-lg mb-4 text-sm">
-                {error}
+            <div className="p-4 sm:p-6 space-y-6">
+              {/* PDF Upload Section */}
+              <div className={`p-4 rounded-xl border ${
+                theme === 'dark' ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} flex items-center gap-2 mb-4`}>
+                  <Upload className="w-5 h-5 text-green-500" />
+                  Upload Questions from PDF
+                </h3>
+                <PDFUploader
+                  onFileSelect={handlePDFSelect}
+                  onExtractedText={handleTextExtraction}
+                />
+                {extractedText && (
+                  <div className={`mt-4 rounded-lg p-4 ${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'}`}>
+                    <h4 className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                      Extracted Text Preview:
+                    </h4>
+                    <pre className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} whitespace-pre-wrap max-h-40 overflow-y-auto`}>
+                      {extractedText.substring(0, 500)}...
+                    </pre>
+                  </div>
+                )}
               </div>
-            )}
-            {success && (
-              <div className="bg-green-900/40 border border-green-600 text-green-200 px-4 py-2 rounded-lg mb-4 text-sm">
-                {success}
-              </div>
-            )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Exam Title
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., ALP Mock Test 1"
-                    required
-                  />
+              {error && (
+                <div className="bg-red-900/40 dark:bg-red-900/40 bg-red-50 border border-red-600 dark:border-red-600 border-red-200 text-red-200 dark:text-red-800 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {error}
                 </div>
+              )}
+              {success && (
+                <div className="bg-green-900/40 dark:bg-green-900/40 bg-green-50 border border-green-600 dark:border-green-600 border-green-200 text-green-200 dark:text-green-800 text-green-700 px-4 py-3 rounded-lg text-sm">
+                  {success}
+                </div>
+              )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Category
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Basic Info - Grid Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="col-span-1 md:col-span-2">
+                    <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                      Exam Title
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        theme === 'dark' 
+                          ? 'bg-gray-700 text-white border-gray-600' 
+                          : 'bg-white text-gray-900 border-gray-300'
+                      }`}
+                      placeholder="e.g., ALP Mock Test 1"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                      Category
+                    </label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({
                         ...formData,
                         category: e.target.value,
                         selected_questions: [],
-                      })
-                    }
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
+                      })}
+                      className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        theme === 'dark' 
+                          ? 'bg-gray-700 text-white border-gray-600' 
+                          : 'bg-white text-gray-900 border-gray-300'
+                      }`}
+                    >
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Subject
-                  </label>
-                  <select
-                    value={formData.subject}
-                    onChange={(e) =>
-                      setFormData({
+                  <div>
+                    <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                      Subject
+                    </label>
+                    <select
+                      value={formData.subject}
+                      onChange={(e) => setFormData({
                         ...formData,
                         subject: e.target.value,
                         selected_questions: [],
-                      })
-                    }
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Math">Math</option>
-                    <option value="Reasoning">Reasoning</option>
-                    <option value="Science">Science</option>
-                    <option value="General Awareness">General Awareness</option>
-                  </select>
-                </div>
+                      })}
+                      className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        theme === 'dark' 
+                          ? 'bg-gray-700 text-white border-gray-600' 
+                          : 'bg-white text-gray-900 border-gray-300'
+                      }`}
+                    >
+                      <option value="Math">Math</option>
+                      <option value="Reasoning">Reasoning</option>
+                      <option value="Science">Science</option>
+                      <option value="General Awareness">General Awareness</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Topics
-                  </label>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newTopic}
-                        onChange={(e) => setNewTopic(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addTopic()}
-                        placeholder="Add a topic..."
-                        className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={addTopic}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.topics.map((topic, index) => (
-                        <span
-                          key={index}
-                          className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                  <div className="col-span-1 md:col-span-2">
+                    <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                      Topics
+                    </label>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newTopic}
+                          onChange={(e) => setNewTopic(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && addTopic()}
+                          placeholder="Add a topic..."
+                          className={`flex-1 px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            theme === 'dark' 
+                              ? 'bg-gray-700 text-white border-gray-600' 
+                              : 'bg-white text-gray-900 border-gray-300'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={addTopic}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition whitespace-nowrap"
                         >
-                          {topic}
-                          <button
-                            type="button"
-                            onClick={() => removeTopic(topic)}
-                            className="hover:text-blue-300"
+                          Add
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {formData.topics.map((topic, index) => (
+                          <span
+                            key={index}
+                            className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-2"
                           >
-                            ×
-                          </button>
-                        </span>
-                      ))}
+                            {topic}
+                            <button
+                              type="button"
+                              onClick={() => removeTopic(topic)}
+                              className="hover:text-blue-300"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
                     </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                      Duration (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.duration_minutes}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        duration_minutes: parseInt(e.target.value),
+                      })}
+                      className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        theme === 'dark' 
+                          ? 'bg-gray-700 text-white border-gray-600' 
+                          : 'bg-white text-gray-900 border-gray-300'
+                      }`}
+                      min="1"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                      Premium Exam
+                    </label>
+                    <label className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer ${
+                      theme === 'dark' 
+                        ? 'bg-gray-700 border-gray-600' 
+                        : 'bg-white border-gray-300'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={formData.is_premium}
+                        onChange={(e) => setFormData({ ...formData, is_premium: e.target.checked })}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+                        Mark as Premium
+                      </span>
+                    </label>
                   </div>
                 </div>
 
+                {/* Question Selection - Mobile Optimized */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Duration (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.duration_minutes}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        duration_minutes: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="1"
-                    required
-                  />
+                  <div className="flex justify-between items-center mb-3">
+                    <label className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Select Questions ({formData.selected_questions.length} selected)
+                    </label>
+                    {questions.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (formData.selected_questions.length === questions.length) {
+                            setFormData({ ...formData, selected_questions: [] });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              selected_questions: questions.map((q) => q.id),
+                            });
+                          }
+                        }}
+                        className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
+                      >
+                        {formData.selected_questions.length === questions.length
+                          ? 'Deselect All'
+                          : 'Select All'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={`rounded-lg border max-h-80 overflow-y-auto ${
+                    theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                  }`}>
+                    {questions.length === 0 ? (
+                      <div className={`p-8 text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                        No questions available for this category. Add some questions first.
+                      </div>
+                    ) : (
+                      <div className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                        {questions.map((question) => (
+                          <label
+                            key={question.id}
+                            className={`flex items-start gap-3 p-4 cursor-pointer transition ${
+                              theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.selected_questions.includes(question.id)}
+                              onChange={() => toggleQuestion(question.id)}
+                              className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 shrink-0"
+                            />
+                            <span className={`flex-1 text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {question.question_text}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Premium Exam
-                  </label>
-                  <label className="flex items-center gap-3 bg-gray-700 px-4 py-3 rounded-lg border border-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_premium}
-                      onChange={(e) =>
-                        setFormData({ ...formData, is_premium: e.target.checked })
-                      }
-                      className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                    />
-                    <span className="text-white">Mark as Premium</span>
-                  </label>
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}">
+                  <button
+                    type="submit"
+                    disabled={!pdfFile}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {editingId ? 'Update Exam' : 'Create Exam'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className={`flex-1 py-3 rounded-lg font-semibold transition ${
+                      theme === 'dark'
+                        ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+                    }`}
+                  >
+                    Cancel
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <label className="text-sm font-medium text-gray-300">
-                    Select Questions ({formData.selected_questions.length} selected)
-                  </label>
-                  {questions.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (formData.selected_questions.length === questions.length) {
-                          setFormData({ ...formData, selected_questions: [] });
-                        } else {
-                          setFormData({
-                            ...formData,
-                            selected_questions: questions.map((q) => q.id),
-                          });
-                        }
-                      }}
-                      className="text-sm text-blue-400 hover:text-blue-300"
-                    >
-                      {formData.selected_questions.length === questions.length
-                        ? 'Deselect All'
-                        : 'Select All'}
-                    </button>
-                  )}
-                </div>
-
-                <div className="bg-gray-700 rounded-lg border border-gray-600 max-h-96 overflow-y-auto">
-                  {questions.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400">
-                      No questions available for this category. Add some questions first.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-gray-600">
-                      {questions.map((question) => (
-                        <label
-                          key={question.id}
-                          className="flex items-start gap-3 p-4 hover:bg-gray-600/50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.selected_questions.includes(question.id)}
-                            onChange={() => toggleQuestion(question.id)}
-                            className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                          />
-                          <span className="flex-1 text-gray-300 text-sm">
-                            {question.question_text}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-4 mt-8">
-                <button
-                  type="submit"
-                  disabled={!pdfFile}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Create Exam
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg font-semibold transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+              </form>
             </div>
           </div>
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Exams List - Redesigned for Mobile */}
+      <div className="space-y-4">
         {loading ? (
-          <div className="col-span-full text-center text-gray-400 py-8">
+          <div className={`text-center py-8 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
             Loading exams...
           </div>
         ) : exams.length === 0 ? (
-          <div className="col-span-full text-center text-gray-400 py-8">
+          <div className={`text-center py-8 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
             No exams created yet. Create your first exam!
           </div>
         ) : (
           exams.map((exam) => (
             <div
               key={exam.id}
-              className="bg-gray-800 rounded-xl p-6 border border-gray-700"
+              className={`rounded-xl border transition-all ${
+                theme === 'dark' 
+                  ? 'bg-gray-800 border-gray-700' 
+                  : 'bg-white border-gray-200 shadow-sm'
+              }`}
             >
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-bold text-white">{exam.title}</h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(exam)}
-                    className="text-blue-400 hover:text-blue-300 p-1"
-                  >
-                    <FileText className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(exam.id)}
-                    className="text-red-400 hover:text-red-300 p-1"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+              {/* Exam Card Header */}
+              <div 
+                className="p-4 sm:p-6 cursor-pointer"
+                onClick={() => toggleExamExpand(exam.id)}
+              >
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
+                        {exam.title}
+                      </h3>
+                      {exam.is_premium && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-yellow-900/30 text-yellow-400 whitespace-nowrap">
+                          Premium
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                      <div className="flex items-center gap-1 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}">
+                        <FileText className="w-4 h-4" />
+                        <span>{exam.category}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}">
+                        <Clock className="w-4 h-4" />
+                        <span>{exam.duration_minutes} min</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}">
+                        <BookOpen className="w-4 h-4" />
+                        <span>{(exam.question_ids as string[]).length} questions</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {expandedExamId === exam.id ? (
+                      <ChevronUp className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`} />
+                    ) : (
+                      <ChevronDown className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`} />
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <FileText className="w-4 h-4" />
-                  {exam.category}
+              {/* Expanded Details */}
+              {expandedExamId === exam.id && (
+                <div className={`px-4 sm:px-6 pb-4 sm:pb-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} pt-4`}>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleEdit(exam)}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this exam?')) {
+                          handleDelete(exam.id);
+                        }
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-lg text-sm font-medium transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Clock className="w-4 h-4" />
-                  {exam.duration_minutes} minutes
-                </div>
-                <div className="text-sm text-gray-400">
-                  {(exam.question_ids as string[]).length} questions
-                </div>
-              </div>
-
-              {exam.is_premium && (
-                <span className="inline-block bg-yellow-900 text-yellow-300 px-3 py-1 rounded-full text-xs font-semibold">
-                  Premium
-                </span>
               )}
             </div>
           ))
