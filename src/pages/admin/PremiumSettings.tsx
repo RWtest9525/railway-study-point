@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Settings } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PRESETS: { label: string; days: number }[] = [
   { label: '1 month', days: 30 },
@@ -15,6 +16,7 @@ const NUDGE_MAX_SEC = 3600;
 export function PremiumSettings() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const { user } = useAuth();
   const [priceRupees, setPriceRupees] = useState('39');
   const [validityDays, setValidityDays] = useState(365);
   const [customDays, setCustomDays] = useState('');
@@ -26,6 +28,14 @@ export function PremiumSettings() {
 
   useEffect(() => {
     (async () => {
+      // Check if user is logged in before attempting to fetch
+      if (!user) {
+        console.log('No session found, skipping settings fetch');
+        setError('Please log in to access premium settings.');
+        setLoading(false);
+        return;
+      }
+
       try {
         console.log('Loading premium settings...');
         // First, check if the site_settings table exists and has the required columns
