@@ -7,7 +7,7 @@ import {
   trialWholeDaysLeft,
   FREE_TRIAL_DAYS,
 } from '../lib/authUtils';
-import { Crown, Calendar, Shield, Clock, ArrowLeft } from 'lucide-react';
+import { Crown, Calendar, Clock, ArrowLeft } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 
 export function Membership() {

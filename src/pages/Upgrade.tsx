@@ -4,7 +4,6 @@ import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { Check, Crown, Zap, BookOpen, Trophy, BarChart3, X, ArrowLeft } from 'lucide-react';
-import { BrandLogo } from '../components/BrandLogo';
 
 function computePremiumUntil(
   currentUntil: string | null | undefined,
@@ -28,33 +27,26 @@ export function Upgrade() {
   const [pricePaise, setPricePaise] = useState(3900);
   const [validityDays, setValidityDays] = useState(365);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
   // Load Razorpay SDK dynamically
   useEffect(() => {
-    const loadRazorpay = () => {
-      // Check if Razorpay is already loaded
-      if (window.Razorpay) {
-        setRazorpayLoaded(true);
-        return;
-      }
+    // Check if Razorpay is already loaded
+    if (window.Razorpay) {
+      return;
+    }
 
-      // Create script element
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      script.onload = () => {
-        console.log('Razorpay SDK loaded successfully');
-        setRazorpayLoaded(true);
-      };
-      script.onerror = () => {
-        console.error('Failed to load Razorpay SDK');
-        setError('Failed to load payment gateway. Please check your internet connection.');
-      };
-      document.body.appendChild(script);
+    // Create script element
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('Razorpay SDK loaded successfully');
     };
-
-    loadRazorpay();
+    script.onerror = () => {
+      console.error('Failed to load Razorpay SDK');
+      setError('Failed to load payment gateway. Please check your internet connection.');
+    };
+    document.body.appendChild(script);
   }, []);
 
   useEffect(() => {

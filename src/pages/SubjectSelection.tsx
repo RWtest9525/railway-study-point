@@ -6,8 +6,6 @@ import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { 
   ArrowLeft, 
-  BookOpen, 
-  ChevronRight, 
   Brain, 
   FlaskConical, 
   Calculator,

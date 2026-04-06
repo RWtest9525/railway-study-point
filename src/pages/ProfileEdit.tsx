@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { User as UserIcon, Mail, Phone, KeyRound, ArrowLeft } from 'lucide-react';
@@ -11,7 +10,6 @@ export function ProfileEdit() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { profile, user, refreshProfile } = useAuth();
-  const { navigate } = useRouter();
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
   const [loading, setLoading] = useState(false);

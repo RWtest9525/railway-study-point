@@ -305,7 +305,6 @@ export function SubscriptionManagement() {
                 filteredUsers.map((u) => {
                   const isActive = u.is_premium && u.premium_until && new Date(u.premium_until) > new Date();
                   const isExpired = u.premium_until && (!u.is_premium || new Date(u.premium_until) <= new Date());
-                  const neverSubscribed = !u.premium_until;
                   
                   return (
                     <tr key={u.id} className={`${isDark ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50'} transition group`}>
