@@ -79,7 +79,7 @@ export function Settings() {
       theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'
     }`}>
       {/* Header */}
-      <div className={`sticky top-0 z-40 backdrop-blur-md ${
+      <div className={`sticky top-0 z-[300] backdrop-blur-md ${
         theme === 'dark' 
           ? 'bg-gray-900/95 border-gray-800' 
           : 'bg-white/95 border-gray-200'

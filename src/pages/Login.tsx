@@ -4,6 +4,8 @@ import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Mail, Lock, Chrome, Eye, EyeOff } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../lib/firebase';
 
 export function Login() {
   const [email, setEmail] = useState('');

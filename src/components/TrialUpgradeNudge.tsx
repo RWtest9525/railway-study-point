@@ -4,7 +4,7 @@ import { useRouter } from '../contexts/RouterContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-const DEFAULT_NUDGE_SEC = 10;
+const DEFAULT_NUDGE_SEC = 60;
 const NUDGE_MIN_SEC = 3;
 const NUDGE_MAX_SEC = 3600;
 

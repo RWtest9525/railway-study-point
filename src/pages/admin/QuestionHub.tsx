@@ -92,10 +92,7 @@ export default function QuestionHub() {
 
   useEffect(() => {
     fetchCategories();
-    if (selectedExam) {
-      fetchExams(selectedExam);
-    }
-  }, [selectedExam]);
+  }, []);
 
   const fetchCategories = async () => {
     try {

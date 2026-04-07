@@ -261,13 +261,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           displayName: fullName ?? undefined
         });
         
-        // Create user profile in Firestore
+        // Create user profile in Firestore with 7-day trial
+        const trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + 7);
+        
         const profileData: Profile = {
           id: userCredential.user.uid,
           email: email,
           full_name: fullName,
           role: 'student',
           is_premium: false,
+          premium_expires_at: trialEndDate.toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };

@@ -255,97 +255,170 @@ export function StudentDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {!selectedCategory ? (
           <>
+            {/* Hero Section */}
             <div className="mb-8">
-              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-                Choose Your Exam Category
-              </h1>
-              <p className="text-gray-400 text-sm sm:text-base">
-                Select a category to start practicing
-              </p>
-              {effectiveRole !== 'admin' && !isPremium && daysLeftTrial !== null && (
-                <div className="mt-4 bg-amber-600/10 border border-amber-500/20 rounded-xl p-3 sm:p-4 flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-amber-500 shrink-0" />
-                  <p className="text-amber-400 text-xs sm:text-sm font-medium">
-                    Free trial active: {daysLeftTrial} day{daysLeftTrial === 1 ? '' : 's'} left — you have full access to all tests.
-                  </p>
-                </div>
-              )}
-              {trialExpiredNeedsPremium && (
-                <div className="mt-4 bg-orange-600/10 border border-orange-500/20 rounded-xl p-3 sm:p-4 flex items-center gap-3">
-                  <Shield className="w-5 h-5 text-orange-500 shrink-0" />
-                  <p className="text-orange-300 text-xs sm:text-sm">
-                    Your free week is over. Upgrade to premium to unlock all exams and continue your journey.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-12">
-              {categories.map((category) => {
-                const Icon = category.icon;
-                return (
-                  <button
-                    key={category.id}
-                    onClick={() => setSelectedCategory(category.id)}
-                    className="bg-gray-800 rounded-2xl p-5 sm:p-6 border border-gray-700 hover:border-gray-500 transition transform hover:scale-[1.02] active:scale-95 text-left group"
-                  >
-                    <div className={`w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br ${category.color} rounded-xl flex items-center justify-center mb-4 group-hover:shadow-lg transition`}>
-                      <Icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-bold text-white mb-1.5">
-                      {category.name}
-                    </h3>
-                    <p className="text-gray-400 text-xs sm:text-sm">
-                      {category.description}
+              <div className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-sm">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                  <div>
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
+                      Welcome to Railway Study Point
+                    </h1>
+                    <p className="text-blue-200 text-lg mb-6">
+                      Your complete preparation platform for railway exams. Practice tests, mock exams, and detailed analysis to help you succeed.
                     </p>
-                    <div className="mt-4 flex items-center gap-1 text-blue-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition">
-                      Explore Exams <ChevronRight className="w-3 h-3" />
+                    
+                    {/* Status Badges */}
+                    <div className="flex flex-wrap gap-3 mb-6">
+                      {effectiveRole !== 'admin' && !isPremium && daysLeftTrial !== null && (
+                        <div className="bg-amber-600/20 border border-amber-500/30 rounded-full px-4 py-2 flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-amber-400" />
+                          <span className="text-amber-300 text-sm font-medium">
+                            Trial: {daysLeftTrial} day{daysLeftTrial === 1 ? '' : 's'} left
+                          </span>
+                        </div>
+                      )}
+                      {isPremium && (
+                        <div className="bg-yellow-600/20 border border-yellow-500/30 rounded-full px-4 py-2 flex items-center gap-2">
+                          <Crown className="w-4 h-4 text-yellow-400" />
+                          <span className="text-yellow-300 text-sm font-medium">
+                            Premium Member
+                          </span>
+                        </div>
+                      )}
+                      {trialExpiredNeedsPremium && (
+                        <div className="bg-orange-600/20 border border-orange-500/30 rounded-full px-4 py-2 flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-orange-400" />
+                          <span className="text-orange-300 text-sm font-medium">
+                            Upgrade Required
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  </button>
-                );
-              })}
+
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => navigate('/leaderboard')}
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"
+                      >
+                        View Leaderboard
+                      </button>
+                      {effectiveRole === 'admin' && (
+                        <button
+                          onClick={() => navigate('/admin-portal')}
+                          className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"
+                        >
+                          Admin Portal
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="hidden lg:block text-right">
+                    <div className="bg-white/10 rounded-2xl p-6 border border-white/20">
+                      <div className="text-4xl font-bold text-white mb-2">
+                        {recentResults.length > 0 ? recentResults[0].score : '0'}
+                      </div>
+                      <div className="text-blue-200 text-sm">Latest Score</div>
+                      {recentResults.length > 0 && (
+                        <div className="mt-4 flex items-center justify-end gap-4 text-sm text-gray-300">
+                          <span>Time: {Math.floor(recentResults[0].time_taken_seconds / 60)}m</span>
+                          <span>Date: {new Date(recentResults[0].started_at).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {recentResults.length > 0 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl sm:text-2xl font-bold text-white">
-                    Recent Performance
-                  </h2>
-                  <Trophy className="w-5 h-5 text-amber-400" />
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center">
+                    <Train className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Railway Exams</h3>
+                    <p className="text-gray-400 text-sm">NTPC, Group D, ALP</p>
+                  </div>
                 </div>
-                <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
+                <button
+                  onClick={() => setSelectedCategory('alp')}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-semibold transition"
+                >
+                  Explore Exams
+                </button>
+              </div>
+
+              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-800 rounded-xl flex items-center justify-center">
+                    <Briefcase className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">SSC & Banking</h3>
+                    <p className="text-gray-400 text-sm">CGL, CHSL, Bank PO</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedCategory('ntpc')}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-semibold transition"
+                >
+                  Explore Exams
+                </button>
+              </div>
+
+              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-800 rounded-xl flex items-center justify-center">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Group D</h3>
+                    <p className="text-gray-400 text-sm">Track Maintainer</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedCategory('group-d')}
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-lg font-semibold transition"
+                >
+                  Explore Exams
+                </button>
+              </div>
+            </div>
+
+            {/* Recent Performance */}
+            {recentResults.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold text-white">Recent Performance</h2>
+                  <Trophy className="w-6 h-6 text-amber-400" />
+                </div>
+                <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full">
                       <thead className="bg-gray-700/50">
                         <tr>
-                          <th className="px-4 sm:px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">
-                            Date
-                          </th>
-                          <th className="px-4 sm:px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">
-                            Score
-                          </th>
-                          <th className="px-4 sm:px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest hidden xs:table-cell">
-                            Time
-                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Exam</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Score</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Time</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-700/50">
                         {recentResults.map((result) => (
                           <tr key={result.id} className="hover:bg-gray-700/30 transition">
-                            <td className="px-4 sm:px-6 py-4 text-gray-300 text-xs sm:text-sm">
-                              {new Date(result.started_at).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 sm:px-6 py-4">
-                              <div className="flex flex-col">
-                                <span className={`font-bold text-sm sm:text-base ${
-                                  (result.score / result.total_questions) * 100 >= 60
-                                    ? 'text-green-400'
-                                    : 'text-red-400'
+                            <td className="px-4 py-3 text-gray-300 text-sm">{new Date(result.started_at).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-gray-300 text-sm">Mock Test</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-bold ${
+                                  (result.score / result.total_questions) * 100 >= 60 ? 'text-green-400' : 'text-red-400'
                                 }`}>
                                   {result.score}/{result.total_questions}
                                 </span>
-                                <div className="w-16 sm:w-24 h-1 bg-gray-700 rounded-full mt-1 overflow-hidden">
+                                <div className="w-20 h-2 bg-gray-700 rounded-full">
                                   <div 
                                     className={`h-full rounded-full ${
                                       (result.score / result.total_questions) * 100 >= 60 ? 'bg-green-500' : 'bg-red-500'
@@ -355,7 +428,7 @@ export function StudentDashboard() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 sm:px-6 py-4 text-gray-400 text-xs sm:text-sm hidden xs:table-cell">
+                            <td className="px-4 py-3 text-gray-400 text-sm">
                               {Math.floor(result.time_taken_seconds / 60)}m {result.time_taken_seconds % 60}s
                             </td>
                           </tr>
@@ -366,6 +439,36 @@ export function StudentDashboard() {
                 </div>
               </div>
             )}
+
+            {/* Exam Categories */}
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-6">Exam Categories</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categories.map((category) => {
+                  const Icon = category.icon;
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategory(category.id)}
+                      className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-gray-500 transition group text-left"
+                    >
+                      <div className={`w-14 h-14 bg-gradient-to-br ${category.color} rounded-xl flex items-center justify-center mb-4 group-hover:shadow-lg transition`}>
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition">
+                        {category.name}
+                      </h3>
+                      <p className="text-gray-400 text-sm">
+                        {category.description}
+                      </p>
+                      <div className="mt-4 flex items-center gap-2 text-blue-400 text-sm font-semibold">
+                        View Exams <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </>
         ) : (
           <div className="animate-in fade-in slide-in-from-left-4 duration-300">
