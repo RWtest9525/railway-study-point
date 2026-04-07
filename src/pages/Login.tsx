@@ -21,17 +21,28 @@ export function Login() {
     setError('');
     setLoading(true);
 
+    // Validate inputs
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      setLoading(false);
+      return;
+    }
+
     try {
       await signIn(email, password);
-      navigate('/dashboard');
+      // Navigation will be handled by auth state change
     } catch (err: any) {
       console.error('Login error:', err);
       if (err.message === 'Email not confirmed') {
         setError('Please verify your email address before signing in. Check your inbox (and spam).');
       } else if (err.message === 'Invalid login credentials') {
         setError('Invalid email or password. Please try again.');
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        setError('Network error. Please check your internet connection and try again.');
+      } else if (err.message?.includes('timeout')) {
+        setError('Request timed out. Please try again.');
       } else {
-        setError(err.message || 'An error occurred during sign in');
+        setError(err.message || 'An error occurred during sign in. Please try again.');
       }
     } finally {
       setLoading(false);

@@ -70,8 +70,8 @@ export function ProfileEdit() {
 
       // 3. Force refresh the global state immediately
       if (profileData) {
-        // Update local state directly for instant feedback
-        window.location.reload();
+        // Refresh the profile data in global state
+        await refreshProfile();
       }
       
       setMessage('Profile updated successfully!');

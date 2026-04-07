@@ -55,10 +55,19 @@ export function RouterProvider({ children }: { children: React.ReactNode }) {
       y: window.scrollY
     });
 
-    if (window.history.length > 1) {
-      window.history.back();
+    // Check if we're on a deep page (exam, results, etc.) - go back normally
+    const deepPaths = ['/exam/', '/results/', '/profile', '/settings', '/leaderboard', '/upgrade', '/membership', '/support', '/notifications'];
+    const isDeepPath = deepPaths.some(path => window.location.pathname.startsWith(path));
+    
+    if (isDeepPath) {
+      // For deep pages, go back to previous page
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        navigate('/dashboard');
+      }
     } else {
-      // If no history, navigate to dashboard
+      // For phone back button/gesture on non-deep pages, go to home/dashboard
       navigate('/dashboard');
     }
   }, [navigate]);

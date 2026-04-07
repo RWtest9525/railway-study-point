@@ -18,7 +18,8 @@ import {
   Folder,
   Moon,
   Sun,
-  ChevronLeft
+  ChevronLeft,
+  Trophy
 } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionBank } from './QuestionBank';
@@ -29,13 +30,14 @@ import { UserManagement } from './UserManagement';
 import { SupportInbox } from './SupportInbox';
 import { SubscriptionManagement } from './SubscriptionManagement';
 import { CategoryManagement } from './CategoryManagement';
+import { AdminLeaderboard } from './AdminLeaderboard';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
   const { navigate } = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'categories'
+    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'categories' | 'leaderboard'
   >('users');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -54,6 +56,7 @@ export function AdminPortal() {
   const managementTabs = [
     { id: 'revenue' as const, name: 'Revenue', icon: DollarSign, desc: 'Track Payments' },
     { id: 'users' as const, name: 'Users', icon: Users, desc: 'Manage All Students' },
+    { id: 'leaderboard' as const, name: 'Leaderboard', icon: Trophy, desc: 'User Learning Stats' },
     { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
     { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
     { id: 'categories' as const, name: 'Categories', icon: Folder, desc: 'Exam Categories' },
@@ -253,6 +256,7 @@ export function AdminPortal() {
             {activeTab === 'support' && <SupportInbox />}
             {activeTab === 'subscription' && <SubscriptionManagement />}
             {activeTab === 'categories' && <CategoryManagement />}
+            {activeTab === 'leaderboard' && <AdminLeaderboard />}
           </div>
         </div>
       </main>

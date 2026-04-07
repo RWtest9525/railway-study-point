@@ -37,18 +37,36 @@ export function QuestionBank() {
 
   const loadQuestions = async () => {
     setLoading(true);
+    setError('');
     try {
+      // First try with created_at ordering
       const { data, error } = await supabase
         .from('questions')
         .select('*')
         .eq('category', selectedCategory)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setQuestions(data || []);
-    } catch (error) {
+      if (error) {
+        // If created_at doesn't exist, try without ordering
+        if (error.message?.includes('created_at') || error.message?.includes('does not exist')) {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('questions')
+            .select('*')
+            .eq('category', selectedCategory)
+            .limit(100);
+          
+          if (fallbackError) throw fallbackError;
+          setQuestions(fallbackData || []);
+        } else {
+          throw error;
+        }
+      } else {
+        setQuestions(data || []);
+      }
+    } catch (error: any) {
       console.error('Error loading questions:', error);
-      setError('Failed to load questions.');
+      setError('Failed to load questions. Please check your database connection and try again.');
+      setQuestions([]);
     } finally {
       setLoading(false);
     }
