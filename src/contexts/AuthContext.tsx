@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback, u
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
+import { cache, createCacheKey } from '../lib/dataCache';
 import {
   getEffectiveRole,
   hasActivePremium,
@@ -42,7 +43,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const sessionRestored = useRef(false);
 
-  const loadProfile = useCallback(async (userId: string, email?: string, fullName?: string) => {
+  const loadProfile = useCallback(async (userId: string, email?: string, fullName?: string, forceRefresh = false) => {
+    // Check cache first (unless force refresh)
+    const cacheKey = createCacheKey('profile', userId);
+    if (!forceRefresh) {
+      const cachedProfile = cache.get<Profile>(cacheKey);
+      if (cachedProfile) {
+        setProfile(cachedProfile);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -74,14 +86,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .eq('id', userId)
               .single();
             setProfile(existingData);
+            cache.set(cacheKey, existingData);
           } else {
             throw createError;
           }
-        } else {
+        } else if (newProfile) {
           setProfile(newProfile);
+          cache.set(cacheKey, newProfile);
         }
-      } else {
+      } else if (data) {
         setProfile(data);
+        cache.set(cacheKey, data);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -255,7 +270,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    await loadProfile(user.id, user.email, user.user_metadata?.full_name);
+    // Force refresh - bypass cache
+    await loadProfile(user.id, user.email, user.user_metadata?.full_name, true);
   }, [user, loadProfile]);
 
   const effectiveRole = useMemo(() => {

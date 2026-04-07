@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
+import { cache, createCacheKey } from '../../lib/dataCache';
 import { Plus, Trash2, Edit2, Folder, Tag } from 'lucide-react';
 
 type Category = {
@@ -26,7 +27,8 @@ export function CategoryManagement() {
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     description: '',
-    icon: '📁',
+    icon: '',
+    icon_file: null as File | null,
     is_active: true,
     sort_order: 0
   });
@@ -36,6 +38,15 @@ export function CategoryManagement() {
   }, []);
 
   const loadCategories = async () => {
+    // Check cache first
+    const cacheKey = createCacheKey('categories');
+    const cachedCategories = cache.get<Category[]>(cacheKey);
+    if (cachedCategories) {
+      setCategories(cachedCategories);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -48,6 +59,7 @@ export function CategoryManagement() {
       
       if (data && data.length > 0) {
         setCategories(data);
+        cache.set(cacheKey, data);
       } else {
         // No categories exist, create defaults
         const defaultCategories = [
@@ -65,7 +77,10 @@ export function CategoryManagement() {
           .select();
 
         if (insertError) throw insertError;
-        if (inserted) setCategories(inserted);
+        if (inserted) {
+          setCategories(inserted);
+          cache.set(cacheKey, inserted);
+        }
       }
     } catch (err: any) {
       console.error('Error loading categories:', err);
@@ -81,7 +96,34 @@ export function CategoryManagement() {
       return;
     }
 
+    // Generate tiny icon from name (first 2 letters)
+    const tinyIcon = generateTinyIcon(categoryForm.name);
+
     try {
+      let iconUrl = categoryForm.icon;
+      
+      // If there's an uploaded image file, upload it to Supabase Storage
+      if (categoryForm.icon_file) {
+        const fileExt = categoryForm.icon_file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('category-icons')
+          .upload(fileName, categoryForm.icon_file);
+
+        if (uploadError) throw uploadError;
+        
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('category-icons')
+          .getPublicUrl(fileName);
+        
+        iconUrl = urlData.publicUrl;
+      }
+
+      // Clear categories cache
+      cache.remove(createCacheKey('categories'));
+
       if (editingCategory) {
         // Update existing category
         const { error: updateError } = await supabase
@@ -89,7 +131,7 @@ export function CategoryManagement() {
           .update({
             name: categoryForm.name,
             description: categoryForm.description || null,
-            icon: categoryForm.icon,
+            icon: iconUrl || tinyIcon,
             is_active: categoryForm.is_active,
             sort_order: categoryForm.sort_order,
             updated_at: new Date().toISOString()
@@ -105,7 +147,7 @@ export function CategoryManagement() {
           .insert({
             name: categoryForm.name,
             description: categoryForm.description || null,
-            icon: categoryForm.icon,
+            icon: iconUrl || tinyIcon,
             is_active: categoryForm.is_active,
             sort_order: categoryForm.sort_order
           })
@@ -130,6 +172,9 @@ export function CategoryManagement() {
   const deleteCategory = async (id: string) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
     
+    // Clear categories cache
+    cache.remove(createCacheKey('categories'));
+    
     try {
       const { error: deleteError } = await supabase
         .from('categories')
@@ -149,7 +194,8 @@ export function CategoryManagement() {
     setCategoryForm({
       name: '',
       description: '',
-      icon: '📁',
+      icon: '',
+      icon_file: null,
       is_active: true,
       sort_order: categories.length + 1
     });
@@ -157,11 +203,34 @@ export function CategoryManagement() {
     setShowCategoryForm(false);
   };
 
+  // Generate a tiny icon (first two letters of category name as avatar)
+  const generateTinyIcon = (name: string) => {
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file');
+        return;
+      }
+      // Validate file size (max 1MB)
+      if (file.size > 1024 * 1024) {
+        setError('Image must be less than 1MB');
+        return;
+      }
+      setCategoryForm({ ...categoryForm, icon_file: file, icon: '' });
+    }
+  };
+
   const editCategory = (category: Category) => {
     setCategoryForm({
       name: category.name,
       description: category.description || '',
-      icon: category.icon || '📁',
+      icon: category.icon || '',
+      icon_file: null,
       is_active: category.is_active,
       sort_order: category.sort_order
     });
@@ -284,28 +353,77 @@ export function CategoryManagement() {
                 />
               </div>
               
-              <div>
-                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Icon (Emoji)</label>
-                <input
-                  type="text"
-                  value={categoryForm.icon}
-                  onChange={(e) => setCategoryForm({...categoryForm, icon: e.target.value})}
-                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'
-                  }`}
-                  placeholder="e.g., 📚"
-                />
-              </div>
+                <div>
+                  <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Category Icon</label>
+                  <div className={`border-2 border-dashed ${isDark ? 'border-gray-600' : 'border-gray-300'} rounded-lg p-4 text-center`}>
+                    {categoryForm.icon_file ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <img 
+                          src={URL.createObjectURL(categoryForm.icon_file)} 
+                          alt="Preview" 
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                        <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                          {categoryForm.icon_file.name}
+                        </span>
+                      </div>
+                    ) : categoryForm.icon ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <img 
+                          src={categoryForm.icon} 
+                          alt="Icon" 
+                          className="w-12 h-12 rounded-lg object-cover"
+                          onError={(e) => {
+                            // If image fails to load, show generated icon
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Using existing icon</span>
+                      </div>
+                    ) : (
+                      <>
+                        <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-2`}>
+                          Upload an icon image (optional)
+                        </p>
+                        <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          If not uploaded, first 2 letters of name will be used
+                        </p>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleIconUpload}
+                      className="mt-3 w-full text-sm"
+                    />
+                  </div>
+                </div>
               
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={categoryForm.is_active}
-                  onChange={(e) => setCategoryForm({...categoryForm, is_active: e.target.checked})}
-                  className="w-4 h-4 text-blue-600 rounded"
-                />
-                <label className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Active</label>
-              </div>
+                {/* Preview of what the icon will look like */}
+                {categoryForm.name && (
+                  <div>
+                    <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Icon Preview</label>
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${isDark ? 'bg-blue-600/20' : 'bg-blue-100'}`}>
+                      {categoryForm.icon_file ? (
+                        <img src={URL.createObjectURL(categoryForm.icon_file)} alt="Preview" className="w-8 h-8 rounded object-cover" />
+                      ) : (
+                        <span className={`font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                          {generateTinyIcon(categoryForm.name)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={categoryForm.is_active}
+                    onChange={(e) => setCategoryForm({...categoryForm, is_active: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <label className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Active</label>
+                </div>
 
               <div>
                 <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Sort Order</label>
