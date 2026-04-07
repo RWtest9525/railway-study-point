@@ -1,128 +1,215 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
-import { MessageSquare, Send } from 'lucide-react';
-import type { Database } from '../../lib/database.types';
+import { useTheme } from '../../contexts/ThemeContext';
+import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { MessageSquare, Check, Clock, X } from 'lucide-react';
 
-type QueryRow = Database['public']['Tables']['support_queries']['Row'];
+interface SupportQuery {
+  id: string;
+  user_id: string;
+  subject: string;
+  message: string;
+  status: 'pending' | 'resolved' | 'closed';
+  created_at: string;
+  updated_at: string;
+}
 
 export function SupportInbox() {
-  const [rows, setRows] = useState<QueryRow[]>([]);
-  const [emails, setEmails] = useState<Record<string, string>>({});
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const [queries, setQueries] = useState<SupportQuery[]>([]);
   const [loading, setLoading] = useState(true);
-  const [replyDraft, setReplyDraft] = useState<Record<string, string>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
-
-  const load = async () => {
-    const { data, error } = await supabase
-      .from('support_queries')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) {
-      console.error(error);
-      setRows([]);
-      setLoading(false);
-      return;
-    }
-    setRows(data ?? []);
-    
-    // Fetch all profiles for these users in one go instead of a loop
-    const userIds = [...new Set((data ?? []).map((r) => r.user_id))];
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, email, full_name')
-        .in('id', userIds);
-      
-      const map: Record<string, string> = {};
-      profiles?.forEach(p => {
-        map[p.id] = `${p.full_name || 'User'} <${p.email}>`;
-      });
-      setEmails(map);
-    }
-    setLoading(false);
-  };
+  const [selectedQuery, setSelectedQuery] = useState<SupportQuery | null>(null);
 
   useEffect(() => {
-    load();
+    loadQueries();
   }, []);
 
-  const sendReply = async (row: QueryRow) => {
-    const text = (replyDraft[row.id] ?? '').trim();
-    if (!text) return;
-    setSavingId(row.id);
-    const { error } = await supabase
-      .from('support_queries')
-      .update({
-        admin_reply: text,
-        status: 'replied',
+  const loadQueries = async () => {
+    try {
+      const queriesRef = collection(db, 'support_queries');
+      const q = query(queriesRef, orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(q);
+      const supportQueries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupportQuery));
+      setQueries(supportQueries);
+    } catch (error) {
+      console.error('Error loading support queries:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStatus = async (queryId: string, status: 'pending' | 'resolved' | 'closed') => {
+    try {
+      const queryRef = doc(db, 'support_queries', queryId);
+      await updateDoc(queryRef, {
+        status,
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', row.id);
-    setSavingId(null);
-    if (!error) {
-      setReplyDraft((d) => ({ ...d, [row.id]: '' }));
-      load();
+      });
+      loadQueries();
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return (
+          <span className="flex items-center gap-1 text-yellow-400">
+            <Clock className="w-4 h-4" /> Pending
+          </span>
+        );
+      case 'resolved':
+        return (
+          <span className="flex items-center gap-1 text-green-400">
+            <Check className="w-4 h-4" /> Resolved
+          </span>
+        );
+      case 'closed':
+        return (
+          <span className="flex items-center gap-1 text-gray-400">
+            <X className="w-4 h-4" /> Closed
+          </span>
+        );
+      default:
+        return <span className="text-gray-400">{status}</span>;
     }
   };
 
   if (loading) {
-    return <p className="text-gray-400">Loading support inbox…</p>;
+    return <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading...</div>;
   }
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-6">
-        <MessageSquare className="w-6 h-6 text-cyan-400" />
-        <h2 className="text-2xl font-bold text-white">Support queries</h2>
+    <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
+      <div className="mb-6">
+        <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Support Inbox</h1>
+        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Manage user support queries</p>
       </div>
-      {rows.length === 0 ? (
-        <p className="text-gray-500">No support messages yet.</p>
-      ) : (
-        <div className="space-y-6">
-          {rows.map((row) => (
-            <div
-              key={row.id}
-              className="bg-gray-800/80 border border-gray-700 rounded-xl p-5"
-            >
-              <div className="flex flex-wrap justify-between gap-2 mb-2">
-                <span className="text-gray-400 text-sm">
-                  {emails[row.user_id] || row.user_id}
-                </span>
-                <span className="text-gray-500 text-xs">
-                  {new Date(row.created_at).toLocaleString()} · {row.status}
-                </span>
-              </div>
-              <p className="text-gray-200 whitespace-pre-wrap mb-4">{row.message}</p>
-              {row.admin_reply && (
-                <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-3 mb-4 text-sm">
-                  <span className="text-blue-400 text-xs font-semibold">Previous reply</span>
-                  <p className="text-gray-300 whitespace-pre-wrap mt-1">{row.admin_reply}</p>
-                </div>
-              )}
-              <div className="flex flex-col sm:flex-row gap-2">
-                <textarea
-                  value={replyDraft[row.id] ?? ''}
-                  onChange={(e) =>
-                    setReplyDraft((d) => ({ ...d, [row.id]: e.target.value }))
-                  }
-                  rows={3}
-                  className="flex-1 bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600 text-sm"
-                  placeholder="Type your reply to the student…"
-                />
-                <button
-                  type="button"
-                  onClick={() => sendReply(row)}
-                  disabled={savingId === row.id || !(replyDraft[row.id] ?? '').trim()}
-                  className="self-end sm:self-stretch flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 text-sm shrink-0"
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6`}>
+          <div className="flex items-center gap-3 mb-2">
+            <Clock className="w-6 h-6 text-yellow-500" />
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Pending</span>
+          </div>
+          <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {queries.filter(q => q.status === 'pending').length}
+          </p>
+        </div>
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6`}>
+          <div className="flex items-center gap-3 mb-2">
+            <Check className="w-6 h-6 text-green-500" />
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Resolved</span>
+          </div>
+          <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {queries.filter(q => q.status === 'resolved').length}
+          </p>
+        </div>
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6`}>
+          <div className="flex items-center gap-3 mb-2">
+            <X className="w-6 h-6 text-gray-500" />
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Closed</span>
+          </div>
+          <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {queries.filter(q => q.status === 'closed').length}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border overflow-hidden`}>
+            <div className="px-6 py-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}">
+              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>All Queries</h2>
+            </div>
+            <div className="max-h-96 overflow-y-auto">
+              {queries.map((query) => (
+                <div
+                  key={query.id}
+                  onClick={() => setSelectedQuery(query)}
+                  className={`p-4 border-b cursor-pointer transition ${
+                    isDark ? 'border-gray-700 hover:bg-gray-700/50' : 'border-gray-200 hover:bg-gray-50'
+                  } ${selectedQuery?.id === query.id ? (isDark ? 'bg-gray-700' : 'bg-blue-50') : ''}`}
                 >
-                  <Send className="w-4 h-4" />
-                  {savingId === row.id ? 'Saving…' : 'Send reply'}
-                </button>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {query.subject}
+                    </span>
+                    {getStatusBadge(query.status)}
+                  </div>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {query.message.substring(0, 50)}...
+                  </p>
+                  <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {new Date(query.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2">
+          {selectedQuery ? (
+            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6`}>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className={`text-xl font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {selectedQuery.subject}
+                  </h2>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    User ID: {selectedQuery.user_id.substring(0, 16)}...
+                  </p>
+                </div>
+                {getStatusBadge(selectedQuery.status)}
+              </div>
+
+              <div className={`p-4 rounded-lg mb-6 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                <p className={`${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                  {selectedQuery.message}
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                {selectedQuery.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => updateStatus(selectedQuery.id, 'resolved')}
+                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition"
+                    >
+                      <Check className="w-4 h-4" />
+                      Mark Resolved
+                    </button>
+                    <button
+                      onClick={() => updateStatus(selectedQuery.id, 'closed')}
+                      className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition"
+                    >
+                      <X className="w-4 h-4" />
+                      Close
+                    </button>
+                  </>
+                )}
+                {selectedQuery.status === 'resolved' && (
+                  <button
+                    onClick={() => updateStatus(selectedQuery.id, 'closed')}
+                    className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition"
+                  >
+                    <X className="w-4 h-4" />
+                    Close Ticket
+                  </button>
+                )}
               </div>
             </div>
-          ))}
+          ) : (
+            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-8 text-center`}>
+              <MessageSquare className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Select a query to view details</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

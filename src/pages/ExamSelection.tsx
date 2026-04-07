@@ -1,156 +1,108 @@
-import { useMemo } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useEffect, useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { 
-  Trophy, 
-  Clock, 
-  Shield, 
-  ChevronRight,
-  BookOpen,
-  Bell
-} from 'lucide-react';
-import { BrandLogo } from '../components/BrandLogo';
-import { trialWholeDaysLeft } from '../lib/authUtils';
+import { subscribeToCategories, Category } from '../lib/firestore';
+import { ArrowRight, BookOpen, Target, Trophy, FileText } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 
 export function ExamSelection() {
-  const { profile, isPremium, effectiveRole, trialExpiredNeedsPremium } = useAuth();
   const { navigate } = useRouter();
-
-  const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile), [profile]);
-
-  const mainCategories = [
-    { id: 'Group-D', name: 'Group D', gradient: 'from-blue-600/20 to-blue-800/20', border: 'border-blue-500/30', text: 'text-blue-400', hover: 'hover:border-blue-400 hover:shadow-blue-500/20' },
-    { id: 'ALP', name: 'ALP', gradient: 'from-orange-600/20 to-orange-800/20', border: 'border-orange-500/30', text: 'text-orange-400', hover: 'hover:border-orange-400 hover:shadow-orange-500/20' },
-    { id: 'Technician', name: 'Technician', gradient: 'from-purple-600/20 to-purple-800/20', border: 'border-purple-500/30', text: 'text-purple-400', hover: 'hover:border-purple-400 hover:shadow-purple-500/20' },
-    { id: 'BSED', name: 'BSED', gradient: 'from-green-600/20 to-green-800/20', border: 'border-green-500/30', text: 'text-green-400', hover: 'hover:border-green-400 hover:shadow-green-500/20' },
-    { id: 'NTPC', name: 'NTPC', gradient: 'from-pink-600/20 to-pink-800/20', border: 'border-pink-500/30', text: 'text-pink-400', hover: 'hover:border-pink-400 hover:shadow-pink-500/20' },
-    { id: 'Technical', name: 'Technical', gradient: 'from-amber-600/20 to-amber-800/20', border: 'border-amber-500/30', text: 'text-amber-400', hover: 'hover:border-amber-400 hover:shadow-amber-500/20' },
-  ];
-
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToCategories((cats) => {
+      setCategories(cats);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const getCategoryIcon = (category: Category) => {
+    switch (category.name?.toLowerCase()) {
+      case 'mock tests':
+        return <Target className="w-6 h-6" />;
+      case 'previous year papers':
+        return <FileText className="w-6 h-6" />;
+      case 'subject quizzes':
+        return <BookOpen className="w-6 h-6" />;
+      default:
+        return <Trophy className="w-6 h-6" />;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className={`${isDark ? 'text-white' : 'text-gray-900'} text-lg`}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Header */}
-      <header className={`sticky top-0 z-50 backdrop-blur-md ${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} border-b`}>
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          {/* Left: Logo and Company Name */}
-          <div className="flex items-center gap-2 min-w-0">
-            <BrandLogo variant="nav" className="w-8 h-8 sm:w-10 sm:h-10 shrink-0" />
-            <span className={`font-bold text-base sm:text-xl tracking-tight truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>Railway Study Point</span>
-          </div>
-
-          {/* Right: Notification Bell */}
-          <button
-            onClick={() => navigate('/notifications')}
-            className={`relative p-2 rounded-lg transition shrink-0 ${isDark ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
-          >
-            <Bell className="w-6 h-6" />
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 ${isDark ? 'border-gray-900' : 'border-gray-50'}" />
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-        {/* Trial/Expiry Nudges */}
-        {!isPremium && effectiveRole !== 'admin' && (
-          <>
-            {daysLeftTrial !== null && (
-              <div className={`${isDark ? 'bg-amber-600/10 border-amber-500/20' : 'bg-amber-100 border-amber-300'} rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2`}>
-                <Clock className={`w-5 h-5 ${isDark ? 'text-amber-500' : 'text-amber-600'} shrink-0`} />
-                <p className={`${isDark ? 'text-amber-400' : 'text-amber-700'} text-sm font-medium`}>
-                  Free trial: {daysLeftTrial} day{daysLeftTrial === 1 ? '' : 's'} left
-                </p>
-              </div>
-            )}
-            {trialExpiredNeedsPremium && (
-              <div className={`${isDark ? 'bg-red-600/10 border-red-500/20' : 'bg-red-100 border-red-300'} rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2`}>
-                <Shield className={`w-5 h-5 ${isDark ? 'text-red-500' : 'text-red-600'} shrink-0`} />
-                <p className={`${isDark ? 'text-red-400' : 'text-red-700'} text-sm`}>Trial expired. Upgrade to unlock exams.</p>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Category Grid */}
-        <section>
-          <h2 className={`text-xl font-bold mb-6 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            <BookOpen className={`w-5 h-5 ${isDark ? 'text-blue-500' : 'text-blue-600'}`} />
-            Select Category
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-            {mainCategories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => navigate(`/exams/${cat.id}`)}
-                className={`bg-gradient-to-br ${cat.gradient} rounded-xl sm:rounded-2xl border-2 ${cat.border} ${cat.hover} p-3 sm:p-4 flex flex-col items-center justify-center text-center transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl`}
-              >
-                <span className={`font-bold text-xs sm:text-sm md:text-base leading-tight ${cat.text} line-clamp-2`}>{cat.name}</span>
-                <ChevronRight className={`w-4 h-5 mt-1 sm:mt-2 ${cat.text} opacity-60 group-hover:opacity-100 transition-opacity`} />
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Leaderboard Button */}
-        <section className="grid grid-cols-1 gap-4">
-          <button
-            onClick={() => navigate('/leaderboard')}
-            className={`w-full ${isDark ? 'bg-gray-900 border-amber-500/30 hover:border-amber-500' : 'bg-white border-amber-300 hover:border-amber-500'} rounded-2xl p-6 flex items-center justify-between group transition-all shadow-sm`}
-          >
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl ${isDark ? 'bg-amber-600/20' : 'bg-amber-100'} flex items-center justify-center`}>
-                <Trophy className={`w-6 h-6 ${isDark ? 'text-amber-500' : 'text-amber-600'}`} />
-              </div>
-              <div className="text-left">
-                <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Leaderboard</h3>
-                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>See where you rank among peers</p>
-              </div>
-            </div>
-            <ChevronRight className={`w-6 h-6 ${isDark ? 'text-amber-500' : 'text-amber-600'} group-hover:translate-x-1 transition-transform`} />
-          </button>
-        </section>
-
-        {/* Today Live Section */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className={`text-xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Today Live
-              <span className="flex items-center gap-1 bg-red-600/20 text-red-500 border border-red-500/30 px-2 py-0.5 rounded text-[10px] uppercase font-black animate-pulse">
-                <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                Live
-              </span>
-            </h2>
-          </div>
-          
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-            {[1, 2, 3].map((i) => (
-              <div 
-                key={i}
-                className={`min-w-[280px] rounded-2xl p-5 space-y-4 border-2 transition-all duration-300 hover:scale-[1.02] ${isDark ? 'bg-gray-900 border-gray-800 hover:border-blue-500/50' : 'bg-white border-gray-200 hover:border-blue-400'} shadow-sm`}
-              >
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">NTPC Stage 1</span>
-                  <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Starts in 2h</span>
-                </div>
-                <h3 className={`font-bold text-lg leading-snug ${isDark ? 'text-white' : 'text-gray-900'}`}>Full Mock Test #0{i}</h3>
-                <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> 90 min</span>
-                  <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> 100 Qs</span>
-                </div>
-                <button className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-xl text-sm font-bold transition">
-                  Remind Me
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
-      {/* Bottom Navigation */}
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
       <BottomNav />
+      
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        <div className="mb-8">
+          <h1 className={`text-2xl sm:text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            Railway Study Point
+          </h1>
+          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            Select a category to start your preparation
+          </p>
+        </div>
+
+        {categories.length === 0 ? (
+          <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-8 text-center`}>
+            <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No categories available yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                onClick={() => navigate(`/exams/${category.id}`)}
+                className={`${
+                  isDark 
+                    ? 'bg-gray-800 border-gray-700 hover:border-blue-500' 
+                    : 'bg-white border-gray-200 hover:border-blue-400'
+                } rounded-2xl border p-5 transition cursor-pointer group`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                      isDark ? 'bg-blue-600/20' : 'bg-blue-100'
+                    } group-hover:scale-110 transition`}>
+                      {category.iconUrl ? (
+                        <img src={category.iconUrl} alt={category.name} className="w-6 h-6" />
+                      ) : (
+                        <span className={`${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                          {getCategoryIcon(category)}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {category.name}
+                      </h3>
+                      <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {category.description || 'View available tests'}
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className={`w-5 h-5 ${isDark ? 'text-gray-500' : 'text-gray-400'} group-hover:translate-x-1 transition`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { supabase } from '../lib/supabase';
+import { doc, getDoc, updateDoc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { Check, Crown, Zap, BookOpen, Trophy, BarChart3, X, ArrowLeft } from 'lucide-react';
 
 function computePremiumUntil(
@@ -52,18 +53,16 @@ export function Upgrade() {
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('site_settings')
-          .select('premium_price_paise, premium_validity_days')
-          .eq('id', 1)
-          .maybeSingle();
-        if (!error && data) {
-          setPricePaise(data.premium_price_paise);
-          setValidityDays(data.premium_validity_days);
+        const docRef = doc(db, 'site_settings', '1');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.premium_price_paise) setPricePaise(data.premium_price_paise);
+          if (data.premium_validity_days) setValidityDays(data.premium_validity_days);
         }
       } catch (e) {
         console.error('Error loading site settings:', e);
-        /* keep defaults if migration not applied */
+        /* keep defaults if settings not found */
       } finally {
         setSettingsLoaded(true);
       }
@@ -110,17 +109,16 @@ export function Upgrade() {
       const finalAmount = pricePaise; 
       console.log('Processing payment for amount (paise):', finalAmount);
 
-      const { data: transactionData, error: transactionError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: profile.id,
-          amount: finalAmount,
-          status: 'pending',
-        })
-        .select()
-        .single();
+      // Create transaction record in Firestore
+      const transactionRef = doc(collection(db, 'transactions'));
+      await setDoc(transactionRef, {
+        user_id: profile.id,
+        amount: finalAmount,
+        status: 'pending',
+        created_at: serverTimestamp(),
+      });
 
-      if (transactionError) throw transactionError;
+      const transactionId = transactionRef.id;
 
       // 4. Reconstruct Options Object
       const options = {
@@ -134,33 +132,27 @@ export function Upgrade() {
           console.log('Payment successful! Response:', response);
           try {
             const paymentId = response.razorpay_payment_id;
-            const { error: updateError } = await supabase
-              .from('transactions')
-              .update({
-                status: 'success',
-                razorpay_payment_id: paymentId ?? null,
-              })
-              .eq('id', transactionData.id);
-
-            if (updateError) throw updateError;
-
-            const newUntil = computePremiumUntil(profile.premium_until, validityDays);
-            const wasActive = profile.premium_until && new Date(profile.premium_until) > new Date();
             
+            // Update transaction status
+            await updateDoc(transactionRef, {
+              status: 'success',
+              razorpay_payment_id: paymentId ?? null,
+            });
+
+            const newUntil = computePremiumUntil((profile as any).premium_until, validityDays);
+            const wasActive = (profile as any).premium_until && new Date((profile as any).premium_until) > new Date();
+            
+            // Update user profile
+            const profileRef = doc(db, 'profiles', profile.id);
             const premiumPatch: any = {
               is_premium: true,
               premium_until: newUntil,
             };
-            if (!wasActive || !profile.premium_started_at) {
+            if (!wasActive || !(profile as any).premium_started_at) {
               premiumPatch.premium_started_at = new Date().toISOString();
             }
 
-            const { error: premiumError } = await supabase
-              .from('profiles')
-              .update(premiumPatch)
-              .eq('id', profile.id);
-
-            if (premiumError) throw premiumError;
+            await updateDoc(profileRef, premiumPatch);
 
             await refreshProfile();
             navigate('/dashboard');
@@ -235,13 +227,13 @@ export function Upgrade() {
         </div>
 
         {/* Pricing Card */}
-        <div className={`relative rounded-2xl p-6 border shadow-xl ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-yellow-500/30 shadow-yellow-500/10' : 'bg-white border-yellow-300 shadow-yellow-100'}`}>
+        <div className="relative rounded-2xl p-6 border shadow-xl ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-yellow-500/30 shadow-yellow-500/10' : 'bg-white border-yellow-300 shadow-yellow-100'}">
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent rounded-2xl pointer-events-none" />
           
           <div className="relative">
             {/* Price */}
             <div className="text-center mb-6">
-              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 border ${isDark ? 'bg-yellow-600/20 border-yellow-500/30' : 'bg-yellow-100 border-yellow-300'}`}>
+              <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 border ${isDark ? 'bg-yellow-600/20 border-yellow-500/30' : 'bg-yellow-100 border-yellow-300'}">
                 <Zap className={`w-3 h-3 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} />
                 <span className={`${isDark ? 'text-yellow-400' : 'text-yellow-700'} text-xs font-bold uppercase tracking-wider`}>Limited Offer</span>
               </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Trophy, Medal, ArrowLeft } from 'lucide-react';
@@ -23,53 +24,56 @@ export function Leaderboard() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // 1. Try RPC first (Efficient)
-        const { data: rpcData, error: rpcError } = await supabase.rpc('get_leaderboard', { limit_n: 100 });
+        // Fetch all attempts from Firestore
+        const attemptsRef = collection(db, 'attempts');
+        const q = query(attemptsRef, orderBy('submitted_at', 'desc'));
+        const snapshot = await getDocs(q);
         
-        if (!rpcError && rpcData) {
-          // Filter out admins from leaderboard
-          const filtered = rpcData.filter((r: any) => r.role !== 'admin');
-          const normalized = filtered.map((r: any) => ({
-            user_id: r.user_id,
-            full_name: r.full_name || 'Student',
-            total_score: Number(r.total_score),
-            exams_taken: Number(r.exams_taken),
-          }));
-          setRows(normalized);
-          setLoading(false);
-          return;
-        }
-
-        // 2. Fallback: Manual aggregation (Resilient)
-        console.warn('Leaderboard RPC missing or failed, using manual fallback');
-        const { data: results, error: resError } = await supabase
-          .from('results')
-          .select('user_id, score, profiles:user_id(full_name, role)')
-          .order('created_at', { ascending: false });
-
-        if (resError) throw resError;
-
-        if (!results || results.length === 0) {
+        if (snapshot.empty) {
           setRows([]);
           setLoading(false);
           return;
         }
 
+        // Aggregate scores by user
         const userStats: Record<string, { full_name: string; total_score: number; exams_taken: number; role: string }> = {};
         
-        results.forEach((r: any) => {
-          const uid = r.user_id;
-          if (!userStats[uid]) {
-            userStats[uid] = {
-              full_name: (r.profiles as any)?.full_name || 'Student',
+        // Fetch profiles to get names
+        const profilesData: Record<string, string> = {};
+        
+        for (const doc of snapshot.docs) {
+          const data = doc.data();
+          const userId = data.user_id;
+          
+          if (!userStats[userId]) {
+            // Fetch profile if not cached
+            if (!profilesData[userId]) {
+              try {
+                const profileRef = collection(db, 'profiles');
+                const profileQuery = query(profileRef, where('__name__', '==', userId));
+                const profileSnap = await getDocs(profileQuery);
+                if (!profileSnap.empty) {
+                  const profileData = profileSnap.docs[0].data();
+                  profilesData[userId] = profileData.full_name || 'Student';
+                } else {
+                  profilesData[userId] = 'Student';
+                }
+              } catch (e) {
+                profilesData[userId] = 'Student';
+              }
+            }
+            
+            userStats[userId] = {
+              full_name: profilesData[userId],
               total_score: 0,
               exams_taken: 0,
-              role: (r.profiles as any)?.role || 'student',
+              role: 'student', // Default role
             };
           }
-          userStats[uid].total_score += (r.score || 0);
-          userStats[uid].exams_taken += 1;
-        });
+          
+          userStats[userId].total_score += data.score || 0;
+          userStats[userId].exams_taken += 1;
+        }
 
         // Filter out admins and sort
         const sorted = Object.entries(userStats)

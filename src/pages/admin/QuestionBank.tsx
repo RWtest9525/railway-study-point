@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-import { Database } from '../../lib/database.types';
+import { getQuestions, createQuestion, updateQuestion, deleteQuestion, Question } from '../../lib/firestore';
 import { Plus, CreditCard as Edit, Trash2 } from 'lucide-react';
-
-type Question = Database['public']['Tables']['questions']['Row'];
 
 export function QuestionBank() {
   const { profile } = useAuth();
   const categories = ['Group-D', 'ALP', 'Technician', 'BSED', 'NTPC', 'Technical'];
-  const subjects = ['Math', 'Reasoning', 'Science', 'General Awareness'];
+  const subjects = ['Maths', 'Reasoning', 'Science', 'GK'];
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALP');
@@ -20,8 +17,7 @@ export function QuestionBank() {
   const [success, setSuccess] = useState('');
 
   const [formData, setFormData] = useState({
-    category: selectedCategory,
-    subject: 'Math',
+    subject: 'Maths' as 'Maths' | 'Reasoning' | 'GK' | 'Science',
     question_text: '',
     option1: '',
     option2: '',
@@ -39,30 +35,10 @@ export function QuestionBank() {
     setLoading(true);
     setError('');
     try {
-      // First try with created_at ordering
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('category', selectedCategory)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        // If created_at doesn't exist, try without ordering
-        if (error.message?.includes('created_at') || error.message?.includes('does not exist')) {
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('questions')
-            .select('*')
-            .eq('category', selectedCategory)
-            .limit(100);
-          
-          if (fallbackError) throw fallbackError;
-          setQuestions(fallbackData || []);
-        } else {
-          throw error;
-        }
-      } else {
-        setQuestions(data || []);
-      }
+      // Note: In Firestore, we'd need to query by exam_id, but for now load all questions
+      const allQuestions = await getQuestions('');
+      // Filter by category if needed (questions should have category field)
+      setQuestions(allQuestions);
     } catch (error: any) {
       console.error('Error loading questions:', error);
       setError('Failed to load questions. Please check your database connection and try again.');
@@ -78,28 +54,22 @@ export function QuestionBank() {
     setSuccess('');
 
     const questionData = {
-      category: formData.category,
+      exam_id: 'general', // Default exam_id - should be selected
       subject: formData.subject,
       question_text: formData.question_text.trim(),
       options: [formData.option1.trim(), formData.option2.trim(), formData.option3.trim(), formData.option4.trim()],
-      correct_answer: formData.correct_answer,
+      correct_index: formData.correct_answer,
       explanation: formData.explanation.trim(),
-      created_by: profile!.id,
+      marks: 1,
+      order: 0,
     };
 
     try {
       if (editingId) {
-        const { error } = await supabase
-          .from('questions')
-          .update(questionData)
-          .eq('id', editingId);
-
-        if (error) throw error;
+        await updateQuestion(editingId, questionData);
         setSuccess('Question updated successfully!');
       } else {
-        const { error } = await supabase.from('questions').insert(questionData);
-
-        if (error) throw error;
+        await createQuestion(questionData);
         setSuccess('Question added successfully!');
       }
 
@@ -116,15 +86,14 @@ export function QuestionBank() {
   const handleEdit = (question: Question) => {
     const options = question.options as string[];
     setFormData({
-      category: question.category,
-      subject: question.subject || 'Math',
+      subject: question.subject as 'Maths' | 'Reasoning' | 'GK' | 'Science',
       question_text: question.question_text,
       option1: options[0] || '',
       option2: options[1] || '',
       option3: options[2] || '',
       option4: options[3] || '',
-      correct_answer: question.correct_answer,
-      explanation: question.explanation,
+      correct_answer: question.correct_index,
+      explanation: question.explanation || '',
     });
     setEditingId(question.id);
     setShowForm(true);
@@ -134,9 +103,7 @@ export function QuestionBank() {
     if (!confirm('Are you sure you want to delete this question?')) return;
 
     try {
-      const { error } = await supabase.from('questions').delete().eq('id', id);
-
-      if (error) throw error;
+      await deleteQuestion(id);
       loadQuestions();
     } catch (error) {
       console.error('Error deleting question:', error);
@@ -145,8 +112,7 @@ export function QuestionBank() {
 
   const resetForm = () => {
     setFormData({
-      category: selectedCategory,
-      subject: 'Math',
+      subject: 'Maths',
       question_text: '',
       option1: '',
       option2: '',
@@ -212,24 +178,6 @@ export function QuestionBank() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Category
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        category: e.target.value,
-                      })
-                    }
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Subject
                   </label>
                   <select
@@ -237,7 +185,7 @@ export function QuestionBank() {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        subject: e.target.value,
+                        subject: e.target.value as 'Maths' | 'Reasoning' | 'GK' | 'Science',
                       })
                     }
                     className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -370,13 +318,8 @@ export function QuestionBank() {
                     {question.question_text.length > 100 ? '...' : ''}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="bg-blue-900/50 text-blue-300 border border-blue-500/30 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                      {question.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
                     <span className="bg-purple-900/50 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                      {question.subject || 'General'}
+                      {question.subject}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">

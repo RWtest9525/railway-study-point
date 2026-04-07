@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
-import { supabase } from '../lib/supabase';
-import { Database } from '../lib/database.types';
+import { getExams, getAttempts, Exam, QuizAttempt } from '../lib/firestore';
 import {
   Brain as Train,
   Briefcase,
@@ -19,16 +18,13 @@ import {
 import { BrandLogo } from '../components/BrandLogo';
 import { trialWholeDaysLeft } from '../lib/authUtils';
 
-type Exam = Database['public']['Tables']['exams']['Row'];
-type Result = Database['public']['Tables']['results']['Row'];
-
 export function StudentDashboard() {
   const { profile, signOut, isPremium, effectiveRole, canAccessTests, trialExpiredNeedsPremium } =
     useAuth();
   const { navigate } = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [exams, setExams] = useState<Exam[]>([]);
-  const [recentResults, setRecentResults] = useState<Result[]>([]);
+  const [recentResults, setRecentResults] = useState<QuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -49,7 +45,7 @@ export function StudentDashboard() {
   }, [profile?.id]);
 
   useEffect(() => {
-    if (selectedCategory === 'ALP' || selectedCategory === 'NTPC' || selectedCategory === 'Group-D') {
+    if (selectedCategory) {
       loadExams(selectedCategory);
     }
   }, [selectedCategory]);
@@ -60,15 +56,8 @@ export function StudentDashboard() {
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from('results')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      setRecentResults(data || []);
+      const attempts = await getAttempts(profile.id);
+      setRecentResults(attempts.slice(0, 5));
     } catch (error) {
       console.error('Error loading results:', error);
     } finally {
@@ -76,16 +65,11 @@ export function StudentDashboard() {
     }
   };
 
-  const loadExams = async (category: 'ALP' | 'NTPC' | 'Group-D') => {
+  const loadExams = async (categoryId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('exams')
-        .select('*')
-        .eq('category', category)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setExams(data || []);
+      const allExams = await getExams();
+      const filteredExams = allExams.filter(exam => exam.category_id === categoryId);
+      setExams(filteredExams);
     } catch (error) {
       console.error('Error loading exams:', error);
     }
@@ -98,21 +82,21 @@ export function StudentDashboard() {
 
   const categories = [
     {
-      id: 'ALP',
+      id: 'alp',
       name: 'Assistant Loco Pilot',
       icon: Train,
       color: 'from-blue-600 to-blue-800',
       description: 'Technical & General Awareness',
     },
     {
-      id: 'NTPC',
+      id: 'ntpc',
       name: 'Non-Technical Popular Categories',
       icon: Briefcase,
       color: 'from-green-600 to-green-800',
       description: 'Graduate & Undergraduate Level',
     },
     {
-      id: 'Group-D',
+      id: 'group-d',
       name: 'Group D',
       icon: Users,
       color: 'from-orange-600 to-orange-800',
@@ -350,7 +334,7 @@ export function StudentDashboard() {
                         {recentResults.map((result) => (
                           <tr key={result.id} className="hover:bg-gray-700/30 transition">
                             <td className="px-4 sm:px-6 py-4 text-gray-300 text-xs sm:text-sm">
-                              {new Date(result.created_at).toLocaleDateString()}
+                              {new Date(result.started_at).toLocaleDateString()}
                             </td>
                             <td className="px-4 sm:px-6 py-4">
                               <div className="flex flex-col">
@@ -432,7 +416,7 @@ export function StudentDashboard() {
                     </span>
                     <span className="flex items-center gap-1.5 bg-gray-700/50 px-2.5 py-1 rounded-md">
                       <Users className="w-4 h-4 text-green-400" />
-                      {(exam.question_ids as string[]).length} questions
+                      {exam.total_marks} marks
                     </span>
                   </div>
 

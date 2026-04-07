@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
-import { supabase } from '../lib/supabase';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const DEFAULT_NUDGE_SEC = 10;
 const NUDGE_MIN_SEC = 3;
@@ -33,16 +34,21 @@ export function TrialUpgradeNudge() {
     if (hide) return;
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('trial_nudge_interval_seconds')
-        .eq('id', 1)
-        .maybeSingle();
-      if (!cancelled) {
-        if (error || !data) {
+      try {
+        const docRef = doc(db, 'site_settings', '1');
+        const docSnap = await getDoc(docRef);
+        if (!cancelled) {
+          if (!docSnap.exists()) {
+            setIntervalSec(DEFAULT_NUDGE_SEC);
+          } else {
+            const data = docSnap.data();
+            setIntervalSec(clampNudgeSec(data?.trial_nudge_interval_seconds));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching nudge settings:', error);
+        if (!cancelled) {
           setIntervalSec(DEFAULT_NUDGE_SEC);
-        } else {
-          setIntervalSec(clampNudgeSec(data.trial_nudge_interval_seconds));
         }
       }
     })();

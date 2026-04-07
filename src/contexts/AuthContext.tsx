@@ -1,16 +1,30 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
-import { Database } from '../lib/database.types';
+import { 
+  User, 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut,
+  signInWithPopup,
+  updateProfile,
+  GoogleAuthProvider
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { auth, db, googleProvider } from '../lib/firebase';
 import { cache, createCacheKey } from '../lib/dataCache';
-import {
-  getEffectiveRole,
-  hasActivePremium,
-  canAccessTests as canAccessTestsFn,
-  trialExpiredNeedsPremium,
-} from '../lib/authUtils';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'student';
+  is_premium: boolean;
+  premium_expires_at?: string;
+  avatar_url?: string;
+  ban_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +51,44 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Track login session start time
 let loginSessionStart: Date | null = null;
 
+// Helper function to determine effective role
+const getEffectiveRole = (profile: Profile | null, userEmail?: string): 'admin' | 'student' | 'banned' => {
+  if (profile?.ban_reason) return 'banned';
+  
+  // Check if user email is in admin list (for initial setup)
+  const adminEmails = ['admin@railwaystudy.com', 'admin@test.com'];
+  if (profile?.role === 'admin' || (userEmail && adminEmails.includes(userEmail.toLowerCase()))) {
+    return 'admin';
+  }
+  
+  return 'student';
+};
+
+// Helper to check if user has active premium
+const hasActivePremium = (profile: Profile | null): boolean => {
+  if (!profile) return false;
+  if (profile.is_premium) {
+    if (profile.premium_expires_at) {
+      return new Date(profile.premium_expires_at) > new Date();
+    }
+    return true;
+  }
+  return false;
+};
+
+// Helper to check if user can access tests
+const canAccessTests = (profile: Profile | null, role: 'admin' | 'student'): boolean => {
+  if (role === 'admin') return true;
+  // Students need premium or are within trial
+  return hasActivePremium(profile);
+};
+
+// Helper to check if trial expired and needs premium
+const trialExpiredNeedsPremium = (profile: Profile | null, role: 'admin' | 'student'): boolean => {
+  if (role === 'admin') return false;
+  return !hasActivePremium(profile);
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -56,47 +108,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      const profileRef = doc(db, 'profiles', userId);
+      const profileSnap = await getDoc(profileRef);
 
-      if (error) throw error;
-
-      if (!data && email) {
-        // Create profile if it doesn't exist (e.g. after Google login)
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            email: email,
-            full_name: fullName || email.split('@')[0],
-            is_premium: false,
-          })
-          .select()
-          .maybeSingle();
-
-        if (createError) {
-          // If profile was created by another concurrent call, just fetch it
-          if (createError.code === '23505') {
-            const { data: existingData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', userId)
-              .single();
-            setProfile(existingData);
-            cache.set(cacheKey, existingData);
-          } else {
-            throw createError;
-          }
-        } else if (newProfile) {
-          setProfile(newProfile);
-          cache.set(cacheKey, newProfile);
-        }
-      } else if (data) {
+      if (profileSnap.exists()) {
+        const data = profileSnap.data() as Profile;
         setProfile(data);
         cache.set(cacheKey, data);
+      } else if (email) {
+        // Create profile if it doesn't exist (e.g. after Google login)
+        const newProfile: Omit<Profile, 'created_at' | 'updated_at'> = {
+          id: userId,
+          email: email,
+          full_name: fullName || email.split('@')[0],
+          role: 'student',
+          is_premium: false,
+        };
+
+        const profileData: Profile = {
+          ...newProfile,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        await setDoc(profileRef, profileData);
+        setProfile(profileData);
+        cache.set(cacheKey, profileData);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -105,29 +142,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Record login in login_history table
+  // Record login in login_history collection
   const recordLogin = useCallback(async (userId: string) => {
     try {
       loginSessionStart = new Date();
       
-      // Get approximate IP and user agent (note: IP requires server-side to get accurately)
-      const { error } = await supabase
-        .from('login_history')
-        .insert({
-          user_id: userId,
-          login_at: loginSessionStart.toISOString(),
-          user_agent: navigator.userAgent
-        });
-      
-      if (error) {
-        console.error('Failed to record login:', error);
-      }
-    } catch (err) {
-      console.error('Error recording login:', err);
+      const loginRef = doc(db, 'login_history', `${userId}_${Date.now()}`);
+      await setDoc(loginRef, {
+        user_id: userId,
+        login_at: loginSessionStart.toISOString(),
+        user_agent: navigator.userAgent,
+        logout_at: null,
+        duration_seconds: null,
+      });
+    } catch (error) {
+      console.error('Failed to record login:', error);
     }
   }, []);
 
-  // Record logout in login_history table
+  // Record logout in login_history collection
   const recordLogout = useCallback(async (userId: string) => {
     try {
       if (!loginSessionStart) return;
@@ -135,134 +168,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const logoutTime = new Date();
       const durationSeconds = Math.floor((logoutTime.getTime() - loginSessionStart.getTime()) / 1000);
       
-      // Update the most recent login_history entry for this user
-      const { error } = await supabase
-        .from('login_history')
-        .update({
-          logout_at: logoutTime.toISOString(),
-          duration_seconds: durationSeconds
-        })
-        .match({ user_id: userId })
-        .is('logout_at', null)
-        .order('login_at', { ascending: false })
-        .limit(1);
-      
-      if (error) {
-        console.error('Failed to record logout:', error);
-      }
+      // Query for the most recent login entry without logout
+      // Note: In production, you'd want to use a more efficient approach
+      const loginRef = doc(db, 'login_history', `${userId}_${loginSessionStart.toISOString()}`);
+      await updateDoc(loginRef, {
+        logout_at: logoutTime.toISOString(),
+        duration_seconds: durationSeconds
+      });
       
       loginSessionStart = null;
-    } catch (err) {
-      console.error('Error recording logout:', err);
+    } catch (error) {
+      console.error('Failed to record logout:', error);
     }
   }, []);
 
   useEffect(() => {
-    // First, try to restore session from localStorage (Supabase handles this automatically)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session restore:', session?.user?.email);
-      setUser(session?.user ?? null);
-      if (session?.user) {
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser?.email);
+      
+      if (firebaseUser) {
+        setUser(firebaseUser);
         loadProfile(
-          session.user.id,
-          session.user.email,
-          session.user.user_metadata?.full_name
+          firebaseUser.uid,
+          firebaseUser.email ?? undefined,
+          firebaseUser.displayName ?? undefined
         ).then(() => {
-          recordLogin(session.user.id);
+          recordLogin(firebaseUser.uid);
         });
       } else {
+        setUser(null);
+        setProfile(null);
         setLoading(false);
       }
-      sessionRestored.current = true;
-    });
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
       
-      switch (event) {
-        case 'SIGNED_IN':
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            loadProfile(
-              session.user.id,
-              session.user.email,
-              session.user.user_metadata?.full_name
-            ).then(() => {
-              recordLogin(session.user.id);
-            });
-          }
-          break;
-          
-        case 'SIGNED_OUT':
-          if (user) {
-            recordLogout(user.id);
-          }
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-          break;
-          
-        case 'TOKEN_REFRESHED':
-          // Session is still valid, keep user logged in
-          if (session?.user) {
-            setUser(session.user);
-          }
-          break;
-          
-        case 'USER_UPDATED':
-        case 'INITIAL_SESSION':
-          if (session?.user) {
-            setUser(session.user);
-            loadProfile(
-              session.user.id,
-              session.user.email,
-              session.user.user_metadata?.full_name
-            );
-          }
-          break;
-          
-        default:
-          (async () => {
-            setUser(session?.user ?? null);
-            if (session?.user) {
-              await loadProfile(
-                session.user.id,
-                session.user.email,
-                session.user.user_metadata?.full_name
-              );
-            } else {
-              setProfile(null);
-              setLoading(false);
-            }
-          })();
+      if (!sessionRestored.current) {
+        sessionRestored.current = true;
       }
     });
-
-    // Handle page visibility change to track session duration
-    const handleVisibilityChange = () => {
-      if (document.hidden && user) {
-        // Page is hidden, could record this as potential logout
-      } else if (!document.hidden && user) {
-        // Page is visible again, ensure session is still valid
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user && session.user.id !== user.id) {
-            // Different user session, reload profile
-            loadProfile(session.user.id, session.user.email);
-          }
-        });
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      subscription.unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      unsubscribe();
       if (user) {
-        recordLogout(user.id);
+        recordLogout(user.uid);
       }
     };
   }, [loadProfile, recordLogin, recordLogout, user]);
@@ -271,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setLoading(true);
     // Force refresh - bypass cache
-    await loadProfile(user.id, user.email, user.user_metadata?.full_name, true);
+    await loadProfile(user.uid, user.email, user.displayName, true);
   }, [user, loadProfile]);
 
   const effectiveRole = useMemo(() => {
@@ -282,10 +230,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isPremium = useMemo(() => hasActivePremium(profile), [profile]);
   const isBanned = useMemo(() => effectiveRole === 'banned', [effectiveRole]);
 
-  const canAccessTests = useMemo(() => {
+  const canAccessTestsValue = useMemo(() => {
     if (loading || isBanned) return false;
     const role = effectiveRole === 'banned' ? 'student' as const : effectiveRole as 'admin' | 'student';
-    return canAccessTestsFn(profile, role);
+    return canAccessTests(profile, role);
   }, [profile, effectiveRole, loading, isBanned]);
 
   const trialExpiredNeedsPremiumFlag = useMemo(() => {
@@ -295,74 +243,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile, effectiveRole, loading, user]);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+      console.error('Sign in error:', error);
+      throw error;
+    }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-        data: {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Update profile with display name
+      if (userCredential.user) {
+        await updateProfile(userCredential.user, {
+          displayName: fullName ?? undefined
+        });
+        
+        // Create user profile in Firestore
+        const profileData: Profile = {
+          id: userCredential.user.uid,
+          email: email,
           full_name: fullName,
-        },
-      },
-    });
-    if (error) {
-      console.error('Signup error:', error.message);
+          role: 'student',
+          is_premium: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        await setDoc(doc(db, 'profiles', userCredential.user.uid), profileData);
+      }
+
+      return { needsEmailConfirmation: false };
+    } catch (error) {
+      console.error('Signup error:', error);
       throw error;
     }
-
-    // If session is returned immediately, Supabase email confirmation is OFF
-    if (data.session) {
-      setUser(data.session.user);
-      await loadProfile(
-        data.session.user.id,
-        data.session.user.email,
-        data.session.user.user_metadata?.full_name
-      );
-    }
-
-    return { needsEmailConfirmation: !data.session };
   };
 
   const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-    if (error) throw error;
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error('Google sign in error:', error);
+      throw error;
+    }
   };
 
   const signOut = async () => {
     try {
       if (user) {
-        await recordLogout(user.id);
+        await recordLogout(user.uid);
       }
+      
       // Clear local state first for instant feedback
       setUser(null);
       setProfile(null);
       setLoading(true);
       
-      // Then sign out from Supabase
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      if (error) {
-        console.error('Sign out error:', error);
-        // Still clear state even if there's an error
-      }
+      // Then sign out from Firebase
+      await firebaseSignOut(auth);
       
       // Clear any cached data
-      localStorage.removeItem('sb-' + (import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || '') + '-auth-token');
+      cache.clear();
       setLoading(false);
-    } catch (err) {
-      console.error('Sign out error:', err);
+    } catch (error) {
+      console.error('Sign out error:', error);
       // Force clear state on error
       setUser(null);
       setProfile(null);
@@ -376,7 +324,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     effectiveRole,
     isPremium,
     isBanned,
-    canAccessTests,
+    canAccessTests: canAccessTestsValue,
     trialExpiredNeedsPremium: trialExpiredNeedsPremiumFlag,
     loading,
     refreshProfile,

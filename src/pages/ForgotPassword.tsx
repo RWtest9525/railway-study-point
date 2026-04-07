@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { useRouter } from '../contexts/RouterContext';
 import { Mail } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
-import { getAuthRedirectOrigin } from '../lib/authRedirect';
 
 export function ForgotPassword() {
   const { navigate } = useRouter();
@@ -17,16 +17,14 @@ export function ForgotPassword() {
     setLoading(true);
     setError('');
     setMessage('');
-    const redirectTo = `${getAuthRedirectOrigin()}/reset-password`;
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo,
-    });
-    setLoading(false);
-    if (err) {
+    
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setMessage('Check your email for a link to reset your password. You can close this page.');
+    } catch (err: any) {
       setError(err.message);
-      return;
     }
-    setMessage('Check your email for a link to reset your password. You can close this page.');
+    setLoading(false);
   };
 
   return (
@@ -40,7 +38,7 @@ export function ForgotPassword() {
         </div>
         <h1 className="text-2xl font-bold text-white text-center mb-2">Forgot password</h1>
         <p className="text-gray-400 text-center text-sm mb-6">
-          Enter the email you used to sign up. We&apos;ll send a link to set a new password.
+          Enter the email you used to sign up. We'll send a link to set a new password.
         </p>
 
         {message && (

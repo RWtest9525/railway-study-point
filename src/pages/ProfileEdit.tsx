@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { supabase } from '../lib/supabase';
+import { sendPasswordResetEmail, updateProfile } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { User as UserIcon, Mail, Phone, KeyRound, ArrowLeft } from 'lucide-react';
-import { getAuthRedirectOrigin } from '../lib/authRedirect';
 import { BottomNav } from '../components/BottomNav';
 
 export function ProfileEdit() {
@@ -11,14 +12,15 @@ export function ProfileEdit() {
   const isDark = theme === 'dark';
   const { profile, user, refreshProfile } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
-  const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
-    setPhone(profile?.phone ?? '');
-  }, [profile?.full_name, profile?.phone, profile?.id]);
+    setPhone(''); // Phone is not in Firestore profile yet
+  }, [profile?.full_name, profile?.id]);
+  
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [pwMessage, setPwMessage] = useState('');
@@ -38,41 +40,21 @@ export function ProfileEdit() {
     setError('');
     setMessage('');
     try {
-      // 1. Update profiles table with proper error handling
-      const { data: profileData, error: pErr } = await supabase
-        .from('profiles')
-        .update({
-          full_name: fullName.trim(),
-          phone: phone.trim(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id)
-        .select()
-        .single();
-      
-      if (pErr) {
-        console.error('Profile update error:', pErr);
-        throw new Error(pErr.message || 'Failed to update profile');
-      }
-
-      // 2. Update auth metadata (important for things like Google login or initial setup)
-      const { error: aErr } = await supabase.auth.updateUser({
-        data: { 
-          full_name: fullName.trim(),
-          phone: phone.trim()
-        },
+      // 1. Update Firebase Auth profile
+      await updateProfile(user, {
+        displayName: fullName.trim()
       });
-      
-      if (aErr) {
-        console.error('Auth update error:', aErr);
-        // Don't throw - profile was updated, auth metadata is secondary
-      }
+
+      // 2. Update Firestore profile
+      const profileRef = doc(db, 'profiles', user.uid);
+      await updateDoc(profileRef, {
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        updated_at: new Date().toISOString(),
+      });
 
       // 3. Force refresh the global state immediately
-      if (profileData) {
-        // Refresh the profile data in global state
-        await refreshProfile();
-      }
+      await refreshProfile();
       
       setMessage('Profile updated successfully!');
       
@@ -86,20 +68,20 @@ export function ProfileEdit() {
     }
   };
 
-  const sendPasswordResetEmail = async () => {
+  const handlePasswordReset = async () => {
     const email = user?.email?.trim();
-    if (!email) return;
+    if (!email || !user) return;
     setPwLoading(true);
     setPwError('');
     setPwMessage('');
-    const redirectTo = `${getAuthRedirectOrigin()}/reset-password`;
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    setPwLoading(false);
-    if (err) {
+    
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setPwMessage('Check your inbox for a link to set a new password.');
+    } catch (err: any) {
       setPwError(err.message);
-      return;
     }
-    setPwMessage('Check your inbox for a link to set a new password.');
+    setPwLoading(false);
   };
 
   return (
@@ -235,7 +217,7 @@ export function ProfileEdit() {
             
             <button
               type="button"
-              onClick={sendPasswordResetEmail}
+              onClick={handlePasswordReset}
               disabled={pwLoading || !user?.email}
               className={`w-full font-bold py-4 rounded-xl transition disabled:opacity-50 active:scale-95 border ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border-gray-300'}`}
             >

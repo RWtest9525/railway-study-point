@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { confirmPasswordReset } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { useRouter } from '../contexts/RouterContext';
 import { Lock } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
@@ -14,15 +15,12 @@ export function ResetPassword() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || session) setReady(true);
-    });
-    return () => subscription.unsubscribe();
+    // Check if we have the oobCode in the URL (Firebase password reset link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const oobCode = urlParams.get('oobCode');
+    if (oobCode) {
+      setReady(true);
+    }
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -35,17 +33,26 @@ export function ResetPassword() {
       setError('Passwords do not match.');
       return;
     }
-    setLoading(true);
-    setError('');
-    const { error: err } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (err) {
-      setError(err.message);
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const oobCode = urlParams.get('oobCode');
+    
+    if (!oobCode) {
+      setError('Invalid reset link. Please request a new password reset.');
       return;
     }
-    setMessage('Password updated. Redirecting to sign in…');
-    await supabase.auth.signOut();
-    window.setTimeout(() => navigate('/login'), 1500);
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      await confirmPasswordReset(auth, oobCode, password);
+      setMessage('Password updated. Redirecting to sign in…');
+      setTimeout(() => navigate('/login'), 1500);
+    } catch (err: any) {
+      setError(err.message);
+    }
+    setLoading(false);
   };
 
   return (

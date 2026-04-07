@@ -1,214 +1,149 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
-import { Database } from '../../lib/database.types';
-import { DollarSign, Users, TrendingUp, Calendar } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { TrendingUp, DollarSign, IndianRupee, Calendar } from 'lucide-react';
 
-type Transaction = Database['public']['Tables']['transactions']['Row'];
-type Profile = Database['public']['Tables']['profiles']['Row'];
-
-interface TransactionWithProfile extends Transaction {
-  profile?: Profile;
+interface Transaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  status: string;
+  created_at: string;
 }
 
 export function RevenueTracker() {
-  const [transactions, setTransactions] = useState<TransactionWithProfile[]>([]);
-  const [stats, setStats] = useState({
-    totalRevenue: 0,
-    successfulTransactions: 0,
-    premiumUsers: 0,
-    monthlyRevenue: 0,
-  });
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
+    loadTransactions();
   }, []);
 
-  const loadData = async () => {
+  const loadTransactions = async () => {
     try {
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('status', 'success')
-        .order('created_at', { ascending: false });
-
-      if (transactionsError) throw transactionsError;
-
-      const userIds = [...new Set(transactionsData?.map((t) => t.user_id) || [])];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', userIds);
-
-      const transactionsWithProfiles = transactionsData?.map((transaction) => ({
-        ...transaction,
-        profile: profilesData?.find((p) => p.id === transaction.user_id),
-      }));
-
-      setTransactions(transactionsWithProfiles || []);
-
-      const totalRevenue =
-        transactionsData?.reduce((sum, t) => sum + t.amount, 0) || 0;
-
-      const { count: premiumCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_premium', true);
-
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const monthlyTransactions = transactionsData?.filter(
-        (t) => new Date(t.created_at) >= firstDayOfMonth
-      );
-      const monthlyRevenue =
-        monthlyTransactions?.reduce((sum, t) => sum + t.amount, 0) || 0;
-
-      setStats({
-        totalRevenue: totalRevenue / 100,
-        successfulTransactions: transactionsData?.length || 0,
-        premiumUsers: premiumCount || 0,
-        monthlyRevenue: monthlyRevenue / 100,
-      });
+      const transactionsRef = collection(db, 'transactions');
+      const q = query(transactionsRef, orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(q);
+      const txns = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      setTransactions(txns);
     } catch (error) {
-      console.error('Error loading revenue data:', error);
+      console.error('Error loading transactions:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  const successfulTransactions = transactions.filter(t => t.status === 'success');
+  const totalRevenue = successfulTransactions.reduce((sum, t) => sum + (t.amount / 100), 0);
+  
+  // Calculate this month's revenue
+  const thisMonth = new Date().getMonth();
+  const thisYear = new Date().getFullYear();
+  const monthlyRevenue = successfulTransactions
+    .filter(t => {
+      const date = new Date(t.created_at);
+      return date.getMonth() === thisMonth && date.getFullYear() === thisYear;
+    })
+    .reduce((sum, t) => sum + (t.amount / 100), 0);
+
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-white text-xl">Loading revenue data...</div>
-      </div>
-    );
+    return <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading...</div>;
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Revenue Tracker</h1>
-        <p className="text-gray-400">Monitor your earnings and transactions</p>
+    <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
+      <div className="mb-6">
+        <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Revenue Tracker</h1>
+        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Track premium subscription revenue</p>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-xl p-6 border border-green-700">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6`}>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-lg bg-green-600/20 flex items-center justify-center">
+              <IndianRupee className="w-5 h-5 text-green-500" />
             </div>
-            <span className="text-green-100 text-sm font-medium">Total Revenue</span>
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Revenue</span>
           </div>
-          <div className="text-3xl font-bold text-white">
-            ₹{stats.totalRevenue.toFixed(2)}
-          </div>
+          <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>₹{totalRevenue.toFixed(0)}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl p-6 border border-blue-700">
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6`}>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-lg bg-blue-600/20 flex items-center justify-center">
+              <Calendar className="w-5 h-5 text-blue-500" />
             </div>
-            <span className="text-blue-100 text-sm font-medium">Successful Payments</span>
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>This Month</span>
           </div>
-          <div className="text-3xl font-bold text-white">
-            {stats.successfulTransactions}
-          </div>
+          <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>₹{monthlyRevenue.toFixed(0)}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-yellow-600 to-yellow-800 rounded-xl p-6 border border-yellow-700">
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6`}>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-lg bg-purple-600/20 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-purple-500" />
             </div>
-            <span className="text-yellow-100 text-sm font-medium">Premium Users</span>
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Transactions</span>
           </div>
-          <div className="text-3xl font-bold text-white">{stats.premiumUsers}</div>
+          <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{successfulTransactions.length}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl p-6 border border-purple-700">
+        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6`}>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-lg bg-yellow-600/20 flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-yellow-500" />
             </div>
-            <span className="text-purple-100 text-sm font-medium">This Month</span>
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Avg. Order</span>
           </div>
-          <div className="text-3xl font-bold text-white">
-            ₹{stats.monthlyRevenue.toFixed(2)}
-          </div>
+          <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            ₹{successfulTransactions.length > 0 ? (totalRevenue / successfulTransactions.length).toFixed(0) : '0'}
+          </p>
         </div>
       </div>
 
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-        <div className="px-6 py-4 bg-gray-700 border-b border-gray-600">
-          <h2 className="text-xl font-bold text-white">Recent Transactions</h2>
+      <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border overflow-hidden`}>
+        <div className="px-6 py-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}">
+          <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Recent Transactions</h2>
         </div>
-
-        {transactions.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">
-            No successful transactions yet.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-700/50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                    Payment ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                {transactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-gray-700/50">
-                    <td className="px-6 py-4 text-gray-300">
-                      {new Date(transaction.created_at).toLocaleDateString('en-IN', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-white font-medium">
-                        {transaction.profile?.full_name || 'Unknown'}
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        {transaction.profile?.email}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-300 font-mono text-sm">
-                      {transaction.razorpay_payment_id?.substring(0, 20)}...
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-green-400 font-semibold">
-                        ₹{(transaction.amount / 100).toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="bg-green-900 text-green-300 px-3 py-1 rounded-full text-xs font-semibold">
-                        {transaction.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <table className="w-full">
+          <thead className={`${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+            <tr>
+              <th className={`px-6 py-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>User ID</th>
+              <th className={`px-6 py-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Amount</th>
+              <th className={`px-6 py-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Status</th>
+              <th className={`px-6 py-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Date</th>
+            </tr>
+          </thead>
+          <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+            {transactions.slice(0, 10).map((txn) => (
+              <tr key={txn.id} className={`hover:${isDark ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
+                <td className={`px-6 py-4 font-mono text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {txn.user_id.substring(0, 16)}...
+                </td>
+                <td className={`px-6 py-4 font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  ₹{(txn.amount / 100).toFixed(2)}
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    txn.status === 'success' 
+                      ? 'bg-green-600/20 text-green-400' 
+                      : txn.status === 'pending'
+                      ? 'bg-yellow-600/20 text-yellow-400'
+                      : 'bg-red-600/20 text-red-400'
+                  }`}>
+                    {txn.status}
+                  </span>
+                </td>
+                <td className={`px-6 py-4 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {txn.created_at ? new Date(txn.created_at).toLocaleDateString() : '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

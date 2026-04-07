@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { MessageSquare, PhoneCall, Clock, User as UserIcon, ArrowLeft } from 'lucide-react';
-import type { Database } from '../lib/database.types';
+import { getDocs, collection, query, where, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { createSupportQuery } from '../lib/firestore';
 import { BottomNav } from '../components/BottomNav';
 
-type QueryRow = Database['public']['Tables']['support_queries']['Row'];
+interface SupportQuery {
+  id: string;
+  user_id: string;
+  message: string;
+  status: string;
+  admin_reply?: string;
+  created_at: string;
+}
 
 const TOPICS = [
   'Account issue',
@@ -22,36 +30,38 @@ export function ContactSupport() {
   const [method, setMethod] = useState<'chat' | 'call' | null>(null);
   const [topic, setTopic] = useState('');
   const [message, setMessage] = useState('');
-  const [phone, setPhone] = useState(profile?.phone || '');
+  const [phone, setPhone] = useState('');
   const [preferredTime, setPreferredTime] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [listLoading, setListLoading] = useState(true);
-  const [items, setItems] = useState<QueryRow[]>([]);
+  const [items, setItems] = useState<SupportQuery[]>([]);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (profile?.phone) setPhone(profile.phone);
-  }, [profile?.phone]);
+    if (profile?.id) load();
+  }, [profile?.id]);
 
   const load = async () => {
     if (!profile?.id) {
       setListLoading(false);
       return;
     }
-    const { data, error: qErr } = await supabase
-      .from('support_queries')
-      .select('*')
-      .eq('user_id', profile.id)
-      .order('created_at', { ascending: false });
-    if (!qErr && data) setItems(data);
+    try {
+      const q = query(
+        collection(db, 'support_queries'),
+        where('user_id', '==', profile.id),
+        orderBy('created_at', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const queries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupportQuery));
+      setItems(queries);
+    } catch (err) {
+      console.error('Error loading support queries:', err);
+    }
     setListLoading(false);
   };
-
-  useEffect(() => {
-    load();
-  }, [profile?.id]);
 
   const submitChat = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,20 +72,21 @@ export function ContactSupport() {
     
     const fullMessage = `[Topic: ${topic}]\n${message.trim()}`;
     
-    const { error: insErr } = await supabase.from('support_queries').insert({
-      user_id: profile.id,
-      message: fullMessage,
-    });
-    setLoading(false);
-    if (insErr) {
-      setError(insErr.message);
-      return;
+    try {
+      await createSupportQuery({
+        user_id: profile.id,
+        subject: topic,
+        message: fullMessage,
+      });
+      setMessage('');
+      setTopic('');
+      setMethod(null);
+      setFeedback('Your support request has been sent. An admin will reply below shortly.');
+      load();
+    } catch (err: any) {
+      setError(err.message);
     }
-    setMessage('');
-    setTopic('');
-    setMethod(null);
-    setFeedback('Your support request has been sent. An admin will reply below shortly.');
-    load();
+    setLoading(false);
   };
 
   const submitCallRequest = async (e: React.FormEvent) => {
@@ -87,18 +98,19 @@ export function ContactSupport() {
 
     const callMessage = `[CALL REQUEST] Phone: ${phone.trim()} | Preferred Time: ${preferredTime}`;
     
-    const { error: insErr } = await supabase.from('support_queries').insert({
-      user_id: profile.id,
-      message: callMessage,
-    });
-    setLoading(false);
-    if (insErr) {
-      setError(insErr.message);
-      return;
+    try {
+      await createSupportQuery({
+        user_id: profile.id,
+        subject: 'Call Request',
+        message: callMessage,
+      });
+      setMethod(null);
+      setFeedback('Call request scheduled! An admin will call you on your provided number.');
+      load();
+    } catch (err: any) {
+      setError(err.message);
     }
-    setMethod(null);
-    setFeedback('Call request scheduled! An admin will call you on your provided number.');
-    load();
+    setLoading(false);
   };
 
   return (
@@ -305,8 +317,8 @@ export function ContactSupport() {
                       {new Date(q.created_at).toLocaleDateString()} at {new Date(q.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <span className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${
-                      q.status === 'open' ? 'text-amber-400' : 
-                      q.status === 'replied' ? 'text-green-400' : (isDark ? 'text-gray-400' : 'text-gray-500')
+                      q.status === 'pending' ? 'text-amber-400' : 
+                      q.status === 'resolved' ? 'text-green-400' : (isDark ? 'text-gray-400' : 'text-gray-500')
                     }`}>
                       Status: {q.status}
                     </span>
