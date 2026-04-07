@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { useRouter } from './contexts/RouterContext';
 import { useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -26,6 +27,19 @@ import { StudentDashboard } from './pages/StudentDashboard';
 function AppContent() {
   const { currentPath, navigate } = useRouter();
   const { user, loading, effectiveRole, isBanned, signOut } = useAuth();
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Handle loading timeout - if loading takes more than 10 seconds, show retry option
+  React.useEffect(() => {
+    if (loading) {
+      const timer = setTimeout(() => {
+        setLoadingTimeout(true);
+      }, 10000); // 10 second timeout
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [loading]);
 
   // 1. BANNED CHECK: Highest Priority
   if (isBanned) {
@@ -59,8 +73,22 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white text-lg mb-2">Loading Railway Study Point...</p>
+          {loadingTimeout && (
+            <div className="mt-4">
+              <p className="text-gray-400 text-sm mb-3">Taking longer than expected?</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition"
+              >
+                Reload Page
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

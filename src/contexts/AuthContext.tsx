@@ -326,11 +326,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (user) {
-      await recordLogout(user.id);
+    try {
+      if (user) {
+        await recordLogout(user.id);
+      }
+      // Clear local state first for instant feedback
+      setUser(null);
+      setProfile(null);
+      setLoading(true);
+      
+      // Then sign out from Supabase
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) {
+        console.error('Sign out error:', error);
+        // Still clear state even if there's an error
+      }
+      
+      // Clear any cached data
+      localStorage.removeItem('sb-' + (import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || '') + '-auth-token');
+      setLoading(false);
+    } catch (err) {
+      console.error('Sign out error:', err);
+      // Force clear state on error
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
     }
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
   };
 
   const value = {

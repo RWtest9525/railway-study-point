@@ -162,14 +162,23 @@ export function ExamCreator() {
     const lines = text.split('\n');
     const questions = [];
     let currentQuestion: any = null;
+    let questionCounter = 0;
     
-    for (const line of lines) {
-      const trimmedLine = line.trim();
+    for (let i = 0; i < lines.length; i++) {
+      const trimmedLine = lines[i].trim();
       
-      const questionMatch = trimmedLine.match(/^\d+\.\s+(.+)$/);
-      if (questionMatch && !currentQuestion) {
+      // Check for question pattern: "1.", "2.", etc. or "Q1.", "Q2."
+      const questionMatch = trimmedLine.match(/^(?:Q?\d+\.|Question\s*\d+:?)\s+(.+)$/i);
+      
+      if (questionMatch) {
+        // Save previous question if it's valid
+        if (currentQuestion && currentQuestion.options.length >= 2) {
+          questions.push(currentQuestion);
+        }
+        
+        questionCounter++;
         currentQuestion = {
-          question_text: questionMatch[1],
+          question_text: questionMatch[1].trim(),
           options: [],
           correct_answer: 0,
           explanation: '',
@@ -179,40 +188,70 @@ export function ExamCreator() {
         continue;
       }
       
-      const optionMatch = trimmedLine.match(/^[A-D]\)\s+(.+)$/);
+      // Check for option patterns: "A)", "A.", "A:", "(A)", etc.
+      const optionMatch = trimmedLine.match(/^[\(]?([A-D])[\).:]\s+(.+)$/i);
       if (optionMatch && currentQuestion) {
-        currentQuestion.options.push(optionMatch[1]);
-        continue;
-      }
-      
-      const answerMatch = trimmedLine.match(/Correct Answer:\s*([A-D])/i);
-      if (answerMatch && currentQuestion) {
-        const answerIndex = answerMatch[1].charCodeAt(0) - 65;
-        currentQuestion.correct_answer = answerIndex;
-        continue;
-      }
-      
-      if (currentQuestion && (questionMatch || trimmedLine === '')) {
-        if (currentQuestion.options.length === 4) {
-          questions.push(currentQuestion);
+        const optionLetter = optionMatch[1].toUpperCase();
+        const optionText = optionMatch[2].trim();
+        
+        // Ensure we have exactly 4 options (A, B, C, D)
+        const optionIndex = optionLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+        if (optionIndex >= 0 && optionIndex < 4) {
+          currentQuestion.options[optionIndex] = optionText;
         }
-        currentQuestion = questionMatch ? {
-          question_text: questionMatch[1],
-          options: [],
-          correct_answer: 0,
-          explanation: '',
-          category: formData.category,
-          subject: formData.subject
-        } : null;
+        continue;
+      }
+      
+      // Check for answer patterns: "Correct Answer: A", "Answer: B", "Ans: C", etc.
+      const answerMatch = trimmedLine.match(/(?:correct\s+)?(?:answer|ans):\s*([A-D])/i);
+      if (answerMatch && currentQuestion) {
+        const answerLetter = answerMatch[1].toUpperCase();
+        currentQuestion.correct_answer = answerLetter.charCodeAt(0) - 65;
+        continue;
+      }
+      
+      // Check if line is empty - might indicate end of question
+      if (trimmedLine === '' && currentQuestion && currentQuestion.options.length >= 2) {
+        // Don't reset here, just continue to allow multi-paragraph questions
+        continue;
+      }
+      
+      // If we have a current question and this line doesn't match any pattern,
+      // it might be part of the question text or explanation
+      if (currentQuestion && trimmedLine && !questionMatch && !optionMatch && !answerMatch) {
+        // Check if it looks like it could be an explanation
+        if (/explanation|solution|detailed/i.test(trimmedLine)) {
+          currentQuestion.explanation = trimmedLine;
+        } else if (currentQuestion.options.length < 2) {
+          // If we don't have options yet, this might be continuation of question
+          currentQuestion.question_text += ' ' + trimmedLine;
+        }
       }
     }
     
-    if (currentQuestion && currentQuestion.options.length === 4) {
+    // Don't forget the last question
+    if (currentQuestion && currentQuestion.options.length >= 2) {
       questions.push(currentQuestion);
     }
     
-    if (questions.length > 0) {
-      createQuestionsFromPDF(questions);
+    // Validate and clean questions
+    const validQuestions = questions.filter((q: any) => {
+      // Ensure question has text and at least 2 options
+      return q.question_text.trim() && q.options.filter((o: any) => o && o.trim()).length >= 2;
+    }).map((q: any) => {
+      // Clean up options - remove empty slots
+      q.options = q.options.filter((o: any) => o && o.trim());
+      // Ensure correct_answer is valid
+      if (q.correct_answer >= q.options.length) {
+        q.correct_answer = 0;
+      }
+      return q;
+    });
+    
+    if (validQuestions.length > 0) {
+      createQuestionsFromPDF(validQuestions);
+    } else {
+      setError('No valid questions found. Please check the format and try again.');
     }
   };
 
@@ -373,8 +412,8 @@ export function ExamCreator() {
 
       {/* Create/Edit Exam Modal - Redesigned for Mobile */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto">
-          <div className={`w-full max-w-4xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} sm:rounded-xl sm:max-h-[90vh] overflow-y-auto sm:my-8`}>
+        <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4 z-[200] overflow-y-auto">
+          <div className={`w-full max-w-4xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} sm:rounded-xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:my-8`}>
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 sm:p-6 border-b ${theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}">
               <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 {editingId ? 'Edit Exam' : 'Create New Exam'}

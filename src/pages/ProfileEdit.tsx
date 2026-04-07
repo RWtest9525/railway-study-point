@@ -30,20 +30,30 @@ export function ProfileEdit() {
       setError('You must be signed in to save profile changes.');
       return;
     }
+    if (!fullName.trim()) {
+      setError('Full name is required.');
+      return;
+    }
     setLoading(true);
     setError('');
     setMessage('');
     try {
-      // 1. Update profiles table
-      const { error: pErr } = await supabase
+      // 1. Update profiles table with proper error handling
+      const { data: profileData, error: pErr } = await supabase
         .from('profiles')
         .update({
           full_name: fullName.trim(),
           phone: phone.trim(),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', user.id);
-      if (pErr) throw pErr;
+        .eq('id', user.id)
+        .select()
+        .single();
+      
+      if (pErr) {
+        console.error('Profile update error:', pErr);
+        throw new Error(pErr.message || 'Failed to update profile');
+      }
 
       // 2. Update auth metadata (important for things like Google login or initial setup)
       const { error: aErr } = await supabase.auth.updateUser({
@@ -52,17 +62,25 @@ export function ProfileEdit() {
           phone: phone.trim()
         },
       });
-      if (aErr) throw aErr;
+      
+      if (aErr) {
+        console.error('Auth update error:', aErr);
+        // Don't throw - profile was updated, auth metadata is secondary
+      }
 
-      // 3. Force refresh the global state
-      await refreshProfile();
+      // 3. Force refresh the global state immediately
+      if (profileData) {
+        // Update local state directly for instant feedback
+        window.location.reload();
+      }
+      
       setMessage('Profile updated successfully!');
       
       // Auto-clear message after 3 seconds
       setTimeout(() => setMessage(''), 3000);
     } catch (err: any) {
       console.error('Profile save error:', err);
-      setError(err.message || 'Could not save. Try again.');
+      setError(err.message || 'Could not save. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }

@@ -57,54 +57,158 @@ export function PDFUploader({ onFileSelect, onExtractedText, className = '' }: P
     setSelectedFile(file);
     onFileSelect(file);
     
-    // Extract text from PDF (placeholder for actual implementation)
+    // Extract text from PDF
     if (onExtractedText) {
-      extractTextFromPDF(file);
+      extractTextFromPDF(file, onExtractedText);
     }
   };
 
-  const extractTextFromPDF = async (file: File) => {
+  const extractTextFromPDF = async (file: File, callback: (text: string) => void) => {
     setUploading(true);
     try {
-      // This is a placeholder - in a real implementation, you would:
-      // 1. Send the PDF to a backend service that can extract text
-      // 2. Use a library like pdf.js or pdf-parse on the frontend
-      // 3. Return the extracted text
-      
-      // Simulating API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock extracted text
-      const mockText = `Sample Questions from ${file.name}:
-      
-1. What is the full form of ALP in Indian Railways?
-A) Assistant Loco Pilot
-B) Assistant Line Pilot  
-C) Assistant Loco Personnel
-D) Automated Loco Pilot
-Correct Answer: A
-
-2. Which of the following is used for braking in a diesel locomotive?
-A) Vacuum brakes
-B) Air brakes
-C) Hydraulic brakes
-D) None of these
-Correct Answer: B
-
-3. In which year was the first railway line in India opened?
-A) 1853
-B) 1857
-C) 1901
-D) 1947
-Correct Answer: A`;
-      
-      onExtractedText(mockText);
+      // Try to use PDF.js from CDN
+      const text = await extractWithPDFJS(file);
+      if (text && text.trim().length > 50) {
+        callback(text);
+      } else {
+        // Fallback to basic extraction
+        const basicText = await basicPDFExtraction();
+        callback(basicText);
+      }
     } catch (error) {
       console.error('Error extracting text from PDF:', error);
-      alert('Failed to extract text from PDF. You can manually add questions.');
+      // Provide manual entry guidance
+      const manualText = `PDF extraction failed. Please copy and paste your questions in this format:
+
+1. What is your question here?
+A) Option 1
+B) Option 2
+C) Option 3
+D) Option 4
+Correct Answer: A
+
+2. Next question?
+A) Option 1
+B) Option 2
+C) Option 3
+D) Option 4
+Correct Answer: B`;
+      callback(manualText);
+      alert('PDF extraction encountered an issue. Please manually enter questions or check the format.');
     } finally {
       setUploading(false);
     }
+  };
+
+  // Better PDF extraction using PDF.js from CDN
+  const extractWithPDFJS = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Load PDF.js from CDN
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      script.onload = () => {
+        const pdfjsLib = (window as any).pdfjsLib;
+        if (!pdfjsLib) {
+          reject(new Error('PDF.js not loaded'));
+          return;
+        }
+        
+        // Set worker source
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        file.arrayBuffer().then(async (arrayBuffer) => {
+          try {
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            
+            // Extract text from each page (limit to first 10 pages)
+            for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items
+                .map((item: any) => item.str)
+                .join(' ')
+                .trim();
+              
+              fullText += pageText + '\n\n';
+            }
+            
+            // Clean and format the extracted text
+            resolve(cleanExtractedText(fullText));
+          } catch (error) {
+            reject(error);
+          }
+        }).catch(reject);
+      };
+      script.onerror = () => reject(new Error('Failed to load PDF.js'));
+      document.head.appendChild(script);
+    });
+  };
+
+  // Basic fallback extraction message
+  const basicPDFExtraction = async (): Promise<string> => {
+    return `PDF extraction requires proper setup. 
+
+Please manually enter your questions in this format:
+
+1. Question text here?
+A) Option A
+B) Option B
+C) Option C
+D) Option D
+Correct Answer: A
+
+2. Another question?
+A) Option A
+B) Option B
+C) Option C
+D) Option D
+Correct Answer: B
+
+Note: The system will automatically:
+- Detect question numbers (1., 2., etc.)
+- Find options (A), B), C), D))
+- Extract correct answers
+- Ignore extra text and explanations`;
+  };
+
+  // Clean and format extracted text for better parsing
+  const cleanExtractedText = (text: string): string => {
+    let cleaned = text;
+    
+    // Remove excessive whitespace
+    cleaned = cleaned.replace(/\s+/g, ' ');
+    
+    // Try to identify and format questions
+    const lines = cleaned.split('\n');
+    const formattedLines: string[] = [];
+    let questionCount = 0;
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      
+      // Check if this looks like a question (contains question mark or starts with number)
+      if (trimmed.includes('?') || /^\d+\./.test(trimmed)) {
+        questionCount++;
+        formattedLines.push(`${questionCount}. ${trimmed.replace(/^\d+\.\s*/, '')}`);
+      } 
+      // Check if this looks like an option
+      else if (/^[A-D][\).]\s/.test(trimmed)) {
+        const optionLetter = trimmed[0];
+        const optionText = trimmed.substring(2).trim();
+        formattedLines.push(`${optionLetter}) ${optionText}`);
+      }
+      // Check if this contains answer information
+      else if (/answer|correct|ans:\s*[A-D]/i.test(trimmed)) {
+        const match = trimmed.match(/([A-D])[\).]/i);
+        if (match) {
+          formattedLines.push(`Correct Answer: ${match[1].toUpperCase()}`);
+        }
+      }
+    }
+    
+    return formattedLines.join('\n') || cleaned;
   };
 
   const removeFile = () => {
