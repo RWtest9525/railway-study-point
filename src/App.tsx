@@ -17,10 +17,10 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Membership } from './pages/Membership';
 import { ContactSupport } from './pages/ContactSupport';
 import { Notifications } from './pages/Notifications';
-import Settings from './pages/Settings';
-import MockTests from './pages/MockTests';
-import SubjectQuizzes from './pages/SubjectQuizzes';
-import PreviousYearPapers from './pages/PreviousYearPapers';
+import { Settings } from './pages/Settings';
+import { MockTests } from './pages/MockTests';
+import { SubjectQuizzes } from './pages/SubjectQuizzes';
+import { PreviousYearPapers } from './pages/PreviousYearPapers';
 import { AdminPortal } from './pages/admin/AdminPortal';
 import { StudentDashboard } from './pages/StudentDashboard';
 

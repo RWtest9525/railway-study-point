@@ -5,7 +5,7 @@ import { getExams, Exam } from '../lib/firestore';
 import { Play, Clock, Users, ArrowLeft } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 
-export default function MockTests() {
+export function MockTests() {
   const { navigate } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';

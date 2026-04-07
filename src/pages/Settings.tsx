@@ -14,7 +14,7 @@ import {
   Sun
 } from 'lucide-react';
 
-export default function Settings() {
+export function Settings() {
   const { profile, signOut, isPremium } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { navigate } = useRouter();

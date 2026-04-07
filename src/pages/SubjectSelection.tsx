@@ -9,7 +9,7 @@ interface SubjectSelectionProps {
   examId?: string;
 }
 
-export default function SubjectSelection({ examId }: SubjectSelectionProps) {
+export function SubjectSelection({ examId }: SubjectSelectionProps) {
   const { navigate, currentPath } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';

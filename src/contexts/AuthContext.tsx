@@ -56,7 +56,7 @@ const getEffectiveRole = (profile: Profile | null, userEmail?: string): 'admin' 
   if (profile?.ban_reason) return 'banned';
   
   // Check if user email is in admin list (for initial setup)
-  const adminEmails = ['admin@railwaystudy.com', 'admin@test.com'];
+  const adminEmails = ['admin@railwaystudy.com', 'admin@test.com', 'yashvishal647@gmail.com', 'saichauhan239@gmail.com'];
   if (profile?.role === 'admin' || (userEmail && adminEmails.includes(userEmail.toLowerCase()))) {
     return 'admin';
   }

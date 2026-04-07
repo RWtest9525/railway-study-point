@@ -5,7 +5,7 @@ import { getExams, Exam } from '../lib/firestore';
 import { BookOpen, Clock, ArrowLeft } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 
-export default function SubjectQuizzes() {
+export function SubjectQuizzes() {
   const { navigate } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';

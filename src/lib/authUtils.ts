@@ -1,6 +1,16 @@
-import type { Database } from './database.types';
-
-type Profile = Database['public']['Tables']['profiles']['Row'];
+// Profile type matching Firestore structure
+export interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'student';
+  is_premium: boolean;
+  premium_expires_at?: string;
+  avatar_url?: string;
+  ban_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export const ADMIN_EMAILS = [
   'saichauhan239@gmail.com',
@@ -26,7 +36,7 @@ export function getEffectiveRole(
   const normProfileEmail = normalizeEmail(profile?.email);
   
   // 1. Check for Banned Status first (highest priority)
-  if (profile?.role === 'banned') {
+  if (profile?.ban_reason) {
     return 'banned';
   }
 
@@ -45,8 +55,8 @@ export const FREE_TRIAL_DAYS = 7;
 
 export function hasActivePremium(profile: Profile | null): boolean {
   if (!profile) return false;
-  if (profile.premium_until) {
-    return new Date(profile.premium_until) > new Date();
+  if (profile.premium_expires_at) {
+    return new Date(profile.premium_expires_at) > new Date();
   }
   return profile.is_premium === true;
 }
