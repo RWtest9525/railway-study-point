@@ -10,8 +10,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Exponential backoff retry configuration
 const MAX_RETRIES = 3;
-const BASE_DELAY_MS = 1000; // 1 second base delay
-const FETCH_TIMEOUT_MS = 15000; // 15 seconds timeout
+const FETCH_TIMEOUT_MS = 30000; // 30 seconds timeout for cold starts
+
+// Retry delays: 1s, 2s, 5s
+const RETRY_DELAYS_MS = [1000, 2000, 5000];
 
 /**
  * Checks if an error is a network-related error that should be retried
@@ -55,8 +57,8 @@ const fetchWithTimeout = async (
 
 /**
  * Custom fetch wrapper with exponential backoff retry logic and timeout
- * Retries failed requests up to MAX_RETRIES times with increasing delays (1s, 2s, 4s)
- * Includes 15-second timeout for each request
+ * Retries failed requests up to MAX_RETRIES times with delays (1s, 2s, 5s)
+ * Includes 30-second timeout for each request to handle cold starts
  * @param input - The fetch request URL or Request object
  * @param init - Optional fetch init options
  * @returns A Promise resolving to the Response
@@ -71,10 +73,10 @@ const fetchWithRetry = async (
     try {
       // Apply delay before retry (not on first attempt)
       if (attempt > 0) {
-        // Exponential backoff: 1s, 2s, 4s
-        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        // Exponential backoff: 1s, 2s, 5s
+        const delayMs = RETRY_DELAYS_MS[attempt - 1] || RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
         // Add small random jitter to prevent thundering herd
-        const jitter = Math.random() * 200;
+        const jitter = Math.random() * 300;
         await new Promise((resolve) => setTimeout(resolve, delayMs + jitter));
       }
 
@@ -98,8 +100,8 @@ const fetchWithRetry = async (
         throw lastError;
       }
 
-      // Continue to next retry iteration
-      console.warn(`Fetch attempt ${attempt + 1} failed. Retrying in ${BASE_DELAY_MS * Math.pow(2, attempt)}ms...`, lastError.message);
+      // Continue to next retry iteration - suppress error messages during retry
+      console.debug(`Fetch attempt ${attempt + 1} failed. Retrying in ${RETRY_DELAYS_MS[attempt]}ms...`, lastError.message);
     }
   }
 
@@ -107,14 +109,18 @@ const fetchWithRetry = async (
   throw lastError || new Error('Unknown error in fetchWithRetry');
 };
 
-// Configure persistent storage for the session with exponential backoff retry
+// Configure Supabase client with optimized settings for reliability
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  // Explicitly set the database schema
+  db: {
+    schema: 'public',
+  },
   auth: {
     // Use localStorage for persistent sessions across browser restarts
     storage: localStorage,
     // Auto-refresh tokens before they expire
     autoRefreshToken: true,
-    // Persist session even after browser close
+    // Persist session even after browser close - CRITICAL for preventing login flash
     persistSession: true,
     // Detect session changes in other tabs
     detectSessionInUrl: true,
@@ -122,5 +128,11 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   // Use custom fetch with exponential backoff retry for all Supabase requests
   global: {
     fetch: fetchWithRetry,
+  },
+  // Realtime configuration
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
   },
 });
