@@ -351,7 +351,7 @@ export function SubscriptionManagement() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all">
+                        <div className="flex justify-end items-center gap-2 opacity-100 transition-all">
                           {!isActive && (
                             <div className="flex gap-1">
                               <button

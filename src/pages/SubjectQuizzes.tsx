@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { 
   ArrowLeft, 
@@ -47,6 +48,8 @@ const subjectColors = {
 export default function SubjectQuizzes() {
   const { isPremium, canAccessTests } = useAuth();
   const { navigate, currentPath } = useRouter();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [subjectGroups, setSubjectGroups] = useState<Record<string, Exam[]>>({});
   const [loading, setLoading] = useState(true);
 
@@ -118,18 +121,18 @@ export default function SubjectQuizzes() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white pb-24">
-      <header className="bg-gray-900/50 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md">
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+      <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center gap-4">
           <button 
             onClick={() => window.history.back()}
-            className="p-2 hover:bg-gray-800 rounded-full transition"
+            className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className={`w-6 h-6 ${isDark ? 'text-white' : 'text-gray-600'}`} />
           </button>
           <div>
-            <h1 className="font-bold text-lg">Subject Quizzes</h1>
-            <p className="text-xs text-gray-400">{categoryId}</p>
+            <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Subject Quizzes</h1>
+            <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{categoryId}</p>
           </div>
         </div>
       </header>
@@ -138,12 +141,12 @@ export default function SubjectQuizzes() {
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto" />
-            <p className="text-gray-400 mt-4">Loading quizzes...</p>
+            <p className={`mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading quizzes...</p>
           </div>
         ) : Object.keys(subjectGroups).length === 0 ? (
-          <div className="text-center py-12 bg-gray-800/50 rounded-xl border border-gray-700">
-            <BookOpen className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400">No subject quizzes available for this category yet.</p>
+          <div className={`text-center py-12 ${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border`}>
+            <BookOpen className={`w-12 h-12 ${isDark ? 'text-gray-600' : 'text-gray-400'} mx-auto mb-4`} />
+            <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>No subject quizzes available for this category yet.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -155,15 +158,15 @@ export default function SubjectQuizzes() {
               return (
                 <div
                   key={subject}
-                  className="bg-gray-800 border border-gray-700 hover:border-green-500/50 rounded-xl p-6"
+                  className={`${isDark ? 'bg-gray-800 border-gray-700 hover:border-green-500/50' : 'bg-white border-gray-200 hover:border-green-400'} rounded-xl p-6 border`}
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center ${colorClass}`}>
                       <IconComponent className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-white text-lg">{subject}</h3>
-                      <p className="text-gray-400 text-sm">{examList.length} Test{examList.length !== 1 ? 's' : ''}</p>
+                      <h3 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'} text-lg`}>{subject}</h3>
+                      <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-sm`}>{examList.length} Test{examList.length !== 1 ? 's' : ''}</p>
                     </div>
                     {hasPremium && (
                       <div className="ml-auto flex items-center gap-1 text-yellow-500">
@@ -178,13 +181,13 @@ export default function SubjectQuizzes() {
                       <div
                         key={exam.id}
                         onClick={() => handleExamClick(exam)}
-                        className="bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-all cursor-pointer"
+                        className={`${isDark ? 'bg-gray-700/50 hover:bg-gray-700' : 'bg-gray-50 hover:bg-gray-100'} rounded-lg p-3 transition-all cursor-pointer`}
                       >
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-300 line-clamp-1">{exam.title}</span>
+                          <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'} line-clamp-1`}>{exam.title}</span>
                           {exam.is_premium && !isPremium && <Lock className="w-3 h-3 text-yellow-500" />}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                        <div className={`flex items-center gap-3 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'} mt-1`}>
                           <span>{exam.duration_minutes}m</span>
                           <span>{exam.question_ids.length} Qs</span>
                         </div>
