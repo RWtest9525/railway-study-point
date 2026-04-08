@@ -183,24 +183,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('Auth state changed:', firebaseUser?.email);
+      console.log('Auth state - UID:', firebaseUser?.uid);
       
       if (firebaseUser) {
+        console.log('User logged in, loading profile...');
         setUser(firebaseUser);
         // Load profile but don't wait for it to set loading to false
         loadProfile(
           firebaseUser.uid,
-          firebaseUser.email || undefined,
-          firebaseUser.displayName || undefined
+          firebaseUser.email ?? undefined,
+          firebaseUser.displayName ?? undefined
         ).then(() => {
+          console.log('Profile loaded for user:', firebaseUser.uid);
           recordLogin(firebaseUser.uid);
+        }).catch((err) => {
+          console.error('Error loading profile:', err);
         });
       } else {
+        console.log('User logged out');
         setUser(null);
         setProfile(null);
       }
       
       // Set loading to false once we know the auth state
       setLoading(false);
+      console.log('Loading state set to:', false);
       
       if (!sessionRestored.current) {
         sessionRestored.current = true;
@@ -256,7 +263,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
       });
       
-      await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+      console.log('DEBUG AUTH: Sign in successful, user:', userCredential.user.email);
+      console.log('DEBUG AUTH: User UID:', userCredential.user.uid);
     } catch (error: any) {
       console.error('Firebase Auth Error Code:', error.code, 'Message:', error.message);
       console.error('Full error:', error);
