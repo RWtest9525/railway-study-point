@@ -165,13 +165,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const logoutTime = new Date();
       const durationSeconds = Math.floor((logoutTime.getTime() - loginSessionStart.getTime()) / 1000);
       
-      // Query for the most recent login entry without logout
-      // Note: In production, you'd want to use a more efficient approach
-      const loginRef = doc(db, 'login_history', `${userId}_${loginSessionStart.toISOString()}`);
-      await updateDoc(loginRef, {
-        logout_at: logoutTime.toISOString(),
-        duration_seconds: durationSeconds
-      });
+      // Try to update the login record, but don't fail if it doesn't exist
+      try {
+        const loginRef = doc(db, 'login_history', `${userId}_${loginSessionStart.toISOString()}`);
+        await updateDoc(loginRef, {
+          logout_at: logoutTime.toISOString(),
+          duration_seconds: durationSeconds
+        });
+      } catch (updateError: any) {
+        // Ignore if document doesn't exist (user may have logged in before this feature was added)
+        if (updateError.code !== 'firestore/not-found') {
+          console.warn('Could not update login record:', updateError.message);
+        }
+      }
       
       loginSessionStart = null;
     } catch (error) {
@@ -226,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setLoading(true);
     // Force refresh - bypass cache
-    await loadProfile(user.uid, user.email || undefined, user.displayName || undefined, true);
+    await loadProfile(user.uid, user.email ?? undefined, user.displayName ?? undefined, true);
   }, [user, loadProfile]);
 
   const effectiveRole = useMemo(() => {
