@@ -244,9 +244,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      console.error('Sign in error:', error);
+      // Debug: Log credentials (trim whitespace)
+      const trimmedEmail = email.trim();
+      const trimmedPassword = password.trim();
+      
+      console.log('DEBUG AUTH: Attempting sign in with:');
+      console.log('  Email:', trimmedEmail);
+      console.log('  Password length:', trimmedPassword.length);
+      console.log('  Auth config:', {
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      });
+      
+      await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+    } catch (error: any) {
+      console.error('Firebase Auth Error Code:', error.code, 'Message:', error.message);
+      console.error('Full error:', error);
       throw error;
     }
   };

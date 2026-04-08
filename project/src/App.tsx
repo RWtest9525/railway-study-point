@@ -23,6 +23,7 @@ import { SubjectQuizzes } from './pages/SubjectQuizzes';
 import { PreviousYearPapers } from './pages/PreviousYearPapers';
 import { AdminPortal } from './pages/admin/AdminPortal';
 import { StudentDashboard } from './pages/StudentDashboard';
+import { StudentAnalytics } from './pages/admin/StudentAnalytics';
 
 function AppContent() {
   const { currentPath, navigate } = useRouter();
@@ -237,6 +238,14 @@ function AppContent() {
     return (
       <ProtectedRoute requireAdmin>
         <AdminPortal />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/admin/student-analytics') {
+    return (
+      <ProtectedRoute requireAdmin>
+        <StudentAnalytics />
       </ProtectedRoute>
     );
   }
