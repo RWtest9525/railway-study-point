@@ -29,6 +29,22 @@ function AppContent() {
   const { currentPath, navigate } = useRouter();
   const { user, loading, effectiveRole, isBanned, signOut } = useAuth();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
+
+  // Handle post-login redirect
+  React.useEffect(() => {
+    if (user && !loading && !hasRedirected) {
+      // If user is on login/signup page after successful auth, redirect them
+      if (currentPath === '/login' || currentPath === '/signup') {
+        if (effectiveRole === 'admin') {
+          navigate('/admin-portal');
+        } else {
+          navigate('/dashboard');
+        }
+        setHasRedirected(true);
+      }
+    }
+  }, [user, loading, currentPath, navigate, effectiveRole, hasRedirected]);
 
   // Handle loading timeout - if loading takes more than 10 seconds, show retry option
   React.useEffect(() => {
