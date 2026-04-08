@@ -22,7 +22,7 @@ import {
   Trophy
 } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
-import { QuestionBank } from './QuestionBank';
+import { QuestionHub } from './QuestionHub';
 import { ExamCreator } from './ExamCreator';
 import { RevenueTracker } from './RevenueTracker';
 import { PremiumSettings } from './PremiumSettings';
@@ -248,7 +248,7 @@ export function AdminPortal() {
       <main className={`flex-1 overflow-y-auto ${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-100'}`}>
         <div className="max-w-6xl mx-auto p-4 sm:p-8 lg:p-12">
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {activeTab === 'questions' && <QuestionBank />}
+            {activeTab === 'questions' && <QuestionHub />}
             {activeTab === 'exams' && <ExamCreator />}
             {activeTab === 'revenue' && <RevenueTracker />}
             {activeTab === 'premium' && <PremiumSettings />}
