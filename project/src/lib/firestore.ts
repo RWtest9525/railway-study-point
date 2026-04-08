@@ -18,6 +18,8 @@ import {
 import { db } from './firebase';
 
 // Types
+
+// Enhanced Category type
 export interface Category {
   id: string;
   name: string;
@@ -31,6 +33,7 @@ export interface Category {
   updated_at: string;
 }
 
+// Enhanced Exam type with proctoring, scheduling, negative marking
 export interface Exam {
   id: string;
   category_id: string;
@@ -39,30 +42,75 @@ export interface Exam {
   duration_minutes: number;
   total_marks: number;
   passing_marks?: number;
+  negative_marking?: number; // -0.25, -0.33, etc.
+  sectional_timing?: {
+    maths?: number;
+    reasoning?: number;
+    science?: number;
+    gk?: number;
+  };
+  schedule_date?: string;
+  schedule_time?: string;
+  auto_submit?: boolean;
+  proctoring_enabled?: boolean;
+  result_declaration_date?: string;
+  instructions?: string;
+  attempt_limits?: number; // 1, 2, unlimited (-1)
+  partial_marking?: boolean;
+  subject_cutoffs?: {
+    maths: number;
+    reasoning: number;
+    science: number;
+    gk: number;
+  };
   is_premium: boolean;
   is_active: boolean;
+  is_private?: boolean; // link-only tests
+  pause_resume_enabled?: boolean;
+  test_series_id?: string;
   created_at: string;
   updated_at: string;
 }
 
+// Enhanced Question type with difficulty, tags, images, LaTeX
 export interface Question {
   id: string;
   exam_id: string;
   subject: 'Maths' | 'Reasoning' | 'GK' | 'Science';
+  topic?: string; // "Maths > Profit & Loss"
+  subtopic?: string;
   question_text: string;
   options: string[];
+  option_images?: string[]; // URLs for option images
   correct_index: number;
   explanation?: string;
+  video_explanation_url?: string; // YouTube or video link
+  difficulty?: 'easy' | 'medium' | 'hard';
+  tags?: string[]; // ["RRB NTPC 2021", "Previous Year"]
+  image_url?: string; // Question image URL
   marks: number;
+  negative_marks?: number;
   order?: number;
+  is_draft?: boolean;
+  version?: number;
+  previous_versions?: string[];
+  created_by?: string;
   created_at: string;
+  updated_at?: string;
 }
 
+// Enhanced QuizAttempt with device info, proctoring
 export interface QuizAttempt {
   id: string;
   user_id: string;
   exam_id: string;
-  answers: { questionId: string; selectedOption: number }[];
+  answers: {
+    questionId: string;
+    selectedOption: number;
+    is_correct?: boolean;
+    time_spent_seconds?: number;
+    skipped?: boolean;
+  }[];
   score: number;
   total_questions: number;
   correct_answers: number;
@@ -70,6 +118,15 @@ export interface QuizAttempt {
   started_at: string;
   submitted_at: string;
   subject_wise_scores?: { [subject: string]: { correct: number; total: number } };
+  device_info?: {
+    type: 'mobile' | 'desktop';
+    browser: string;
+    os: string;
+  };
+  ip_address?: string;
+  tab_switches?: number;
+  is_flagged?: boolean;
+  status?: 'in_progress' | 'completed' | 'paused';
 }
 
 export interface SupportQuery {
@@ -80,6 +137,100 @@ export interface SupportQuery {
   status: 'pending' | 'resolved' | 'closed';
   created_at: string;
   updated_at: string;
+}
+
+// New types for Pro Education System
+export interface TestSeries {
+  id: string;
+  title: string;
+  description?: string;
+  exam_ids: string[];
+  price: number;
+  discount_percentage?: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  max_uses?: number;
+  used_count: number;
+  valid_until: string;
+  is_active: boolean;
+  applicable_plans?: string[];
+  created_at: string;
+}
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  plan_type: 'monthly' | 'yearly' | 'lifetime';
+  amount: number;
+  status: 'active' | 'expired' | 'cancelled';
+  start_date: string;
+  end_date: string;
+  auto_renew: boolean;
+  payment_id: string;
+  coupon_used?: string;
+  created_at: string;
+}
+
+export interface Doubt {
+  id: string;
+  user_id: string;
+  question_id: string;
+  attempt_id: string;
+  reason: string;
+  status: 'pending' | 'resolved' | 'rejected';
+  admin_response?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CMSSetting {
+  id: string;
+  key: string; // "home_banner", "faq", "footer_links", etc.
+  value: any;
+  updated_by: string;
+  updated_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  old_value?: any;
+  new_value?: any;
+  ip_address?: string;
+  created_at: string;
+}
+
+export interface Notification {
+  id: string;
+  user_id?: string; // optional for broadcast
+  title: string;
+  message: string;
+  type: 'test_live' | 'result_declared' | 'payment' | 'system';
+  is_read: boolean;
+  action_url?: string;
+  created_at: string;
+}
+
+export interface ProctoringLog {
+  id: string;
+  attempt_id: string;
+  user_id: string;
+  device_info: any;
+  ip_address: string;
+  events: Array<{ type: string; timestamp: string; details?: any }>;
+  tab_switch_count: number;
+  violation_count: number;
+  created_at: string;
 }
 
 // Categories
