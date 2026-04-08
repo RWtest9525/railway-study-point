@@ -227,13 +227,13 @@ export function Upgrade() {
         </div>
 
         {/* Pricing Card */}
-        <div className="relative rounded-2xl p-6 border shadow-xl ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-yellow-500/30 shadow-yellow-500/10' : 'bg-white border-yellow-300 shadow-yellow-100'}">
+        <div className={`relative rounded-2xl p-6 border shadow-xl ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-yellow-500/30 shadow-yellow-500/10' : 'bg-white border-yellow-300 shadow-yellow-100'}`}>
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent rounded-2xl pointer-events-none" />
           
           <div className="relative">
             {/* Price */}
             <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 border ${isDark ? 'bg-yellow-600/20 border-yellow-500/30' : 'bg-yellow-100 border-yellow-300'}">
+              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 border ${isDark ? 'bg-yellow-600/20 border-yellow-500/30' : 'bg-yellow-100 border-yellow-300'}`}>
                 <Zap className={`w-3 h-3 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} />
                 <span className={`${isDark ? 'text-yellow-400' : 'text-yellow-700'} text-xs font-bold uppercase tracking-wider`}>Limited Offer</span>
               </div>
