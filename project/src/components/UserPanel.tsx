@@ -1,21 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Bell, Crown, HelpCircle, LogOut, Settings, Shield, Trophy, User, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
-import {
-  Settings,
-  User,
-  Crown,
-  Shield,
-  Briefcase,
-  LogOut,
-  ChevronDown,
-  Clock,
-  Trophy,
-  Star,
-  Zap,
-  ShieldCheck,
-  Award
-} from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
+import { trialWholeDaysLeft } from '../lib/authUtils';
 
 interface UserPanelProps {
   isOpen: boolean;
@@ -26,7 +14,8 @@ export function UserPanel({ isOpen, onClose }: UserPanelProps) {
   const { profile, signOut, isPremium, effectiveRole, trialExpiredNeedsPremium } = useAuth();
   const { navigate } = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'profile' | 'membership' | 'stats'>('profile');
+  const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile as any), [profile]);
+  const [activeSection, setActiveSection] = useState<'overview' | 'account'>('overview');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -46,273 +35,195 @@ export function UserPanel({ isOpen, onClose }: UserPanelProps) {
     };
   }, [isOpen, onClose]);
 
+  const handleNavigate = (path: string) => {
+    onClose();
+    navigate(path);
+  };
+
   const handleSignOut = async () => {
     await signOut();
+    onClose();
     navigate('/login');
   };
 
-  const daysLeftTrial = profile ? Math.ceil((new Date(profile.premium_until || '').getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
-
   if (!isOpen) return null;
 
+  const infoItems = [
+    { label: 'Name', value: profile?.full_name || 'Unavailable' },
+    { label: 'Email', value: profile?.email || 'Unavailable' },
+    { label: 'Role', value: effectiveRole || 'Unavailable' },
+    {
+      label: 'Member Since',
+      value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'Unavailable',
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000]">
-      <div 
-        ref={panelRef}
-        className="fixed top-16 right-4 w-96 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl animate-in slide-in-from-top-2 duration-200"
-      >
-        {/* Header */}
-        <div className="p-4 border-b border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-white font-semibold">{profile?.full_name || 'User'}</h3>
-                <p className="text-gray-400 text-sm">{profile?.email}</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <ChevronDown className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
-          
-          {/* Status Badges */}
-          <div className="flex items-center gap-2 mt-3">
-            {isPremium ? (
-              <span className="inline-flex items-center gap-1.5 bg-yellow-600/20 border border-yellow-500/30 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold">
-                <Crown className="w-3 h-3" />
-                Premium Member
-              </span>
-            ) : trialExpiredNeedsPremium ? (
-              <span className="inline-flex items-center gap-1.5 bg-orange-600/20 border border-orange-500/30 text-orange-400 px-3 py-1 rounded-full text-xs font-bold">
-                <ShieldCheck className="w-3 h-3" />
-                Upgrade Required
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 bg-blue-600/20 border border-blue-500/30 text-blue-400 px-3 py-1 rounded-full text-xs font-bold">
-                <Clock className="w-3 h-3" />
-                Trial Active
-              </span>
-            )}
-            {effectiveRole === 'admin' && (
-              <span className="inline-flex items-center gap-1.5 bg-red-600/20 border border-red-500/30 text-red-400 px-3 py-1 rounded-full text-xs font-bold">
-                <Shield className="w-3 h-3" />
-                Admin
-              </span>
-            )}
-          </div>
-        </div>
+    <div className="fixed inset-0 z-[1000] bg-slate-950/55 backdrop-blur-sm">
+      <div className="absolute inset-x-0 bottom-0 top-auto md:inset-y-0 md:left-auto md:right-0 md:top-0 md:w-[28rem]">
+        <div
+          ref={panelRef}
+          className="h-[86vh] rounded-t-[32px] border border-slate-200 bg-white shadow-2xl md:h-full md:rounded-none md:rounded-l-[32px]"
+        >
+          <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-slate-300 md:hidden" />
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-700">
-          {[
-            { id: 'profile', label: 'Profile', icon: User },
-            { id: 'membership', label: 'Membership', icon: Crown },
-            { id: 'stats', label: 'Stats', icon: Trophy }
-          ].map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'text-white border-b-2 border-blue-500'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
+          <div className="border-b border-slate-200 px-5 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <BrandLogo variant="inline" className="ring-1 ring-slate-200" />
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Railway Study Point</div>
+                  <div className="text-xs text-slate-500">Student Panel</div>
+                </div>
+              </div>
+              <button onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                <X className="h-5 w-5" />
               </button>
-            );
-          })}
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
-          {activeTab === 'profile' && (
-            <div className="space-y-4">
-              <div className="bg-gray-800 rounded-lg p-4">
-                <h4 className="text-white font-medium mb-3">Account Information</h4>
-                <div className="space-y-2 text-sm text-gray-300">
-                  <div className="flex justify-between">
-                    <span>Name:</span>
-                    <span className="text-white">{profile?.full_name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Email:</span>
-                    <span className="text-white">{profile?.email}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Role:</span>
-                    <span className="text-white capitalize">{effectiveRole}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Member Since:</span>
-                    <span className="text-white">{new Date(profile?.created_at || '').toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    onClose();
-                    navigate('/profile');
-                  }}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition"
-                >
-                  Edit Profile
-                </button>
-                <button
-                  onClick={() => {
-                    onClose();
-                    navigate('/support');
-                  }}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium transition"
-                >
-                  Support
-                </button>
-              </div>
             </div>
-          )}
 
-          {activeTab === 'membership' && (
-            <div className="space-y-4">
-              <div className="bg-gradient-to-br from-yellow-600/20 to-orange-600/20 border border-yellow-500/30 rounded-lg p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <Crown className="w-6 h-6 text-yellow-400" />
-                  <div>
-                    <h4 className="text-white font-medium">Membership Status</h4>
-                    <p className="text-yellow-300 text-sm">
-                      {isPremium ? 'Premium Member' : 'Free Trial'}
-                    </p>
-                  </div>
+            <div className="mt-4 rounded-3xl bg-gradient-to-br from-sky-50 via-white to-amber-50 p-4 ring-1 ring-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-lg font-bold text-white">
+                  {profile?.full_name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
-                
-                {!isPremium && (
-                  <div className="text-sm text-gray-300 mb-3">
-                    <p>Days remaining: <span className="text-yellow-300 font-medium">{daysLeftTrial}</span></p>
-                    <p className="text-gray-400">Upgrade to unlock all features</p>
-                  </div>
+                <div className="min-w-0">
+                  <div className="truncate text-base font-semibold text-slate-900">{profile?.full_name || 'Unavailable'}</div>
+                  <div className="truncate text-sm text-slate-500">{profile?.email || 'Unavailable'}</div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {effectiveRole === 'admin' && (
+                  <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600">
+                    Admin Access
+                  </span>
                 )}
-
-                <button
-                  onClick={() => {
-                    onClose();
-                    navigate('/upgrade');
-                  }}
-                  className={`w-full py-2 px-4 rounded-lg font-medium transition ${
-                    isPremium
-                      ? 'bg-green-600/20 border border-green-500/30 text-green-400 hover:bg-green-600/30'
-                      : 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white hover:from-yellow-700 hover:to-yellow-800'
-                  }`}
-                >
-                  {isPremium ? 'Manage Subscription' : 'Upgrade to Premium'}
-                </button>
-              </div>
-
-              {!isPremium && (
-                <div className="bg-gray-800 rounded-lg p-4">
-                  <h4 className="text-white font-medium mb-3">Premium Benefits</h4>
-                  <div className="space-y-2 text-sm text-gray-300">
-                    {[
-                      { icon: Star, text: 'Unlimited mock tests' },
-                      { icon: Zap, text: 'Advanced analytics' },
-                      { icon: Award, text: 'Detailed performance reports' },
-                      { icon: ShieldCheck, text: 'Ad-free experience' }
-                    ].map((benefit, index) => {
-                      const Icon = benefit.icon;
-                      return (
-                        <div key={index} className="flex items-center gap-2">
-                          <Icon className="w-4 h-4 text-yellow-400" />
-                          <span>{benefit.text}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'stats' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-800 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-400">12</div>
-                  <div className="text-xs text-gray-400 mt-1">Exams Taken</div>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-400">85%</div>
-                  <div className="text-xs text-gray-400 mt-1">Avg. Score</div>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-purple-400">4.2</div>
-                  <div className="text-xs text-gray-400 mt-1">Rating</div>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-orange-400">150</div>
-                  <div className="text-xs text-gray-400 mt-1">Questions Solved</div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800 rounded-lg p-4">
-                <h4 className="text-white font-medium mb-3">Recent Activity</h4>
-                <div className="space-y-2 text-sm text-gray-300">
-                  <div className="flex justify-between">
-                    <span>Mock Test - RRB NTPC</span>
-                    <span className="text-green-400">85%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Group D Practice</span>
-                    <span className="text-green-400">78%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>ALP Mock Test</span>
-                    <span className="text-red-400">62%</span>
-                  </div>
-                </div>
+                {isPremium ? (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                    Premium Active
+                  </span>
+                ) : trialExpiredNeedsPremium ? (
+                  <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
+                    Upgrade Required
+                  </span>
+                ) : (
+                  <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                    Trial {daysLeftTrial ?? 'Unavailable'} day left
+                  </span>
+                )}
               </div>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-700">
-          <div className="flex flex-col gap-2">
-            {effectiveRole === 'admin' && (
-              <button
-                onClick={() => {
-                  onClose();
-                  navigate('/admin-portal');
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2 text-red-400 hover:bg-red-400/10 rounded-lg transition"
-              >
-                <Shield className="w-4 h-4" />
-                Admin Portal
-              </button>
-            )}
+          <div className="flex border-b border-slate-200">
             <button
-              onClick={() => {
-                onClose();
-                navigate('/leaderboard');
-              }}
-              className="w-full flex items-center gap-3 px-4 py-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition"
+              onClick={() => setActiveSection('overview')}
+              className={`flex-1 px-4 py-3 text-sm font-semibold ${activeSection === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`}
             >
-              <Trophy className="w-4 h-4" />
-              Leaderboard
+              Overview
             </button>
+            <button
+              onClick={() => setActiveSection('account')}
+              className={`flex-1 px-4 py-3 text-sm font-semibold ${activeSection === 'account' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`}
+            >
+              Account
+            </button>
+          </div>
+
+          <div className="space-y-5 overflow-y-auto px-5 py-5" style={{ maxHeight: 'calc(86vh - 220px)' }}>
+            {activeSection === 'overview' ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => handleNavigate('/notifications')} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
+                    <Bell className="mb-2 h-5 w-5 text-blue-600" />
+                    <div className="text-sm font-semibold text-slate-900">Notifications</div>
+                    <div className="mt-1 text-xs text-slate-500">Unavailable right now</div>
+                  </button>
+                  <button onClick={() => handleNavigate('/leaderboard')} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
+                    <Trophy className="mb-2 h-5 w-5 text-amber-500" />
+                    <div className="text-sm font-semibold text-slate-900">Leaderboard</div>
+                    <div className="mt-1 text-xs text-slate-500">Check your rank</div>
+                  </button>
+                  <button onClick={() => handleNavigate('/profile')} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
+                    <User className="mb-2 h-5 w-5 text-blue-600" />
+                    <div className="text-sm font-semibold text-slate-900">Profile</div>
+                    <div className="mt-1 text-xs text-slate-500">Edit your details</div>
+                  </button>
+                  <button onClick={() => handleNavigate('/support')} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
+                    <HelpCircle className="mb-2 h-5 w-5 text-emerald-600" />
+                    <div className="text-sm font-semibold text-slate-900">Support</div>
+                    <div className="mt-1 text-xs text-slate-500">Get help quickly</div>
+                  </button>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <Crown className="h-4 w-4 text-amber-500" />
+                    Membership
+                  </div>
+                  <div className="mt-3 space-y-2 text-sm text-slate-600">
+                    <div>Status: {isPremium ? 'Premium Active' : trialExpiredNeedsPremium ? 'Upgrade required' : 'Free trial running'}</div>
+                    <div>
+                      {isPremium
+                        ? `Premium valid until ${profile?.premium_until ? new Date(profile.premium_until).toLocaleDateString() : 'Unavailable'}`
+                        : daysLeftTrial !== null
+                        ? `${daysLeftTrial} trial day(s) remaining`
+                        : 'Trial information unavailable'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleNavigate('/upgrade')}
+                    className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
+                  >
+                    {isPremium ? 'Manage Premium' : 'Upgrade to Premium'}
+                  </button>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <Settings className="h-4 w-4 text-slate-600" />
+                    Quick status
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-slate-50 p-3">
+                      <div className="text-xs uppercase tracking-wide text-slate-500">Notifications</div>
+                      <div className="mt-1 text-sm font-medium text-slate-900">Unavailable</div>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-3">
+                      <div className="text-xs uppercase tracking-wide text-slate-500">Recent stats</div>
+                      <div className="mt-1 text-sm font-medium text-slate-900">Unavailable</div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                {infoItems.map((item) => (
+                  <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">{item.label}</div>
+                    <div className="mt-1 text-sm font-medium text-slate-900">{item.value}</div>
+                  </div>
+                ))}
+
+                {effectiveRole === 'admin' && (
+                  <button
+                    onClick={() => handleNavigate('/admin-portal')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600"
+                  >
+                    <Shield className="h-4 w-4" />
+                    Open Admin Panel
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-slate-200 px-5 py-4">
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-4 py-2 text-red-400 hover:bg-red-400/10 rounded-lg transition"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="h-4 w-4" />
               Sign Out
             </button>
           </div>

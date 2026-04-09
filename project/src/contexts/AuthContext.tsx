@@ -26,6 +26,8 @@ interface Profile {
   updated_at: string;
 }
 
+const FREE_TRIAL_DAYS = 7;
+
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
@@ -76,17 +78,25 @@ const hasActivePremium = (profile: Profile | null): boolean => {
   return false;
 };
 
+const isWithinFreeTrial = (profile: Profile | null): boolean => {
+  if (!profile?.created_at) return true;
+  const createdAt = new Date(profile.created_at);
+  const trialEnd = new Date(createdAt);
+  trialEnd.setDate(trialEnd.getDate() + FREE_TRIAL_DAYS);
+  return new Date() < trialEnd;
+};
+
 // Helper to check if user can access tests
 const canAccessTests = (profile: Profile | null, role: 'admin' | 'student'): boolean => {
   if (role === 'admin') return true;
-  // Students need premium or are within trial
-  return hasActivePremium(profile);
+  return hasActivePremium(profile) || isWithinFreeTrial(profile);
 };
 
 // Helper to check if trial expired and needs premium
 const trialExpiredNeedsPremium = (profile: Profile | null, role: 'admin' | 'student'): boolean => {
   if (role === 'admin') return false;
-  return !hasActivePremium(profile);
+  if (!profile) return false;
+  return !hasActivePremium(profile) && !isWithinFreeTrial(profile);
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -289,17 +299,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           displayName: fullName ?? undefined
         });
         
-        // Create user profile in Firestore with 7-day trial
-        const trialEndDate = new Date();
-        trialEndDate.setDate(trialEndDate.getDate() + 7);
-        
+        // Create user profile in Firestore. Trial is computed from created_at.
         const profileData: Profile = {
           id: userCredential.user.uid,
           email: email,
           full_name: fullName,
           role: 'student',
           is_premium: false,
-          premium_until: trialEndDate.toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };

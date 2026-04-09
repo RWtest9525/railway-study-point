@@ -48,9 +48,8 @@ export function AdminPortal() {
   const { navigate } = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'categories' | 'leaderboard' | 'dashboard' | 'activity' | 'backup'
+    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'leaderboard' | 'dashboard' | 'activity' | 'backup'
   >('dashboard');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleSignOut = async () => {
@@ -71,62 +70,49 @@ export function AdminPortal() {
     { id: 'leaderboard' as const, name: 'Leaderboard', icon: Trophy, desc: 'User Learning Stats' },
     { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
     { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
-    { id: 'categories' as const, name: 'Categories', icon: Folder, desc: 'Exam Categories' },
     { id: 'activity' as const, name: 'Activity', icon: Activity, desc: 'System Logs' },
     { id: 'backup' as const, name: 'Backup', icon: Database, desc: 'Export Data' },
   ];
 
   const handleTabClick = (tabId: typeof activeTab) => {
     setActiveTab(tabId);
-    setIsMenuOpen(false);
   };
+
+  if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+    return (
+      <div className="min-h-screen bg-slate-100 px-5 py-10">
+        <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-xl">
+          <div className="mb-4 flex justify-center">
+            <BrandLogo variant="nav" className="ring-1 ring-slate-200" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">Admin Panel Desktop Only</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            For better management, exam editing, analytics, and question upload, please open the admin panel on a laptop or desktop screen.
+          </p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="mt-6 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
+          >
+            Back to Student Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen flex flex-col md:flex-row relative ${
       theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'
     }`}>
-        {/* Mobile Header */}
-        <div className={`md:hidden ${
-          theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        } border-b p-4 flex items-center justify-between sticky top-0 z-[150]`}>
-          <div className="flex items-center gap-3">
-            <BrandLogo variant="nav" className="bg-white/5 ring-1 ring-white/10 shadow-md w-8 h-8" />
-            <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Railway Admin
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <SearchAutocomplete onSearch={(result) => {
-              console.log('Search result:', result);
-              // Handle search navigation
-            }} />
-            <button 
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`p-2 ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition`}
-            >
-              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-        </div>
-
-      {/* Overlay for mobile menu */}
-      {isMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-[140] md:hidden"
-          onClick={() => setIsMenuOpen(false)}
-        />
-      )}
-
       {/* Sidebar Navigation */}
       <aside className={`
-        fixed inset-y-0 left-0 ${isSidebarCollapsed && !isMenuOpen ? 'md:w-20' : 'w-64'} 
+        fixed inset-y-0 left-0 ${isSidebarCollapsed ? 'md:w-20' : 'w-64'} 
         ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} 
         border-r flex flex-col shrink-0 z-[150] transition-all duration-300 transform
-        ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0 md:static md:z-[100]
         overflow-hidden
       `}>
-        <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} hidden md:flex items-center gap-3`}>
+        <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} flex items-center gap-3`}>
           <BrandLogo variant="nav" className="bg-white/5 ring-1 ring-white/10 shadow-md w-8 h-8 shrink-0" />
           {!isSidebarCollapsed && (
             <div className="flex flex-col min-w-0">
@@ -313,7 +299,6 @@ export function AdminPortal() {
             {activeTab === 'users' && <UserManagement />}
             {activeTab === 'support' && <SupportInbox />}
             {activeTab === 'subscription' && <SubscriptionManagement />}
-            {activeTab === 'categories' && <CategoryManagement />}
             {activeTab === 'leaderboard' && <AdminLeaderboard />}
             {activeTab === 'activity' && <ActivityLogs />}
             {activeTab === 'backup' && <DatabaseBackup />}

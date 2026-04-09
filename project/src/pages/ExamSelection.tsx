@@ -1,108 +1,223 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Bell, ChevronRight, Clock3, Crown, FileText, PlayCircle, Target, Trophy } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { subscribeToCategories, Category } from '../lib/firestore';
-import { ArrowRight, BookOpen, Target, Trophy, FileText } from 'lucide-react';
+import { getExams, subscribeToCategories, Category, Exam } from '../lib/firestore';
+import { trialWholeDaysLeft } from '../lib/authUtils';
+import { BrandLogo } from '../components/BrandLogo';
 import { BottomNav } from '../components/BottomNav';
+import { UserPanel } from '../components/UserPanel';
 
 export function ExamSelection() {
   const { navigate } = useRouter();
   const { theme } = useTheme();
+  const { profile, isPremium, effectiveRole, canAccessTests, trialExpiredNeedsPremium } = useAuth();
   const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
+  const [featuredExams, setFeaturedExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userPanelOpen, setUserPanelOpen] = useState(false);
+  const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile as any), [profile]);
 
   useEffect(() => {
     const unsubscribe = subscribeToCategories((cats) => {
       setCategories(cats);
       setLoading(false);
     });
+
+    void getExams().then((exams) => setFeaturedExams(exams.slice(0, 6)));
     return () => unsubscribe();
   }, []);
 
   const getCategoryIcon = (category: Category) => {
-    switch (category.name?.toLowerCase()) {
-      case 'mock tests':
-        return <Target className="w-6 h-6" />;
-      case 'previous year papers':
-        return <FileText className="w-6 h-6" />;
-      case 'subject quizzes':
-        return <BookOpen className="w-6 h-6" />;
-      default:
-        return <Trophy className="w-6 h-6" />;
+    const label = category.name?.toLowerCase() || '';
+    if (label.includes('mock')) return <Target className="w-6 h-6" />;
+    if (label.includes('paper')) return <FileText className="w-6 h-6" />;
+    return <Trophy className="w-6 h-6" />;
+  };
+
+  const handleStartExam = (exam: Exam) => {
+    if (!canAccessTests || (exam.is_premium && !isPremium)) {
+      navigate('/upgrade');
+      return;
     }
+    const ok = confirm(`Start "${exam.title}" now?`);
+    if (ok) navigate(`/exam/${exam.id}`);
   };
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center`}>
+      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-slate-50'} flex items-center justify-center`}>
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className={`${isDark ? 'text-white' : 'text-gray-900'} text-lg`}>Loading...</p>
+          <p className={`${isDark ? 'text-white' : 'text-slate-900'} text-lg`}>Loading home...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
-      <BottomNav />
-      
-      <main className="max-w-4xl mx-auto px-4 py-6">
-        <div className="mb-8">
-          <h1 className={`text-2xl sm:text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            Railway Study Point
-          </h1>
-          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            Select a category to start your preparation
-          </p>
-        </div>
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-[#f5f7fb]'}`}>
+      <UserPanel isOpen={userPanelOpen} onClose={() => setUserPanelOpen(false)} />
 
-        {categories.length === 0 ? (
-          <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-8 text-center`}>
-            <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No categories available yet.</p>
+      <header className={`${isDark ? 'bg-gray-900/95 border-gray-800' : 'bg-white/95 border-slate-200'} sticky top-0 z-50 border-b backdrop-blur-md`}>
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandLogo variant="nav" className={`${isDark ? 'ring-white/10' : 'ring-slate-200'} ring-1`} />
+            <div className="min-w-0">
+              <div className={`truncate text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Railway Study Point</div>
+              <div className={`truncate text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Mobile-first student dashboard</div>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                onClick={() => navigate(`/exams/${category.id}`)}
-                className={`${
-                  isDark 
-                    ? 'bg-gray-800 border-gray-700 hover:border-blue-500' 
-                    : 'bg-white border-gray-200 hover:border-blue-400'
-                } rounded-2xl border p-5 transition cursor-pointer group`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      isDark ? 'bg-blue-600/20' : 'bg-blue-100'
-                    } group-hover:scale-110 transition`}>
-                      {category.iconUrl ? (
-                        <img src={category.iconUrl} alt={category.name} className="w-6 h-6" />
-                      ) : (
-                        <span className={`${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
-                          {getCategoryIcon(category)}
-                        </span>
-                      )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/notifications')}
+              className={`rounded-2xl p-2.5 ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-slate-100 text-slate-700'}`}
+            >
+              <Bell className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => setUserPanelOpen(true)}
+              className={`rounded-2xl px-3 py-2 text-xs font-semibold ${isDark ? 'bg-gray-800 text-white' : 'bg-slate-900 text-white'}`}
+            >
+              Open Panel
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-4 py-5">
+        <section className={`overflow-hidden rounded-[28px] border p-5 ${
+          isDark
+            ? 'border-blue-500/20 bg-gradient-to-br from-blue-900/30 via-gray-900 to-amber-900/20'
+            : 'border-sky-100 bg-gradient-to-br from-sky-50 via-white to-amber-50'
+        }`}>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {effectiveRole === 'admin' && (
+                <button onClick={() => navigate('/admin-portal')} className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 ring-1 ring-red-200">
+                  Admin Panel
+                </button>
+              )}
+              {isPremium ? (
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">Premium Active</span>
+              ) : daysLeftTrial !== null ? (
+                <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                  {daysLeftTrial} trial day(s) left
+                </span>
+              ) : trialExpiredNeedsPremium ? (
+                <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-200">
+                  Upgrade to continue
+                </span>
+              ) : null}
+            </div>
+
+            <div>
+              <h1 className={`text-2xl font-bold leading-tight sm:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                Choose category, open subcategory, then start your test fast.
+              </h1>
+              <p className={`mt-2 text-sm leading-6 sm:text-base ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+                Optimized for phone users first. Pick NTPC, Group D, mock tests, subject quizzes, or previous-year papers and move directly into available exams.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Categories</h2>
+            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Tap to open subcategory/tests</span>
+          </div>
+
+          {categories.length === 0 ? (
+            <div className={`rounded-3xl border p-5 text-sm ${isDark ? 'border-gray-700 bg-gray-800 text-gray-400' : 'border-slate-200 bg-white text-slate-500'}`}>
+              Categories unavailable
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => navigate(`/exams/${category.id}`)}
+                  className={`rounded-[24px] border p-4 text-left transition ${
+                    isDark ? 'border-gray-700 bg-gray-800 hover:border-blue-500' : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-md'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-50 text-blue-600'}`}>
+                        {category.iconUrl ? <img src={category.iconUrl} alt={category.name} className="h-6 w-6" /> : getCategoryIcon(category)}
+                      </div>
+                      <div>
+                        <div className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{category.name}</div>
+                        <div className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                          {category.description || 'Subcategories and tests available inside'}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        {category.name}
-                      </h3>
-                      <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {category.description || 'View available tests'}
-                      </p>
-                    </div>
+                    <ChevronRight className={`mt-1 h-5 w-5 ${isDark ? 'text-gray-500' : 'text-slate-400'}`} />
                   </div>
-                  <ArrowRight className={`w-5 h-5 ${isDark ? 'text-gray-500' : 'text-gray-400'} group-hover:translate-x-1 transition`} />
-                </div>
-              </div>
-            ))}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Direct Join Exams</h2>
+            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Students can enter directly from here</span>
           </div>
-        )}
+
+          {featuredExams.length === 0 ? (
+            <div className={`rounded-3xl border p-5 text-sm ${isDark ? 'border-gray-700 bg-gray-800 text-gray-400' : 'border-slate-200 bg-white text-slate-500'}`}>
+              Exams unavailable
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {featuredExams.map((exam) => (
+                <div
+                  key={exam.id}
+                  className={`rounded-[24px] border p-4 ${
+                    isDark ? 'border-gray-700 bg-gray-800' : 'border-slate-200 bg-white shadow-sm'
+                  }`}
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className={`truncate text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{exam.title}</h3>
+                        {exam.is_premium && <Crown className="h-4 w-4 text-amber-500" />}
+                      </div>
+                      <div className={`mt-2 flex flex-wrap gap-2 text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                        <span className={`rounded-full px-3 py-1 ${isDark ? 'bg-gray-700' : 'bg-slate-100'}`}>{exam.category_id}</span>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 ${isDark ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                          <Clock3 className="h-3.5 w-3.5" />
+                          {exam.duration_minutes} min
+                        </span>
+                        <span className={`rounded-full px-3 py-1 ${isDark ? 'bg-gray-700' : 'bg-slate-100'}`}>{exam.total_marks} marks</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleStartExam(exam)}
+                      className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${
+                        !canAccessTests || (exam.is_premium && !isPremium)
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-slate-900 text-white'
+                      }`}
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      {!canAccessTests || (exam.is_premium && !isPremium) ? 'Unlock & Join' : 'Join Exam'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
+
+      <BottomNav />
     </div>
   );
 }

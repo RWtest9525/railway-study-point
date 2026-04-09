@@ -17,8 +17,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (savedTheme) {
       return savedTheme;
     }
-    // Default to dark theme
-    return 'dark';
+    // Default to light theme
+    return 'light';
   });
 
   const [mounted, setMounted] = useState(false);

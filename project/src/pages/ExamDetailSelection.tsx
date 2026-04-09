@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getExams, getCategory, Exam, Category } from '../lib/firestore';
-import { Play, Clock, Users, ArrowLeft, Award } from 'lucide-react';
+import { Clock, ArrowLeft, Award, Layers3 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { BottomNav } from '../components/BottomNav';
 
 interface ExamDetailSelectionProps {
@@ -12,6 +13,7 @@ interface ExamDetailSelectionProps {
 export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
   const { navigate } = useRouter();
   const { theme } = useTheme();
+  const { canAccessTests, isPremium } = useAuth();
   const isDark = theme === 'dark';
   const [exams, setExams] = useState<Exam[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
@@ -36,6 +38,15 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const startExam = (exam: Exam) => {
+    if (!canAccessTests || (exam.is_premium && !isPremium)) {
+      navigate('/upgrade');
+      return;
+    }
+    const ok = confirm(`Start "${exam.title}" now?`);
+    if (ok) navigate(`/exam/${exam.id}`);
   };
 
   if (loading) {
@@ -67,7 +78,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
 
       <main className="max-w-3xl mx-auto px-4 py-6">
         {category && (
-          <div className={`mb-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-5`}>
+          <div className={`mb-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-[28px] border p-5`}>
             <h2 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
               {category.name}
             </h2>
@@ -90,15 +101,20 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
                   isDark 
                     ? 'bg-gray-800 border-gray-700 hover:border-blue-500' 
                     : 'bg-white border-gray-200 hover:border-blue-400'
-                } rounded-2xl border p-5 transition cursor-pointer`}
-                onClick={() => navigate(`/exam/${exam.id}`)}
+                } rounded-[26px] border p-5 transition`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {exam.title}
-                    </h3>
-                    <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {exam.title}
+                      </h3>
+                      {exam.is_premium && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Premium</span>}
+                    </div>
+                    <p className={`mb-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {exam.description || 'Tap below to begin this test.'}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
                       <span className={`flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                         <Clock className="w-4 h-4" />
                         {exam.duration_minutes} mins
@@ -107,14 +123,25 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
                         <Award className="w-4 h-4" />
                         {exam.total_marks} marks
                       </span>
+                      <span className={`flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <Layers3 className="w-4 h-4" />
+                        {exam.category_id}
+                      </span>
                     </div>
                   </div>
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    isDark ? 'bg-blue-600/20' : 'bg-blue-100'
-                  }`}>
-                    <Play className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-                  </div>
                 </div>
+                <button
+                  onClick={() => startExam(exam)}
+                  className={`mt-5 w-full rounded-2xl py-3 text-sm font-semibold ${
+                    !canAccessTests || (exam.is_premium && !isPremium)
+                      ? 'bg-amber-500 text-white'
+                      : isDark
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-slate-900 text-white'
+                  }`}
+                >
+                  {!canAccessTests || (exam.is_premium && !isPremium) ? 'Unlock to Start' : 'Start This Exam'}
+                </button>
               </div>
             ))}
           </div>
