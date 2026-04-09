@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { getExam, getQuestions, createAttempt, Question, Exam } from '../lib/firestore';
-import { Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -28,6 +28,9 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [loading, setLoading] = useState(true);
   const [startTime] = useState(Date.now());
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [isFocused, setIsFocused] = useState(true);
+  const [proctoringViolations, setProctoringViolations] = useState<string[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -37,6 +40,41 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     }
     loadExamData();
   }, [examId, canAccessTests, authLoading, navigate]);
+
+  // Proctoring: Detect tab switching and browser focus changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setTabSwitchCount(prev => prev + 1);
+        setIsFocused(false);
+        console.log('Proctoring: Tab switched away');
+      } else {
+        setIsFocused(true);
+        console.log('Proctoring: Tab switched back');
+      }
+    };
+
+    const handleFocus = () => {
+      setIsFocused(true);
+      console.log('Proctoring: Window focused');
+    };
+
+    const handleBlur = () => {
+      setTabSwitchCount(prev => prev + 1);
+      setIsFocused(false);
+      console.log('Proctoring: Window blurred');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   useEffect(() => {
     if (timeRemaining > 0) {
@@ -73,6 +111,17 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
 
   const handleSubmit = async () => {
     if (!profile?.id || !exam) return;
+
+    // Check for proctoring violations
+    if (tabSwitchCount > 0) {
+      const violationMessage = `Warning: You switched tabs ${tabSwitchCount} time(s) during the exam. This may be considered a violation of exam rules.`;
+      proctoringViolations.push(violationMessage);
+      setProctoringViolations([...proctoringViolations]);
+      
+      if (!confirm(violationMessage + ' Do you want to continue?')) {
+        return;
+      }
+    }
     
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
     
@@ -153,6 +202,17 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
 
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      {/* Proctoring Warning */}
+      {tabSwitchCount > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5" />
+            <span className="font-medium">Proctoring Alert: You have switched tabs {tabSwitchCount} time(s) during this exam.</span>
+            <span className="text-sm text-yellow-600">This may be considered a violation of exam rules.</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-10`}>
         <div className="max-w-7xl mx-auto px-4 py-4">

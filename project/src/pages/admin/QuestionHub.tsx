@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { getQuestions, Question } from '../../lib/firestore';
 import { 
   Search, Filter, Plus, Folder, FileText, Tag, 
@@ -8,6 +9,9 @@ import {
   Download, Upload, RefreshCw, LayoutList, LayoutGrid,
   Check, X, Calendar, Users, TrendingUp, DollarSign
 } from 'lucide-react';
+import { AddQuestionModal } from '../../components/AddQuestionModal';
+import toast from 'react-hot-toast';
+import { useLocation } from 'react-router-dom';
 
 interface EnhancedQuestion extends Question {
   topic?: string;
@@ -40,9 +44,17 @@ interface Topic {
 
 export function QuestionHub() {
   const { profile } = useAuth();
+  const { theme } = useTheme();
+  const location = useLocation();
+  const isDark = theme === 'dark';
   const [questions, setQuestions] = useState<EnhancedQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  
+  // Get examId from URL query params
+  const urlParams = new URLSearchParams(location.search);
+  const examId = urlParams.get('examId');
   
   // Navigation State
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -156,38 +168,23 @@ export function QuestionHub() {
 
   // Filter questions based on current selection
   const filteredQuestions = questions.filter(q => {
-    // Category filter
     if (selectedCategory && q.subject) {
       const category = categories.find(c => c.subjects.some(s => s.id === q.subject));
       if (!category || category.id !== selectedCategory) return false;
     }
-    
-    // Subject filter
     if (selectedSubject && q.subject !== selectedSubject) return false;
-    
-    // Topic filter
     if (selectedTopic && q.topic !== selectedTopic) return false;
-    
-    // Search filter
     if (searchQuery && !q.question_text.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    
-    // Difficulty filter
     if (difficultyFilter && q.difficulty !== difficultyFilter) return false;
-    
-    // Status filter
     if (statusFilter) {
       if (statusFilter === 'live' && q.is_draft) return false;
       if (statusFilter === 'draft' && !q.is_draft) return false;
     }
-    
-    // Tags filter
     if (tagsFilter && q.tags && !q.tags.some(tag => tag.toLowerCase().includes(tagsFilter.toLowerCase()))) return false;
-    
     return true;
   }).sort((a, b) => {
     let aVal: any = '';
     let bVal: any = '';
-    
     switch (sortBy) {
       case 'created_at':
         aVal = a.created_at || new Date(0);
@@ -206,22 +203,18 @@ export function QuestionHub() {
         bVal = b.is_draft ? 'Draft' : 'Live';
         break;
     }
-    
     const comparison = String(aVal).localeCompare(String(bVal));
     return sortOrder === 'asc' ? comparison : -comparison;
   });
 
-  // Get current navigation path
   const getCurrentPath = () => {
     const path = [];
     if (selectedCategory) {
       const category = categories.find(c => c.id === selectedCategory);
       if (category) path.push(category.name);
-      
       if (selectedSubject) {
         const subject = category?.subjects.find(s => s.id === selectedSubject);
         if (subject) path.push(subject.name);
-        
         if (selectedTopic) {
           const topic = subject?.topics.find(t => t.id === selectedTopic);
           if (topic) path.push(topic.name);
@@ -250,23 +243,23 @@ export function QuestionHub() {
 
   const getDifficultyBadgeColor = (difficulty?: string) => {
     switch (difficulty) {
-      case 'easy': return 'bg-green-100 text-green-800 border-green-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'hard': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'easy': return isDark ? 'bg-green-900/30 text-green-400 border-green-700' : 'bg-green-100 text-green-800 border-green-200';
+      case 'medium': return isDark ? 'bg-yellow-900/30 text-yellow-400 border-yellow-700' : 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'hard': return isDark ? 'bg-red-900/30 text-red-400 border-red-700' : 'bg-red-100 text-red-800 border-red-200';
+      default: return isDark ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const getStatusBadgeColor = (isDraft?: boolean) => {
-    return isDraft 
-      ? 'bg-yellow-100 text-yellow-800 border-yellow-200' 
-      : 'bg-green-100 text-green-800 border-green-200';
+  const getStatusBadgeColor = (isDraftQ?: boolean) => {
+    return isDraftQ 
+      ? isDark ? 'bg-yellow-900/30 text-yellow-400 border-yellow-700' : 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      : isDark ? 'bg-green-900/30 text-green-400 border-green-700' : 'bg-green-100 text-green-800 border-green-200';
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Top Navigation Bar */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-40`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Breadcrumb Navigation */}
@@ -277,14 +270,14 @@ export function QuestionHub() {
                   setSelectedSubject('');
                   setSelectedTopic('');
                 }}
-                className="text-gray-600 hover:text-gray-900 transition-colors"
+                className={`${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors`}
               >
                 <Folder className="w-5 h-5" />
               </button>
               {getCurrentPath().map((item, index) => (
                 <div key={index} className="flex items-center space-x-2">
                   <ChevronRight className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-900">{item}</span>
+                  <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{item}</span>
                 </div>
               ))}
             </div>
@@ -297,7 +290,11 @@ export function QuestionHub() {
                 </div>
                 <input
                   type="text"
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg leading-5 ${
+                    isDark 
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
+                  }`}
                   placeholder="Search questions..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -309,13 +306,21 @@ export function QuestionHub() {
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`p-2 rounded-lg ${
+                  viewMode === 'list' 
+                    ? 'bg-blue-600 text-white' 
+                    : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
                 <LayoutList className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`p-2 rounded-lg ${
+                  viewMode === 'grid' 
+                    ? 'bg-blue-600 text-white' 
+                    : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
                 <LayoutGrid className="w-5 h-5" />
               </button>
@@ -328,10 +333,10 @@ export function QuestionHub() {
         <div className="grid grid-cols-12 gap-6">
           {/* Sidebar - Category Navigation */}
           <div className="col-span-3">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Categories</h2>
-                <p className="text-sm text-gray-600 mt-1">Navigate through exam categories</p>
+            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border`}>
+              <div className={`p-6 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                <h2 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Categories</h2>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'} mt-1`}>Navigate through exam categories</p>
               </div>
               
               <div className="p-4 space-y-4">
@@ -345,8 +350,8 @@ export function QuestionHub() {
                       }}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         selectedCategory === category.id
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'text-gray-700 hover:bg-gray-50'
+                          ? isDark ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -369,8 +374,8 @@ export function QuestionHub() {
                               }}
                               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                                 selectedSubject === subject.id
-                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                  : 'text-gray-600 hover:bg-gray-50'
+                                  ? isDark ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-50'
                               }`}
                             >
                               <div className="flex items-center justify-between">
@@ -390,8 +395,8 @@ export function QuestionHub() {
                                     onClick={() => setSelectedTopic(topic.id)}
                                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                                       selectedTopic === topic.id
-                                        ? 'bg-blue-50 text-blue-700 border border-blue-200 font-medium'
-                                        : 'text-gray-500 hover:bg-gray-50'
+                                        ? isDark ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-medium' : 'bg-blue-50 text-blue-700 border border-blue-200 font-medium'
+                                        : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:bg-gray-50'
                                     }`}
                                   >
                                     <div className="flex items-center space-x-2">
@@ -413,23 +418,23 @@ export function QuestionHub() {
 
             {/* Bulk Actions */}
             {selectedQuestions.length > 0 && (
-              <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="text-sm font-medium text-gray-900 mb-4">Bulk Actions</h3>
+              <div className={`mt-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border p-6`}>
+                <h3 className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'} mb-4`}>Bulk Actions</h3>
                 <div className="space-y-3">
-                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-400 hover:bg-red-400/10 rounded-lg transition-colors">
                     <Trash2 className="w-4 h-4" />
                     <span>Delete Selected</span>
                   </button>
-                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors">
                     <Folder className="w-4 h-4" />
                     <span>Move to Category</span>
                   </button>
-                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-green-400 hover:bg-green-400/10 rounded-lg transition-colors">
                     <CheckCircle className="w-4 h-4" />
                     <span>Publish Selected</span>
                   </button>
                 </div>
-                <div className="mt-4 text-xs text-gray-500">
+                <div className={`mt-4 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                   Selected: {selectedQuestions.length} questions
                 </div>
               </div>
@@ -439,26 +444,33 @@ export function QuestionHub() {
           {/* Main Content */}
           <div className="col-span-9">
             {/* Filters and Actions Bar */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border p-6 mb-6`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-4">
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                     Question Hub
                   </h2>
-                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  <span className={`text-sm ${isDark ? 'text-gray-400 bg-gray-700' : 'text-gray-500 bg-gray-100'} px-3 py-1 rounded-full`}>
                     {filteredQuestions.length} questions
                   </span>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                  <button 
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
                     <Plus className="w-4 h-4" />
-                    <span>Add Question</span>
+                    <span>{examId ? 'Add Question to Exam' : 'Add Question'}</span>
                   </button>
-                  <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                  <button className={`flex items-center space-x-2 px-4 py-2 border rounded-lg transition-colors ${
+                    isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}>
                     <Upload className="w-4 h-4" />
                     <span>Bulk Import</span>
                   </button>
-                  <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                  <button className={`flex items-center space-x-2 px-4 py-2 border rounded-lg transition-colors ${
+                    isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}>
                     <Download className="w-4 h-4" />
                     <span>Export CSV</span>
                   </button>
@@ -468,11 +480,13 @@ export function QuestionHub() {
               {/* Filter Controls */}
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Difficulty</label>
+                  <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Difficulty</label>
                   <select
                     value={difficultyFilter}
                     onChange={(e) => setDifficultyFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'
+                    }`}
                   >
                     <option value="">All Difficulties</option>
                     <option value="easy">Easy</option>
@@ -481,11 +495,13 @@ export function QuestionHub() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Status</label>
+                  <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Status</label>
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'
+                    }`}
                   >
                     <option value="">All Status</option>
                     <option value="live">Live</option>
@@ -493,11 +509,13 @@ export function QuestionHub() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Sort By</label>
+                  <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Sort By</label>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'
+                    }`}
                   >
                     <option value="created_at">Date Created</option>
                     <option value="subject">Subject</option>
@@ -506,11 +524,13 @@ export function QuestionHub() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Order</label>
+                  <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Order</label>
                   <select
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'
+                    }`}
                   >
                     <option value="desc">Descending</option>
                     <option value="asc">Ascending</option>
@@ -521,29 +541,29 @@ export function QuestionHub() {
 
             {/* Questions List/Grid */}
             {loading ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+              <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border p-8`}>
                 <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
+                  <div className={`h-4 ${isDark ? 'bg-gray-700' : 'bg-gray-200'} rounded w-1/4 mb-4`}></div>
                   <div className="space-y-3">
                     {[1, 2, 3, 4, 5].map((i) => (
-                      <div key={i} className="h-16 bg-gray-200 rounded"></div>
+                      <div key={i} className={`h-16 ${isDark ? 'bg-gray-700' : 'bg-gray-200'} rounded`}></div>
                     ))}
                   </div>
                 </div>
               </div>
             ) : filteredQuestions.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-                <div className="text-gray-500">
-                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-lg font-medium text-gray-900 mb-2">No questions found</p>
-                  <p className="text-sm text-gray-600">Try adjusting your filters or add new questions</p>
+              <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border p-8 text-center`}>
+                <div>
+                  <FileText className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
+                  <p className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>No questions found</p>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Try adjusting your filters or add new questions</p>
                 </div>
               </div>
             ) : viewMode === 'list' ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border overflow-hidden`}>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-gray-700">
+                    <thead className={isDark ? 'bg-gray-700/50' : 'bg-gray-50'}>
                       <tr>
                         <th className="px-6 py-3 text-left">
                           <input
@@ -553,32 +573,32 @@ export function QuestionHub() {
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
                           Question Preview
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
                           Subject
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
                           Topic
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
                           Difficulty
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
                           Status
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
                           Tags
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className={`px-6 py-3 text-right text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className={`${isDark ? 'bg-gray-800 divide-gray-700' : 'bg-white divide-gray-200'} divide-y`}>
                       {filteredQuestions.map((question) => (
-                        <tr key={question.id} className="hover:bg-gray-50">
+                        <tr key={question.id} className={isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <input
                               type="checkbox"
@@ -593,19 +613,19 @@ export function QuestionHub() {
                                 <img src={question.image_url} alt="Question" className="w-12 h-12 object-cover rounded" />
                               )}
                               <div>
-                                <div className="text-sm font-medium text-gray-900 max-w-md truncate">
+                                <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'} max-w-md truncate`}>
                                   {question.question_text.substring(0, 100)}
                                   {question.question_text.length > 100 ? '...' : ''}
                                 </div>
                                 <div className="flex items-center space-x-2 mt-1">
                                   {question.video_explanation_url && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-900/30 text-red-400 border border-red-700">
                                       <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
                                       Video
                                     </span>
                                   )}
                                   {question.option_images && question.option_images.length > 0 && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-900/30 text-blue-400 border border-blue-700">
                                       <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
                                       Images
                                     </span>
@@ -615,11 +635,11 @@ export function QuestionHub() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-900/30 text-purple-400 border border-purple-700">
                               {question.subject || 'Unknown'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
                             {question.topic || '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -637,23 +657,23 @@ export function QuestionHub() {
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-1">
                               {question.tags?.slice(0, 2).map((tag, i) => (
-                                <span key={i} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                <span key={i} className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-800 border-gray-200'} border`}>
                                   {tag}
                                 </span>
                               ))}
                               {question.tags && question.tags.length > 2 && (
-                                <span className="text-xs text-gray-500">+{question.tags.length - 2}</span>
+                                <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>+{question.tags.length - 2}</span>
                               )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <button className="text-blue-600 hover:text-blue-900">
+                            <button className="text-blue-400 hover:text-blue-300">
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button className="text-green-600 hover:text-green-900">
+                            <button className="text-green-400 hover:text-green-300">
                               <Edit className="w-4 h-4" />
                             </button>
-                            <button className="text-red-600 hover:text-red-900">
+                            <button className="text-red-400 hover:text-red-300">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </td>
@@ -666,7 +686,7 @@ export function QuestionHub() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredQuestions.map((question) => (
-                  <div key={question.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                  <div key={question.id} className={`${isDark ? 'bg-gray-800 border-gray-700 hover:border-gray-500' : 'bg-white border-gray-200 hover:shadow-md'} rounded-xl shadow-sm border p-6 transition-shadow`}>
                     <div className="flex items-start justify-between mb-4">
                       <input
                         type="checkbox"
@@ -690,30 +710,30 @@ export function QuestionHub() {
                       {question.image_url && (
                         <img src={question.image_url} alt="Question" className="w-full h-32 object-cover rounded-lg mb-3" />
                       )}
-                      <p className="text-sm text-gray-900 line-clamp-3">
+                      <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'} line-clamp-3`}>
                         {question.question_text}
                       </p>
                     </div>
                     
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-900/30 text-purple-400 border border-purple-700">
                           {question.subject || 'Unknown'}
                         </span>
                         {question.topic && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-800 border-gray-200'} border`}>
                             {question.topic}
                           </span>
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <button className="p-2 text-gray-400 hover:text-gray-600">
+                        <button className={`p-2 ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}>
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button className="p-2 text-gray-400 hover:text-gray-600">
+                        <button className={`p-2 ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}>
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button className="p-2 text-gray-400 hover:text-gray-600">
+                        <button className={`p-2 ${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-400 hover:text-gray-600'}`}>
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -725,6 +745,17 @@ export function QuestionHub() {
           </div>
         </div>
       </div>
+
+      {/* Add Question Modal */}
+      <AddQuestionModal 
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSuccess={() => {
+          loadQuestions();
+          toast.success('Question added successfully!');
+        }}
+        examId={examId || undefined}
+      />
     </div>
   );
 }

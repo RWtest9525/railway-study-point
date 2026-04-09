@@ -19,7 +19,11 @@ import {
   Moon,
   Sun,
   ChevronLeft,
-  Trophy
+  Trophy,
+  BarChart3,
+  Activity,
+  Database,
+  Search
 } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionHub } from './QuestionHub';
@@ -31,14 +35,21 @@ import { SupportInbox } from './SupportInbox';
 import { SubscriptionManagement } from './SubscriptionManagement';
 import { CategoryManagement } from './CategoryManagement';
 import { AdminLeaderboard } from './AdminLeaderboard';
+import { AdminDashboardCharts } from '../../components/AdminDashboardCharts';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
+import { ActivityLogs } from './ActivityLogs';
+import { GlobalAnnouncement } from '../../components/GlobalAnnouncement';
+import { TopStudentsWidget } from '../../components/TopStudentsWidget';
+import { DatabaseBackup } from '../../components/DatabaseBackup';
+import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
   const { navigate } = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'categories' | 'leaderboard'
-  >('users');
+    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'categories' | 'leaderboard' | 'dashboard' | 'activity' | 'backup'
+  >('dashboard');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -48,6 +59,7 @@ export function AdminPortal() {
   };
 
   const mainTabs = [
+    { id: 'dashboard' as const, name: 'Dashboard', icon: BarChart3, desc: 'Analytics & Overview' },
     { id: 'questions' as const, name: 'Questions', icon: FileText, desc: 'Manage Question Bank' },
     { id: 'exams' as const, name: 'Exams', icon: PlusCircle, desc: 'Create & Edit Exams' },
     { id: 'support' as const, name: 'Support', icon: MessageSquare, desc: 'Student Help Tickets' },
@@ -60,6 +72,8 @@ export function AdminPortal() {
     { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
     { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
     { id: 'categories' as const, name: 'Categories', icon: Folder, desc: 'Exam Categories' },
+    { id: 'activity' as const, name: 'Activity', icon: Activity, desc: 'System Logs' },
+    { id: 'backup' as const, name: 'Backup', icon: Database, desc: 'Export Data' },
   ];
 
   const handleTabClick = (tabId: typeof activeTab) => {
@@ -71,23 +85,29 @@ export function AdminPortal() {
     <div className={`min-h-screen flex flex-col md:flex-row relative ${
       theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'
     }`}>
-      {/* Mobile Header */}
-      <div className={`md:hidden ${
-        theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-      } border-b p-4 flex items-center justify-between sticky top-0 z-[150]`}>
-        <div className="flex items-center gap-3">
-          <BrandLogo variant="nav" className="bg-white/5 ring-1 ring-white/10 shadow-md w-8 h-8" />
-          <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Railway Admin
-          </span>
+        {/* Mobile Header */}
+        <div className={`md:hidden ${
+          theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        } border-b p-4 flex items-center justify-between sticky top-0 z-[150]`}>
+          <div className="flex items-center gap-3">
+            <BrandLogo variant="nav" className="bg-white/5 ring-1 ring-white/10 shadow-md w-8 h-8" />
+            <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Railway Admin
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <SearchAutocomplete onSearch={(result) => {
+              console.log('Search result:', result);
+              // Handle search navigation
+            }} />
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className={`p-2 ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition`}
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
-        <button 
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className={`p-2 ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition`}
-        >
-          {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-      </div>
 
       {/* Overlay for mobile menu */}
       {isMenuOpen && (
@@ -248,6 +268,44 @@ export function AdminPortal() {
       <main className={`flex-1 overflow-y-auto ${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-100'}`}>
         <div className="max-w-6xl mx-auto p-4 sm:p-8 lg:p-12">
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Breadcrumbs */}
+            <Breadcrumbs 
+              items={[
+                { label: 'Admin Portal', onClick: () => setActiveTab('dashboard') },
+                { label: activeTab.charAt(0).toUpperCase() + activeTab.slice(1) }
+              ]}
+              onHome={() => setActiveTab('dashboard')}
+            />
+
+            {/* Dashboard Tab */}
+            {activeTab === 'dashboard' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      Admin Dashboard
+                    </h1>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Overview of system performance and analytics
+                    </p>
+                  </div>
+                  <div className="hidden md:flex gap-3">
+                    <GlobalAnnouncement />
+                  </div>
+                </div>
+                
+                <AdminDashboardCharts />
+                
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <TopStudentsWidget />
+                  <div className="lg:col-span-2">
+                    <ActivityLogs />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Other Tabs */}
             {activeTab === 'questions' && <QuestionHub />}
             {activeTab === 'exams' && <ExamCreator />}
             {activeTab === 'revenue' && <RevenueTracker />}
@@ -257,6 +315,8 @@ export function AdminPortal() {
             {activeTab === 'subscription' && <SubscriptionManagement />}
             {activeTab === 'categories' && <CategoryManagement />}
             {activeTab === 'leaderboard' && <AdminLeaderboard />}
+            {activeTab === 'activity' && <ActivityLogs />}
+            {activeTab === 'backup' && <DatabaseBackup />}
           </div>
         </div>
       </main>

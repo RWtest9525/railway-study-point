@@ -28,7 +28,7 @@ export function Signup() {
       const { needsEmailConfirmation } = await signUp(email, password, fullName);
       if (needsEmailConfirmation) {
         setInfo(
-          'Account created! You need to verify your email. If you turned off confirmation in Supabase, try logging in now.'
+          'Account created! Please check your email to verify your account, then log in.'
         );
         setTimeout(() => navigate('/login'), 5000);
       } else {

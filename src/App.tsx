@@ -7,7 +7,7 @@ import { Signup } from './pages/Signup';
 import { ExamSelection } from './pages/ExamSelection';
 import { SubjectSelection } from './pages/SubjectSelection';
 import { ExamDetailSelection } from './pages/ExamDetailSelection';
-import { ExamInterface } from './pages/ExamInterface';
+import ExamInterface from './pages/ExamInterface';
 import { Results } from './pages/Results';
 import { Upgrade } from './pages/Upgrade';
 import { Leaderboard } from './pages/Leaderboard';

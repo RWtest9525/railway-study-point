@@ -1,265 +1,95 @@
-import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useRouter } from '../../contexts/RouterContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { 
-  FileText, 
-  PlusCircle, 
-  DollarSign, 
-  LogOut, 
-  Users, 
-  MessageSquare, 
-  LayoutDashboard,
-  ShieldCheck,
-  ChevronRight,
-  Menu,
-  X,
-  CreditCard,
-  Folder,
-  Moon,
-  Sun,
-  ChevronLeft,
-  Trophy
-} from 'lucide-react';
-import { BrandLogo } from '../../components/BrandLogo';
-import { QuestionBank } from './QuestionBank';
-import { ExamCreator } from './ExamCreator';
-import { RevenueTracker } from './RevenueTracker';
-import { PremiumSettings } from './PremiumSettings';
-import { UserManagement } from './UserManagement';
-import { SupportInbox } from './SupportInbox';
-import { SubscriptionManagement } from './SubscriptionManagement';
-import { CategoryManagement } from './CategoryManagement';
-import { AdminLeaderboard } from './AdminLeaderboard';
+import React, { useState, useEffect } from 'react';
+import { db } from '../../lib/firebase';
+import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { LayoutDashboard, BookOpen, FileText, Users, IndianRupee, Plus, Trash2 } from 'lucide-react';
 
-export function AdminPortal() {
-  const { profile, signOut } = useAuth();
-  const { navigate } = useRouter();
-  const { theme, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'categories' | 'leaderboard'
-  >('users');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+const AdminPortal = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [exams, setExams] = useState<any[]>([]);
+  const [newExam, setNewExam] = useState({ title: '', category: '', duration: '', negativeMark: '0.25' });
+  const [newQuestion, setNewQuestion] = useState({ examId: '', text: '', opt1: '', opt2: '', opt3: '', opt4: '', correct: '1' });
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/login');
+  const fetchExams = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'exams'));
+      setExams(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (err) { console.error("Error fetching exams:", err); }
   };
 
-  const mainTabs = [
-    { id: 'questions' as const, name: 'Questions', icon: FileText, desc: 'Manage Question Bank' },
-    { id: 'exams' as const, name: 'Exams', icon: PlusCircle, desc: 'Create & Edit Exams' },
-    { id: 'support' as const, name: 'Support', icon: MessageSquare, desc: 'Student Help Tickets' },
-  ];
+  useEffect(() => { fetchExams(); }, []);
 
-  const managementTabs = [
-    { id: 'revenue' as const, name: 'Revenue', icon: DollarSign, desc: 'Track Payments' },
-    { id: 'users' as const, name: 'Users', icon: Users, desc: 'Manage All Students' },
-    { id: 'leaderboard' as const, name: 'Leaderboard', icon: Trophy, desc: 'User Learning Stats' },
-    { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
-    { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
-    { id: 'categories' as const, name: 'Categories', icon: Folder, desc: 'Exam Categories' },
-  ];
+  const handleCreateExam = async () => {
+    if (!newExam.title) return alert("Please enter Exam Title");
+    await addDoc(collection(db, 'exams'), { ...newExam, createdAt: new Date() });
+    alert("Exam Created Successfully!");
+    fetchExams();
+  };
 
-  const handleTabClick = (tabId: typeof activeTab) => {
-    setActiveTab(tabId);
-    setIsMenuOpen(false);
+  const handleAddQuestion = async () => {
+    if (!newQuestion.examId) return alert("Select an Exam first!");
+    if (!newQuestion.text) return alert("Question text is empty");
+    await addDoc(collection(db, 'questions'), { ...newQuestion, createdAt: new Date() });
+    alert("Question Added to Bank!");
+    setNewQuestion({ ...newQuestion, text: '', opt1: '', opt2: '', opt3: '', opt4: '' });
   };
 
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row relative ${
-      theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'
-    }`}>
-      {/* Mobile Header */}
-      <div className={`md:hidden ${
-        theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-      } border-b p-4 flex items-center justify-between sticky top-0 z-[150]`}>
-        <div className="flex items-center gap-3">
-          <BrandLogo variant="nav" className="bg-white/5 ring-1 ring-white/10 shadow-md w-8 h-8" />
-          <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Railway Admin
-          </span>
-        </div>
-        <button 
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className={`p-2 ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition`}
-        >
-          {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-      </div>
-
-      {/* Overlay for mobile menu */}
-      {isMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-[140] md:hidden"
-          onClick={() => setIsMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar Navigation */}
-      <aside className={`
-        fixed inset-y-0 left-0 ${isSidebarCollapsed && !isMenuOpen ? 'md:w-20' : 'w-64'} 
-        ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} 
-        border-r flex flex-col shrink-0 z-[150] transition-all duration-300 transform
-        ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:translate-x-0 md:static md:z-[100]
-        overflow-hidden
-      `}>
-        <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} hidden md:flex items-center gap-3`}>
-          <BrandLogo variant="nav" className="bg-white/5 ring-1 ring-white/10 shadow-md w-8 h-8 shrink-0" />
-          {!isSidebarCollapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} leading-tight truncate`}>
-                Railway Admin
-              </span>
-              <span className={`text-[10px] ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-widest font-bold`}>
-                Control Panel
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Collapse Toggle Button (Desktop Only) */}
-        <button
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="hidden md:flex items-center justify-center p-2 mx-2 my-2 rounded-lg transition hover:bg-gray-700/50 text-gray-400 hover:text-white"
-        >
-          {isSidebarCollapsed ? (
-            <ChevronRight className="w-5 h-5" />
-          ) : (
-            <ChevronLeft className="w-5 h-5" />
-          )}
-        </button>
-
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
-          {/* Core Section */}
-          <div>
-            {!isSidebarCollapsed && (
-              <h3 className={`text-[10px] font-bold ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 px-2`}>
-                Core Features
-              </h3>
-            )}
-            <div className="space-y-1">
-              {mainTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(tab.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${
-                    activeTab === tab.id 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                      : theme === 'dark'
-                        ? 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <tab.icon className={`w-5 h-5 shrink-0 ${activeTab === tab.id ? 'text-white' : ''}`} />
-                  {!isSidebarCollapsed && (
-                    <span className="text-sm font-semibold truncate">{tab.name}</span>
-                  )}
-                  {activeTab === tab.id && !isSidebarCollapsed && <ChevronRight className="w-4 h-4 ml-auto shrink-0" />}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Management Section */}
-          <div>
-            {!isSidebarCollapsed && (
-              <h3 className={`text-[10px] font-bold ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 px-2`}>
-                Management
-              </h3>
-            )}
-            <div className="space-y-1">
-              {managementTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(tab.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${
-                    activeTab === tab.id 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                      : theme === 'dark'
-                        ? 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <tab.icon className={`w-5 h-5 shrink-0 ${activeTab === tab.id ? 'text-white' : ''}`} />
-                  {!isSidebarCollapsed && (
-                    <span className="text-sm font-semibold truncate">{tab.name}</span>
-                  )}
-                  {activeTab === tab.id && !isSidebarCollapsed && <ChevronRight className="w-4 h-4 ml-auto shrink-0" />}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className={`mx-3 mb-2 flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-            theme === 'dark'
-              ? 'bg-gray-700/50 hover:bg-gray-700 text-gray-300'
-              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-          }`}
-        >
-          {theme === 'dark' ? (
-            <Sun className="w-5 h-5 shrink-0" />
-          ) : (
-            <Moon className="w-5 h-5 shrink-0" />
-          )}
-          {!isSidebarCollapsed && (
-            <span className="text-sm font-medium">
-              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-            </span>
-          )}
-        </button>
-
-        <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
-          <div className={`${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-100'} rounded-xl p-3 mb-3 flex items-center gap-3`}>
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0">
-              {profile?.full_name?.charAt(0) || 'A'}
-            </div>
-            {!isSidebarCollapsed && (
-              <div className="min-w-0">
-                <p className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} truncate`}>
-                  {profile?.full_name || 'Admin'}
-                </p>
-                <button 
-                  onClick={() => navigate('/dashboard')}
-                  className={`text-[10px] ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} font-bold flex items-center gap-1`}
-                >
-                  <LayoutDashboard className="w-3 h-3" /> Dashboard
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-red-400 hover:bg-red-400/10 rounded-lg transition"
-          >
-            <LogOut className="w-4 h-4" /> 
-            {!isSidebarCollapsed && 'Sign Out'}
-          </button>
-        </div>
+    <div className="flex min-h-screen bg-slate-900 text-white">
+      {/* Fixed Sidebar */}
+      <aside className="w-64 bg-slate-800 p-6 border-r border-slate-700 h-screen sticky top-0">
+        <h1 className="text-xl font-bold text-indigo-400 mb-10">RAILWAY ADMIN PRO</h1>
+        <nav className="space-y-4">
+          <button onClick={() => setActiveTab('dashboard')} className={`flex items-center w-full p-3 rounded ${activeTab === 'dashboard' ? 'bg-indigo-600' : 'hover:bg-slate-700'}`}><LayoutDashboard className="mr-3"/> Dashboard</button>
+          <button onClick={() => setActiveTab('exams')} className={`flex items-center w-full p-3 rounded ${activeTab === 'exams' ? 'bg-indigo-600' : 'hover:bg-slate-700'}`}><FileText className="mr-3"/> Manage Exams</button>
+          <button onClick={() => setActiveTab('questions')} className={`flex items-center w-full p-3 rounded ${activeTab === 'questions' ? 'bg-indigo-600' : 'hover:bg-slate-700'}`}><BookOpen className="mr-3"/> Question Bank</button>
+        </nav>
       </aside>
 
-      {/* Main Content Area */}
-      <main className={`flex-1 overflow-y-auto ${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-100'}`}>
-        <div className="max-w-6xl mx-auto p-4 sm:p-8 lg:p-12">
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {activeTab === 'questions' && <QuestionBank />}
-            {activeTab === 'exams' && <ExamCreator />}
-            {activeTab === 'revenue' && <RevenueTracker />}
-            {activeTab === 'premium' && <PremiumSettings />}
-            {activeTab === 'users' && <UserManagement />}
-            {activeTab === 'support' && <SupportInbox />}
-            {activeTab === 'subscription' && <SubscriptionManagement />}
-            {activeTab === 'categories' && <CategoryManagement />}
-            {activeTab === 'leaderboard' && <AdminLeaderboard />}
+      <main className="flex-1 p-8">
+        {activeTab === 'dashboard' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><Users className="text-blue-400 mb-2"/> <p className="text-gray-400 font-medium">Total Students</p><h3 className="text-3xl font-bold">120+</h3></div>
+            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><FileText className="text-green-400 mb-2"/> <p className="text-gray-400 font-medium">Active Exams</p><h3 className="text-3xl font-bold">{exams.length}</h3></div>
+            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><IndianRupee className="text-yellow-400 mb-2"/> <p className="text-gray-400 font-medium">Revenue</p><h3 className="text-3xl font-bold">₹3,400</h3></div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'exams' && (
+          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl max-w-2xl">
+            <h2 className="text-2xl font-bold mb-6 text-indigo-300">Create New Mock Test</h2>
+            <div className="space-y-4">
+              <input placeholder="Exam Title (e.g. NTPC Mock 1)" className="w-full bg-slate-700 p-3 rounded-lg border border-slate-600 outline-none focus:border-indigo-500" onChange={e => setNewExam({...newExam, title: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <select className="bg-slate-700 p-3 rounded-lg border border-slate-600" onChange={e => setNewExam({...newExam, category: e.target.value})}>
+                  <option>Select Category</option><option value="ALP">ALP</option><option value="NTPC">NTPC</option><option value="GROUP-D">Group D</option>
+                </select>
+                <input placeholder="Duration (min)" type="number" className="bg-slate-700 p-3 rounded-lg border border-slate-600" onChange={e => setNewExam({...newExam, duration: e.target.value})} />
+              </div>
+              <button onClick={handleCreateExam} className="w-full bg-indigo-600 hover:bg-indigo-700 p-3 rounded-lg font-bold flex justify-center items-center transition"><Plus className="mr-2"/> Create Now</button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'questions' && (
+          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl max-w-4xl">
+             <h2 className="text-2xl font-bold mb-6 text-green-400">Add Questions to Bank</h2>
+             <select className="bg-slate-700 p-3 w-full mb-6 rounded-lg border border-slate-600" onChange={e => setNewQuestion({...newQuestion, examId: e.target.value})}>
+                <option>Select Exam (Where to add?)</option>
+                {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.title} ({ex.category})</option>)}
+             </select>
+             <textarea placeholder="Type Question here..." className="bg-slate-700 p-3 w-full mb-4 rounded-lg border border-slate-600 min-h-[100px]" onChange={e => setNewQuestion({...newQuestion, text: e.target.value})} value={newQuestion.text}/>
+             <div className="grid grid-cols-2 gap-4 mb-6">
+                <input placeholder="Option 1" className="bg-slate-700 p-3 rounded-lg border border-slate-600" onChange={e => setNewQuestion({...newQuestion, opt1: e.target.value})} value={newQuestion.opt1} />
+                <input placeholder="Option 2" className="bg-slate-700 p-3 rounded-lg border border-slate-600" onChange={e => setNewQuestion({...newQuestion, opt2: e.target.value})} value={newQuestion.opt2} />
+                <input placeholder="Option 3" className="bg-slate-700 p-3 rounded-lg border border-slate-600" onChange={e => setNewQuestion({...newQuestion, opt3: e.target.value})} value={newQuestion.opt3} />
+                <input placeholder="Option 4" className="bg-slate-700 p-3 rounded-lg border border-slate-600" onChange={e => setNewQuestion({...newQuestion, opt4: e.target.value})} value={newQuestion.opt4} />
+             </div>
+             <button onClick={handleAddQuestion} className="w-full bg-green-600 hover:bg-green-700 p-4 rounded-lg font-bold text-lg transition">Save Question</button>
+          </div>
+        )}
       </main>
     </div>
   );
-}
+};
+
+export default AdminPortal;

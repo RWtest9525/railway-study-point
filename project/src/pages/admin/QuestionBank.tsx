@@ -722,7 +722,7 @@ export function QuestionBank() {
                     )}
                     <input
                       type="text"
-                      value={formData[`option${num}` as keyof typeof formData]}
+                      value={String(formData[`option${num}` as keyof typeof formData] || '')}
                       onChange={(e) => setFormData({ ...formData, [`option${num}`]: e.target.value })}
                       className="w-full bg-gray-600 text-white px-3 py-2 rounded-lg border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required

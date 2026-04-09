@@ -1,4 +1,4 @@
-# Never commit environment files — they hold API keys (Razorpay, Supabase, etc.)
+# Never commit environment files — they hold API keys (Razorpay, etc.)
 .env
 **/.env
 

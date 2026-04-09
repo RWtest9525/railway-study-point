@@ -3,9 +3,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getExams, createExam, updateExam, deleteExam, Exam } from '../../lib/firestore';
 import { Plus, Edit, Trash2, Calendar, Clock, Settings, Shield, Download, AlertTriangle, CheckCircle } from 'lucide-react';
 import { formatDate, formatDateTime } from '../../lib/dateUtils';
+import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 export function ExamCreator() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [exams, setExams] = useState<Exam[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -57,6 +60,12 @@ export function ExamCreator() {
     setSuccess('');
 
     try {
+      // Check if user is authenticated
+      if (!profile) {
+        toast.error('Session expired. Please login again.');
+        return;
+      }
+
       const examData = {
         ...formData,
         negative_marking: parseFloat(formData.negative_marking as any),
@@ -64,7 +73,7 @@ export function ExamCreator() {
         total_marks: parseInt(formData.total_marks as any),
         passing_marks: parseInt(formData.passing_marks as any),
         attempt_limits: parseInt(formData.attempt_limits as any),
-        created_by: (profile as any)?.uid,
+        created_by: profile.id,
       };
 
       if (editingId) {
@@ -244,6 +253,12 @@ export function ExamCreator() {
                   className="flex-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 py-2 rounded-lg text-sm font-semibold transition"
                 >
                   Edit
+                </button>
+                <button
+                  onClick={() => navigate(`/admin/questions?examId=${exam.id}`)}
+                  className="flex-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 rounded-lg text-sm font-semibold transition"
+                >
+                  Manage Questions
                 </button>
                 <button
                   onClick={() => generatePDF(exam)}
