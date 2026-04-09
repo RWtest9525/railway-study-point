@@ -76,12 +76,13 @@ export interface Exam {
 export interface Question {
   id: string;
   exam_id: string;
-  subject: 'Maths' | 'Reasoning' | 'GK' | 'Science';
+  subject: string;
   topic?: string; // "Maths > Profit & Loss"
   subtopic?: string;
   question_text: string;
   options: string[];
   option_images?: string[]; // URLs for option images
+  option_label_style?: 'alphabet' | 'numeric';
   correct_index: number;
   explanation?: string;
   video_explanation_url?: string; // YouTube or video link
@@ -107,9 +108,18 @@ export interface QuizAttempt {
   answers: {
     questionId: string;
     selectedOption: number;
+    correctOption?: number;
     is_correct?: boolean;
     time_spent_seconds?: number;
     skipped?: boolean;
+    question_text?: string;
+    question_image_url?: string;
+    option_text?: string[];
+    option_images?: string[];
+    option_label_style?: 'alphabet' | 'numeric';
+    subject?: string;
+    marks?: number;
+    negative_marks?: number;
   }[];
   score: number;
   total_questions: number;
@@ -283,12 +293,14 @@ export const deleteCategory = async (categoryId: string) => {
 // Exams
 export const examsRef = collection(db, 'exams');
 
-export const getExams = async (categoryId?: string) => {
+export const getExams = async (categoryId?: string, includeInactive: boolean = false) => {
   let q;
   if (categoryId) {
-    q = query(examsRef, where('category_id', '==', categoryId), where('is_active', '==', true));
+    q = includeInactive
+      ? query(examsRef, where('category_id', '==', categoryId), orderBy('created_at', 'desc'))
+      : query(examsRef, where('category_id', '==', categoryId), where('is_active', '==', true));
   } else {
-    q = query(examsRef, where('is_active', '==', true));
+    q = includeInactive ? query(examsRef, orderBy('created_at', 'desc')) : query(examsRef, where('is_active', '==', true));
   }
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exam));
@@ -329,6 +341,21 @@ export const questionsRef = collection(db, 'questions');
 
 export const getQuestions = async (examId: string) => {
   const q = query(questionsRef, where('exam_id', '==', examId), orderBy('order', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
+};
+
+export const getQuestion = async (questionId: string) => {
+  const docRef = doc(db, 'questions', questionId);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() } as Question;
+  }
+  return null;
+};
+
+export const getAllQuestions = async () => {
+  const q = query(questionsRef, orderBy('created_at', 'desc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
 };
@@ -404,6 +431,22 @@ export const getAttempts = async (userId: string, examId?: string) => {
 };
 
 export const getUserAttempts = getAttempts;
+
+export const getAllAttempts = async () => {
+  const q = query(attemptsRef, orderBy('submitted_at', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizAttempt));
+};
+
+export const getAttemptsByExam = async (examId: string) => {
+  const q = query(
+    attemptsRef,
+    where('exam_id', '==', examId),
+    orderBy('submitted_at', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizAttempt));
+};
 
 export const getAttempt = async (attemptId: string) => {
   const docRef = doc(db, 'attempts', attemptId);

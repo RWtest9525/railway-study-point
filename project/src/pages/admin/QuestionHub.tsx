@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { getQuestions, Question } from '../../lib/firestore';
+import { deleteQuestion, getAllQuestions, getQuestions, Question, updateQuestion } from '../../lib/firestore';
 import { 
   Search, Filter, Plus, Folder, FileText, Tag, 
   Clock, Eye, Edit, Trash2, ChevronRight, ChevronDown,
@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { AddQuestionModal } from '../../components/AddQuestionModal';
 import toast from 'react-hot-toast';
-import { useLocation } from 'react-router-dom';
 
 interface EnhancedQuestion extends Question {
   topic?: string;
@@ -45,7 +44,6 @@ interface Topic {
 export function QuestionHub() {
   const { profile } = useAuth();
   const { theme } = useTheme();
-  const location = useLocation();
   const isDark = theme === 'dark';
   const [questions, setQuestions] = useState<EnhancedQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +51,7 @@ export function QuestionHub() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
   // Get examId from URL query params
-  const urlParams = new URLSearchParams(location.search);
+  const urlParams = new URLSearchParams(window.location.search);
   const examId = urlParams.get('examId');
   
   // Navigation State
@@ -155,7 +153,7 @@ export function QuestionHub() {
     setLoading(true);
     setError('');
     try {
-      const allQuestions = await getQuestions('');
+      const allQuestions = examId ? await getQuestions(examId) : await getAllQuestions();
       setQuestions(allQuestions as EnhancedQuestion[]);
     } catch (error: any) {
       console.error('Error loading questions:', error);
@@ -254,6 +252,17 @@ export function QuestionHub() {
     return isDraftQ 
       ? isDark ? 'bg-yellow-900/30 text-yellow-400 border-yellow-700' : 'bg-yellow-100 text-yellow-800 border-yellow-200'
       : isDark ? 'bg-green-900/30 text-green-400 border-green-700' : 'bg-green-100 text-green-800 border-green-200';
+  };
+
+  const handleDeleteQuestion = async (questionId: string) => {
+    if (!confirm('Delete this question from the bank?')) return;
+    await deleteQuestion(questionId);
+    await loadQuestions();
+  };
+
+  const toggleDraftState = async (question: EnhancedQuestion) => {
+    await updateQuestion(question.id, { is_draft: !question.is_draft, updated_at: new Date().toISOString() });
+    await loadQuestions();
   };
 
   return (
@@ -448,7 +457,7 @@ export function QuestionHub() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-4">
                   <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    Question Hub
+                    {examId ? 'Exam Question Hub' : 'Question Hub'}
                   </h2>
                   <span className={`text-sm ${isDark ? 'text-gray-400 bg-gray-700' : 'text-gray-500 bg-gray-100'} px-3 py-1 rounded-full`}>
                     {filteredQuestions.length} questions
@@ -670,12 +679,20 @@ export function QuestionHub() {
                             <button className="text-blue-400 hover:text-blue-300">
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button className="text-green-400 hover:text-green-300">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button className="text-red-400 hover:text-red-300">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                    <button
+                      onClick={() => void toggleDraftState(question)}
+                      className="text-green-400 hover:text-green-300"
+                      title={question.is_draft ? 'Publish question' : 'Move to draft'}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => void handleDeleteQuestion(question.id)}
+                      className="text-red-400 hover:text-red-300"
+                      title="Delete question"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                           </td>
                         </tr>
                       ))}

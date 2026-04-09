@@ -15,13 +15,13 @@ interface SearchResult {
 export function SearchAutocomplete({ onSearch }: { onSearch: (result: SearchResult) => void }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const [query, setQuery] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
-    if (query.length < 2) {
+    if (searchTerm.length < 2) {
       setResults([]);
       setShowResults(false);
       return;
@@ -29,7 +29,7 @@ export function SearchAutocomplete({ onSearch }: { onSearch: (result: SearchResu
     setShowResults(true);
     setLoading(true);
     searchDatabase();
-  }, [query]);
+  }, [searchTerm]);
 
   const searchDatabase = async () => {
     try {
@@ -107,7 +107,7 @@ export function SearchAutocomplete({ onSearch }: { onSearch: (result: SearchResu
 
   const handleSelect = (result: SearchResult) => {
     onSearch(result);
-    setQuery('');
+    setSearchTerm('');
     setShowResults(false);
   };
 
@@ -118,15 +118,15 @@ export function SearchAutocomplete({ onSearch }: { onSearch: (result: SearchResu
           <div className="flex items-center gap-3 p-3">
             <Search className={`w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
             <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search questions, exams, users..."
               className={`flex-1 px-3 py-2 text-sm ${isDark ? 'bg-transparent text-white placeholder-gray-500' : 'bg-transparent text-gray-900 placeholder-gray-400'}`}
               onFocus={() => setShowResults(true)}
             />
-            {query && (
+            {searchTerm && (
               <button
-                onClick={() => setQuery('')}
+                onClick={() => setSearchTerm('')}
                 className={`p-1 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
               >
                 <X className="w-4 h-4" />

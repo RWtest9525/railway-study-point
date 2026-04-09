@@ -66,7 +66,7 @@ export function Settings() {
       icon: Crown,
       title: isPremium ? 'Manage Premium' : 'Upgrade to Premium',
       description: isPremium 
-        ? `Premium until ${profile?.premium_expires_at ? formatDate(profile.premium_expires_at) : 'N/A'}`
+        ? `Premium until ${profile?.premium_until ? formatDate(profile.premium_until) : 'N/A'}`
         : 'Unlock all features',
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10',

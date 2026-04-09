@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getExams, createExam, updateExam, deleteExam, Exam } from '../../lib/firestore';
-import { Plus, Edit, Trash2, Calendar, Clock, Settings, Shield, Download, AlertTriangle, CheckCircle } from 'lucide-react';
-import { formatDate, formatDateTime } from '../../lib/dateUtils';
+import { Plus, Edit, Trash2, Calendar, Clock, Shield, Download, AlertTriangle, CheckCircle, Camera, BarChart3, Settings } from 'lucide-react';
+import { formatDate } from '../../lib/dateUtils';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from '../../contexts/RouterContext';
 
 export function ExamCreator() {
   const { profile } = useAuth();
-  const navigate = useNavigate();
+  const { navigate } = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export function ExamCreator() {
   const loadExams = async () => {
     setLoading(true);
     try {
-      const data = await getExams();
+      const data = await getExams(undefined, true);
       setExams(data);
     } catch (error: any) {
       console.error('Error loading exams:', error);
@@ -239,6 +239,9 @@ export function ExamCreator() {
                     Negative marking: -{exam.negative_marking} per wrong answer
                   </div>
                 )}
+                <div className="text-xs text-gray-500">
+                  Admin can add image-based questions with text or photo options from the question hub.
+                </div>
                 {exam.proctoring_enabled && (
                   <div className="flex items-center gap-2 text-sm text-red-400">
                     <Shield className="w-4 h-4" />
@@ -247,31 +250,40 @@ export function ExamCreator() {
                 )}
               </div>
 
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleEdit(exam)}
-                  className="flex-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 py-2 rounded-lg text-sm font-semibold transition"
+                  className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 py-2 rounded-lg text-sm font-semibold transition"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => navigate(`/admin/questions?examId=${exam.id}`)}
-                  className="flex-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 rounded-lg text-sm font-semibold transition"
+                  className="bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
                 >
+                  <Camera className="w-4 h-4" />
                   Manage Questions
                 </button>
                 <button
+                  onClick={() => navigate(`/admin/student-analytics?examId=${exam.id}`)}
+                  className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  View Results
+                </button>
+                <button
                   onClick={() => generatePDF(exam)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1"
+                  className="bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1"
                 >
                   <Download className="w-4 h-4" />
                   PDF
                 </button>
                 <button
                   onClick={() => handleDelete(exam.id)}
-                  className="px-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 py-2 rounded-lg transition"
+                  className="col-span-2 px-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 py-2 rounded-lg transition flex items-center justify-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
+                  Delete Exam
                 </button>
               </div>
             </div>

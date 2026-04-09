@@ -1,29 +1,54 @@
-import { useState, useEffect } from 'react';
-import { Plus, X, Upload, Image, Video, Tag, Save, AlertCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Image as ImageIcon, Loader2, Plus, Save, Trash2, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
+import { createQuestion, getExams, getQuestions, Exam } from '../lib/firestore';
+import { uploadImage, validateImage } from '../lib/imageUtils';
 
 interface AddQuestionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  examId?: string; // Optional exam ID for direct question addition
+  examId?: string;
 }
 
-interface Option {
+interface OptionDraft {
   id: string;
   text: string;
-  is_correct: boolean;
-  image_url?: string;
+  image_url: string;
 }
 
+const SUBJECTS = ['Maths', 'Reasoning', 'GK', 'Science', 'English', 'Quantitative'];
+const TOPIC_MAP: Record<string, string[]> = {
+  Maths: ['Arithmetic', 'Algebra', 'Geometry', 'Trigonometry'],
+  Reasoning: ['Verbal', 'Non-Verbal', 'Logical'],
+  GK: ['Current Affairs', 'History', 'Geography', 'Polity'],
+  Science: ['Physics', 'Chemistry', 'Biology'],
+  English: ['Grammar', 'Vocabulary', 'Comprehension'],
+  Quantitative: ['Arithmetic', 'DI'],
+};
+
+const defaultOptions = (): OptionDraft[] => [
+  { id: '1', text: '', image_url: '' },
+  { id: '2', text: '', image_url: '' },
+  { id: '3', text: '', image_url: '' },
+  { id: '4', text: '', image_url: '' },
+];
+
 export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQuestionModalProps) {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
+  const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
+  const [availableExams, setAvailableExams] = useState<Exam[]>([]);
+  const [correctIndex, setCorrectIndex] = useState(0);
+  const [options, setOptions] = useState<OptionDraft[]>(defaultOptions());
   const [formData, setFormData] = useState({
+    exam_id: examId || '',
     question_text: '',
-    subject: '',
+    subject: 'Maths',
     topic: '',
+    subtopic: '',
     difficulty: 'medium' as 'easy' | 'medium' | 'hard',
     marks: 1,
     negative_marks: 0,
@@ -32,51 +57,107 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
     is_draft: false,
     image_url: '',
     video_explanation_url: '',
-    options: [
-      { id: '1', text: '', is_correct: false, image_url: '' },
-      { id: '2', text: '', is_correct: false, image_url: '' },
-      { id: '3', text: '', is_correct: false, image_url: '' },
-      { id: '4', text: '', is_correct: false, image_url: '' },
-    ] as Option[],
+    option_label_style: 'alphabet' as 'alphabet' | 'numeric',
   });
 
-  const subjects = [
-    { id: 'maths', name: 'Mathematics', topics: ['algebra', 'geometry', 'trigonometry', 'calculus'] },
-    { id: 'reasoning', name: 'Reasoning', topics: ['verbal', 'non-verbal', 'logical'] },
-    { id: 'science', name: 'General Science', topics: ['physics', 'chemistry', 'biology'] },
-    { id: 'gk', name: 'General Knowledge', topics: ['current-affairs', 'history', 'geography', 'polity'] },
-    { id: 'english', name: 'English', topics: ['grammar', 'vocabulary', 'comprehension'] },
-    { id: 'quantitative', name: 'Quantitative Aptitude', topics: ['arithmetic', 'data-interpretation'] }
-  ];
+  useEffect(() => {
+    if (!isOpen) return;
+    void loadExams();
+  }, [isOpen]);
 
-  const getTopicsForSubject = (subjectId: string) => {
-    const subject = subjects.find(s => s.id === subjectId);
-    return subject?.topics || [];
+  const loadExams = async () => {
+    const exams = await getExams(undefined, true);
+    setAvailableExams(exams);
+    setFormData((prev) => ({
+      ...prev,
+      exam_id: examId || prev.exam_id || exams[0]?.id || '',
+    }));
   };
 
-  const handleOptionChange = (id: string, field: keyof Option, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      options: prev.options.map(opt => 
-        opt.id === id ? { ...opt, [field]: value } : opt
-      )
-    }));
+  const topics = useMemo(() => TOPIC_MAP[formData.subject] || [], [formData.subject]);
+
+  const resetForm = () => {
+    setError('');
+    setCorrectIndex(0);
+    setOptions(defaultOptions());
+    setFormData({
+      exam_id: examId || availableExams[0]?.id || '',
+      question_text: '',
+      subject: 'Maths',
+      topic: '',
+      subtopic: '',
+      difficulty: 'medium',
+      marks: 1,
+      negative_marks: 0,
+      explanation: '',
+      tags: '',
+      is_draft: false,
+      image_url: '',
+      video_explanation_url: '',
+      option_label_style: 'alphabet',
+    });
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const updateOption = (id: string, patch: Partial<OptionDraft>) => {
+    setOptions((prev) => prev.map((option) => (option.id === id ? { ...option, ...patch } : option)));
   };
 
   const addOption = () => {
-    const newId = (parseInt(formData.options[formData.options.length - 1].id) + 1).toString();
-    setFormData(prev => ({
-      ...prev,
-      options: [...prev.options, { id: newId, text: '', is_correct: false, image_url: '' }]
-    }));
+    setOptions((prev) => [...prev, { id: String(prev.length + 1), text: '', image_url: '' }]);
   };
 
   const removeOption = (id: string) => {
-    if (formData.options.length > 2) {
-      setFormData(prev => ({
-        ...prev,
-        options: prev.options.filter(opt => opt.id !== id)
-      }));
+    if (options.length <= 2) return;
+    const next = options.filter((option) => option.id !== id).map((option, index) => ({ ...option, id: String(index + 1) }));
+    setOptions(next);
+    setCorrectIndex((current) => Math.min(current, next.length - 1));
+  };
+
+  const uploadQuestionImage = async (file: File) => {
+    const validation = validateImage(file, true);
+    if (!validation.valid) {
+      const message = validation.errors.join(', ');
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    setUploadingQuestionImage(true);
+    try {
+      const uploaded = await uploadImage(file, `questions/${Date.now()}-${file.name}`);
+      setFormData((prev) => ({ ...prev, image_url: uploaded.url }));
+      toast.success('Question image uploaded');
+    } catch (uploadError: any) {
+      const message = uploadError?.message || 'Failed to upload question image';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setUploadingQuestionImage(false);
+    }
+  };
+
+  const uploadOptionImage = async (optionId: string, file: File) => {
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      const message = validation.errors.join(', ');
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    try {
+      const uploaded = await uploadImage(file, `questions/options/${Date.now()}-${optionId}-${file.name}`);
+      updateOption(optionId, { image_url: uploaded.url });
+      toast.success('Option image uploaded');
+    } catch (uploadError: any) {
+      const message = uploadError?.message || 'Failed to upload option image';
+      setError(message);
+      toast.error(message);
     }
   };
 
@@ -86,349 +167,339 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
     setError('');
 
     try {
-      // Validation
-      if (!formData.question_text.trim()) {
-        throw new Error('Question text is required');
-      }
-      if (!formData.subject) {
-        throw new Error('Subject is required');
-      }
-      if (!formData.topic) {
-        throw new Error('Topic is required');
-      }
-      if (formData.options.filter(opt => opt.text.trim()).length < 2) {
-        throw new Error('At least 2 options are required');
-      }
-      if (!formData.options.some(opt => opt.is_correct)) {
-        throw new Error('At least one option must be marked as correct');
+      if (!profile?.id) throw new Error('Please sign in again.');
+      if (!formData.exam_id) throw new Error('Please select an exam.');
+      if (!formData.topic) throw new Error('Please select a topic.');
+      if (!formData.question_text.trim() && !formData.image_url.trim()) {
+        throw new Error('Add question text or upload a question image.');
       }
 
-      // Prepare question data
-      const questionData = {
-        question_text: formData.question_text,
+      const preparedOptions = options
+        .map((option) => ({ ...option, text: option.text.trim(), image_url: option.image_url.trim() }))
+        .filter((option) => option.text || option.image_url);
+
+      if (preparedOptions.length < 2) throw new Error('At least 2 options are required.');
+      if (correctIndex >= preparedOptions.length) throw new Error('Please choose a correct answer.');
+
+      const existingQuestions = await getQuestions(formData.exam_id);
+
+      await createQuestion({
+        exam_id: formData.exam_id,
         subject: formData.subject,
         topic: formData.topic,
+        subtopic: formData.subtopic || undefined,
+        question_text: formData.question_text.trim(),
+        options: preparedOptions.map((option) => option.text || 'Image option'),
+        option_images: preparedOptions.some((option) => option.image_url)
+          ? preparedOptions.map((option) => option.image_url || '')
+          : undefined,
+        option_label_style: formData.option_label_style,
+        correct_index: correctIndex,
+        explanation: formData.explanation.trim() || undefined,
+        video_explanation_url: formData.video_explanation_url.trim() || undefined,
         difficulty: formData.difficulty,
-        marks: formData.marks,
-        negative_marks: formData.negative_marks,
-        explanation: formData.explanation,
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+        tags: formData.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+        image_url: formData.image_url.trim() || undefined,
+        marks: Number(formData.marks) || 1,
+        negative_marks: Number(formData.negative_marks) || 0,
+        order: existingQuestions.length + 1,
         is_draft: formData.is_draft,
-        image_url: formData.image_url,
-        video_explanation_url: formData.video_explanation_url,
-        options: formData.options.filter(opt => opt.text.trim()),
-        exam_id: examId, // Include exam_id if provided
-        created_at: new Date().toISOString(),
-      };
+        version: 1,
+        created_by: profile.id,
+        updated_at: new Date().toISOString(),
+      });
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast.success('Question created successfully!');
+      toast.success('Question created successfully');
       onSuccess();
-      onClose();
-      resetForm();
-    } catch (err: any) {
-      setError(err.message);
-      toast.error(err.message);
+      handleClose();
+    } catch (submitError: any) {
+      const message = submitError?.message || 'Failed to create question';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      question_text: '',
-      subject: '',
-      topic: '',
-      difficulty: 'medium',
-      marks: 1,
-      negative_marks: 0,
-      explanation: '',
-      tags: '',
-      is_draft: false,
-      image_url: '',
-      video_explanation_url: '',
-      options: [
-        { id: '1', text: '', is_correct: false, image_url: '' },
-        { id: '2', text: '', is_correct: false, image_url: '' },
-        { id: '3', text: '', is_correct: false, image_url: '' },
-        { id: '4', text: '', is_correct: false, image_url: '' },
-      ],
-    });
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
-      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Plus className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Add New Question
-              </h2>
-              <p className="text-sm text-gray-600">
-                {examId ? 'Adding question directly to exam' : 'Create a new question for the question bank'}
-              </p>
-            </div>
+    <div className="fixed inset-0 z-[200] bg-black/80 p-3 sm:p-6">
+      <div className="mx-auto max-h-[92vh] max-w-5xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-700 px-4 py-4 sm:px-6">
+          <div>
+            <h2 className="text-xl font-semibold text-white">Create Photo Question</h2>
+            <p className="text-sm text-slate-400">Real Firestore save with image upload and answer-style control.</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
+          <button onClick={handleClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="w-5 h-5" />
-                <span>{error}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Question Text */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Question Text *
-            </label>
-            <textarea
-              value={formData.question_text}
-              onChange={(e) => setFormData({ ...formData, question_text: e.target.value })}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter the question text..."
-            />
-          </div>
-
-          {/* Subject and Topic */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Subject *
-              </label>
-              <select
-                value={formData.subject}
-                onChange={(e) => setFormData({ ...formData, subject: e.target.value, topic: '' })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Subject</option>
-                {subjects.map(subject => (
-                  <option key={subject.id} value={subject.id}>{subject.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Topic *
-              </label>
-              <select
-                value={formData.topic}
-                onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                disabled={!formData.subject}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Topic</option>
-                {getTopicsForSubject(formData.subject).map(topic => (
-                  <option key={topic} value={topic}>{topic.replace('-', ' ').toUpperCase()}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Difficulty and Marks */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Difficulty *
-              </label>
-              <select
-                value={formData.difficulty}
-                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Marks *
-              </label>
-              <input
-                type="number"
-                value={formData.marks}
-                onChange={(e) => setFormData({ ...formData, marks: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                min="1"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Negative Marks
-              </label>
-              <input
-                type="number"
-                value={formData.negative_marks}
-                onChange={(e) => setFormData({ ...formData, negative_marks: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                min="0"
-                step="0.25"
-              />
-            </div>
-          </div>
-
-          {/* Options */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Options *
-            </label>
-            <div className="space-y-3">
-              {formData.options.map((option, index) => (
-                <div key={option.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg">
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={option.text}
-                      onChange={(e) => handleOptionChange(option.id, 'text', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder={`Option ${index + 1}...`}
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={option.is_correct}
-                        onChange={(e) => handleOptionChange(option.id, 'is_correct', e.target.checked)}
-                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                      />
-                      <span className="text-sm text-gray-700">Correct</span>
-                    </label>
-                    {formData.options.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => removeOption(option.id)}
-                        className="p-1 text-red-500 hover:text-red-700"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+        <form onSubmit={handleSubmit} className="grid gap-6 p-4 sm:grid-cols-[1.35fr_0.9fr] sm:p-6">
+          <div className="space-y-5">
+            {error && (
+              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
                 </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={addOption}
-              className="mt-2 flex items-center space-x-2 text-blue-600 hover:text-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Option</span>
-            </button>
-          </div>
+              </div>
+            )}
 
-          {/* Additional Fields */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Explanation
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Exam</span>
+                <select
+                  value={formData.exam_id}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, exam_id: e.target.value }))}
+                  disabled={!!examId}
+                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                >
+                  <option value="">Select exam</option>
+                  {availableExams.map((exam) => (
+                    <option key={exam.id} value={exam.id}>{exam.title}</option>
+                  ))}
+                </select>
               </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Subject</span>
+                <select
+                  value={formData.subject}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, subject: e.target.value, topic: '' }))}
+                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                >
+                  {SUBJECTS.map((subject) => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Topic</span>
+                <select
+                  value={formData.topic}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, topic: e.target.value }))}
+                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                >
+                  <option value="">Select topic</option>
+                  {topics.map((topic) => (
+                    <option key={topic} value={topic}>{topic}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Subtopic</span>
+                <input
+                  value={formData.subtopic}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, subtopic: e.target.value }))}
+                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                  placeholder="Optional subtopic"
+                />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-200">Question text</span>
               <textarea
-                value={formData.explanation}
-                onChange={(e) => setFormData({ ...formData, explanation: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Detailed explanation..."
+                value={formData.question_text}
+                onChange={(e) => setFormData((prev) => ({ ...prev, question_text: e.target.value }))}
+                rows={4}
+                className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                placeholder="Type the question, or upload a question image below."
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tags
-              </label>
-              <input
-                type="text"
-                value={formData.tags}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="tag1, tag2, tag3"
-              />
-            </div>
-          </div>
+            </label>
 
-          {/* Media URLs */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Image className="w-4 h-4 inline mr-1" />
-                Question Image URL
+            <div className="grid gap-4 sm:grid-cols-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Difficulty</span>
+                <select
+                  value={formData.difficulty}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, difficulty: e.target.value as 'easy' | 'medium' | 'hard' }))}
+                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
               </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Marks</span>
+                <input type="number" min="1" value={formData.marks} onChange={(e) => setFormData((prev) => ({ ...prev, marks: Number(e.target.value) }))} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Negative</span>
+                <input type="number" min="0" step="0.25" value={formData.negative_marks} onChange={(e) => setFormData((prev) => ({ ...prev, negative_marks: Number(e.target.value) }))} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Option style</span>
+                <select
+                  value={formData.option_label_style}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, option_label_style: e.target.value as 'alphabet' | 'numeric' }))}
+                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                >
+                  <option value="alphabet">A B C D</option>
+                  <option value="numeric">1 2 3 4</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="rounded-3xl border border-slate-700 bg-slate-950/70 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-200">Question image</span>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-100">
+                  {uploadingQuestionImage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                  Upload
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void uploadQuestionImage(file);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </label>
+              </div>
               <input
                 type="url"
                 value={formData.image_url}
-                onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="https://example.com/image.jpg"
+                onChange={(e) => setFormData((prev) => ({ ...prev, image_url: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                placeholder="https://question-image-url"
               />
+              {formData.image_url && <img src={formData.image_url} alt="Question" className="mt-4 max-h-64 w-full rounded-2xl object-contain" />}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Video className="w-4 h-4 inline mr-1" />
-                Video Explanation URL
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white">Options</h3>
+                <button type="button" onClick={addOption} className="rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-100">
+                  <Plus className="mr-1 inline h-3.5 w-3.5" />
+                  Add option
+                </button>
+              </div>
+              {options.map((option, index) => (
+                <div key={option.id} className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCorrectIndex(index)}
+                      className={`rounded-full border px-3 py-1 text-sm font-semibold ${
+                        correctIndex === index ? 'border-emerald-400 bg-emerald-500 text-white' : 'border-slate-600 text-slate-300'
+                      }`}
+                    >
+                      {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-100">
+                        <Upload className="h-3.5 w-3.5" />
+                        Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) void uploadOptionImage(option.id, file);
+                            e.currentTarget.value = '';
+                          }}
+                        />
+                      </label>
+                      {options.length > 2 && (
+                        <button type="button" onClick={() => removeOption(option.id)} className="rounded-xl p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-300">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <textarea
+                    value={option.text}
+                    onChange={(e) => updateOption(option.id, { text: e.target.value })}
+                    rows={2}
+                    className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                    placeholder="Option text"
+                  />
+                  {option.image_url ? (
+                    <img src={option.image_url} alt={`Option ${index + 1}`} className="mt-3 h-28 rounded-2xl object-cover" />
+                  ) : (
+                    <div className="mt-3 flex h-24 items-center justify-center rounded-2xl border border-dashed border-slate-700 text-slate-500">
+                      <ImageIcon className="mr-2 h-4 w-4" />
+                      Option image preview
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-200">Explanation</span>
+                <textarea value={formData.explanation} onChange={(e) => setFormData((prev) => ({ ...prev, explanation: e.target.value }))} rows={4} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" />
               </label>
-              <input
-                type="url"
-                value={formData.video_explanation_url}
-                onChange={(e) => setFormData({ ...formData, video_explanation_url: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="https://youtube.com/watch?v=..."
-              />
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-200">Video explanation URL</span>
+                  <input type="url" value={formData.video_explanation_url} onChange={(e) => setFormData((prev) => ({ ...prev, video_explanation_url: e.target.value }))} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-200">Tags</span>
+                  <input type="text" value={formData.tags} onChange={(e) => setFormData((prev) => ({ ...prev, tags: e.target.value }))} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" placeholder="rrb, image, mock" />
+                </label>
+                <label className="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-200">
+                  <input type="checkbox" checked={formData.is_draft} onChange={(e) => setFormData((prev) => ({ ...prev, is_draft: e.target.checked }))} />
+                  Save as draft
+                </label>
+              </div>
             </div>
           </div>
 
-          {/* Status */}
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={formData.is_draft}
-                onChange={(e) => setFormData({ ...formData, is_draft: e.target.checked })}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">Save as Draft</span>
-            </label>
-            {examId && (
-              <span className="text-sm text-green-600 font-medium">
-                Question will be added to exam: {examId}
-              </span>
-            )}
+          <div className="space-y-5">
+            <div className="rounded-3xl border border-slate-700 bg-slate-950/70 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-white">Student preview</h3>
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
+                  <div className="mb-2 text-xs text-slate-400">{formData.subject} • {formData.marks} mark(s)</div>
+                  <div className="text-sm text-white">{formData.question_text || 'Question preview'}</div>
+                  {formData.image_url && <img src={formData.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl object-contain" />}
+                </div>
+                {options.map((option, index) => (
+                  <div key={option.id} className={`rounded-2xl border p-3 ${index === correctIndex ? 'border-emerald-400/40 bg-emerald-500/10' : 'border-slate-700 bg-slate-900'}`}>
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600 text-xs font-semibold text-slate-200">
+                        {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-slate-100">{option.text || 'Option text'}</div>
+                        {option.image_url && <img src={option.image_url} alt={`Option ${index + 1}`} className="mt-2 max-h-28 rounded-xl object-cover" />}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-300">
+              <div className="mb-3 font-semibold text-white">Checklist</div>
+              <div className="space-y-2">
+                <div>{formData.exam_id ? '✓' : '•'} Exam selected</div>
+                <div>{formData.topic ? '✓' : '•'} Topic chosen</div>
+                <div>{formData.question_text.trim() || formData.image_url ? '✓' : '•'} Question content added</div>
+                <div>{options.filter((option) => option.text || option.image_url).length >= 2 ? '✓' : '•'} Enough options added</div>
+              </div>
+            </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+          <div className="sm:col-span-2 flex items-center justify-end gap-3 border-t border-slate-700 pt-2">
+            <button type="button" onClick={handleClose} className="rounded-2xl border border-slate-600 px-5 py-3 text-sm font-medium text-slate-200">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-            >
-              <Save className="w-4 h-4" />
-              <span>{loading ? 'Creating...' : 'Create Question'}</span>
+            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-70">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {loading ? 'Saving...' : 'Save question'}
             </button>
           </div>
         </form>

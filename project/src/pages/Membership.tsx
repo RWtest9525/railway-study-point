@@ -67,17 +67,6 @@ export function Membership() {
               </div>
               
               <div className={`${isDark ? 'bg-gray-700/30 border-gray-700/50' : 'bg-gray-50 border-gray-200'} rounded-2xl p-5 space-y-4 border`}>
-                {profile?.premium_started_at && (
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center shrink-0">
-                      <Calendar className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div>
-                      <span className={`${isDark ? 'text-gray-500' : 'text-gray-500'} block text-[10px] uppercase font-bold tracking-widest mb-0.5`}>Started On</span>
-                      <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{new Date(profile.premium_started_at).toLocaleDateString(undefined, { dateStyle: 'long' })}</span>
-                    </div>
-                  </div>
-                )}
                 {profile?.premium_until && (
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center shrink-0">

@@ -4,8 +4,6 @@ import { useRouter } from '../contexts/RouterContext';
 import { getExam, getQuestions, createAttempt, Question, Exam } from '../lib/firestore';
 import { Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 
 interface ExamInterfaceProps {
   examId: string;
@@ -31,6 +29,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [isFocused, setIsFocused] = useState(true);
   const [proctoringViolations, setProctoringViolations] = useState<string[]>([]);
+  const [activeSubject, setActiveSubject] = useState<string>('All');
 
   useEffect(() => {
     if (authLoading) return;
@@ -127,14 +126,19 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     
     // Calculate score and subject-wise analysis
     let score = 0;
+    let correctAnswers = 0;
     const subjectWiseScores: { [subject: string]: { correct: number; total: number } } = {};
     
     questions.forEach((question) => {
       const userAnswer = answers[question.id];
+      const answered = userAnswer !== undefined;
       const isCorrect = userAnswer === question.correct_index;
-      
-      if (isCorrect) {
+
+      if (answered && isCorrect) {
         score += question.marks || 1;
+        correctAnswers += 1;
+      } else if (answered && !isCorrect) {
+        score -= question.negative_marks ?? exam.negative_marking ?? 0;
       }
       
       if (!subjectWiseScores[question.subject]) {
@@ -150,17 +154,35 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       const attemptId = await createAttempt({
         user_id: profile.id,
         exam_id: examId,
-        answers: Object.entries(answers).map(([questionId, selectedOption]) => ({
-          questionId,
-          selectedOption,
-        })),
+        answers: questions.map((question) => {
+          const selectedOption = answers[question.id];
+          return {
+            questionId: question.id,
+            selectedOption: selectedOption ?? -1,
+            correctOption: question.correct_index,
+            is_correct: selectedOption === question.correct_index,
+            skipped: selectedOption === undefined,
+            question_text: question.question_text,
+            question_image_url: question.image_url,
+            option_text: question.options,
+            option_images: question.option_images,
+            option_label_style: question.option_label_style,
+            subject: question.subject,
+            marks: question.marks,
+            negative_marks: question.negative_marks ?? exam.negative_marking ?? 0,
+          };
+        }),
         score,
         total_questions: questions.length,
-        correct_answers: Object.values(answers).filter((answer, idx) => 
-          questions[idx]?.correct_index === answer
-        ).length,
+        correct_answers: correctAnswers,
         time_taken_seconds: timeTaken,
         started_at: new Date(startTime).toISOString(),
+        tab_switches: tabSwitchCount,
+        device_info: {
+          type: /Mobi|Android/i.test(window.navigator.userAgent) ? 'mobile' : 'desktop',
+          browser: window.navigator.userAgent,
+          os: window.navigator.platform,
+        },
         subject_wise_scores: subjectWiseScores,
       });
 
@@ -192,13 +214,16 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Group questions by subject for tabs
   const subjects = Array.from(new Set(questions.map(q => q.subject)));
-  const [activeSubject, setActiveSubject] = useState<string>('All');
 
   const filteredQuestions = activeSubject === 'All' 
     ? questions 
     : questions.filter(q => q.subject === activeSubject);
+
+  const getOptionLabel = (question: QuestionWithSubject | undefined, index: number) => {
+    const style = question?.option_label_style ?? 'alphabet';
+    return style === 'numeric' ? String(index + 1) : String.fromCharCode(65 + index);
+  };
 
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
@@ -300,6 +325,16 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                 {currentQuestion?.question_text}
               </h2>
 
+              {currentQuestion?.image_url && (
+                <div className={`mb-6 overflow-hidden rounded-2xl border ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
+                  <img
+                    src={currentQuestion.image_url}
+                    alt="Question"
+                    className="max-h-[28rem] w-full object-contain"
+                  />
+                </div>
+              )}
+
               <div className="space-y-3">
                 {currentQuestion?.options?.map((option, index) => (
                   <button
@@ -326,9 +361,18 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                           ? 'border-gray-500 text-gray-400'
                           : 'border-gray-400 text-gray-500'
                       }`}>
-                        {String.fromCharCode(65 + index)}
+                        {getOptionLabel(currentQuestion, index)}
                       </span>
-                      <span className="flex-1 pt-1">{option}</span>
+                      <div className="flex-1 pt-1">
+                        <div>{option}</div>
+                        {currentQuestion.option_images?.[index] && (
+                          <img
+                            src={currentQuestion.option_images[index]}
+                            alt={`Option ${index + 1}`}
+                            className="mt-3 max-h-44 rounded-xl object-contain"
+                          />
+                        )}
+                      </div>
                     </div>
                   </button>
                 ))}

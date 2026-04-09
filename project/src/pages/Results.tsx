@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
-import { getAttempt, getExam, getQuestions, QuizAttempt, Exam, Question } from '../lib/firestore';
+import { getAttempt, getAttemptsByExam, getExam, getQuestions, QuizAttempt, Exam, Question } from '../lib/firestore';
 import { Trophy, Clock, Target, CheckCircle, XCircle, ArrowLeft, BarChart3 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { BottomNav } from '../components/BottomNav';
@@ -22,6 +22,7 @@ export function Results({ resultId }: ResultsProps) {
   const [questions, setQuestions] = useState<QuestionWithSubject[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'analysis'>('overview');
+  const [examRank, setExamRank] = useState<number | null>(null);
 
   useEffect(() => {
     loadResultData();
@@ -38,6 +39,11 @@ export function Results({ resultId }: ResultsProps) {
 
       const questionsData = await getQuestions(attemptData.exam_id);
       setQuestions(questionsData as QuestionWithSubject[]);
+
+      const examAttempts = await getAttemptsByExam(attemptData.exam_id);
+      const rankedAttempts = [...examAttempts].sort((a, b) => b.score - a.score || a.time_taken_seconds - b.time_taken_seconds);
+      const rank = rankedAttempts.findIndex((entry) => entry.id === attemptData.id);
+      setExamRank(rank >= 0 ? rank + 1 : null);
     } catch (error) {
       console.error('Error loading result:', error);
       navigate('/dashboard');
@@ -73,13 +79,12 @@ export function Results({ resultId }: ResultsProps) {
     );
   }
 
-  const percentage = ((attempt.score / attempt.total_questions) * 100).toFixed(1);
+  const totalMarks = questions.reduce((sum, question) => sum + (question.marks || 1), 0) || attempt.total_questions;
+  const percentage = ((attempt.score / totalMarks) * 100).toFixed(1);
   const correctCount = attempt.correct_answers;
-  const wrongCount = attempt.total_questions - correctCount;
+  const skippedCount = attempt.answers.filter((answer) => answer.skipped || answer.selectedOption < 0).length;
+  const wrongCount = attempt.total_questions - correctCount - skippedCount;
   const userAnswers = attempt.answers;
-
-  // Build a map of questionId -> question for quick lookup
-  const questionMap = new Map(questions.map(q => [q.id, q]));
 
   // Subject-wise analysis
   const subjectAnalysis: { [subject: string]: { correct: number; total: number; percentage: number } } = {};
@@ -134,7 +139,7 @@ export function Results({ resultId }: ResultsProps) {
               </div>
               <div className={`flex items-center justify-center gap-1 text-xs sm:text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                 <Target className="w-4 h-4" />
-                Score
+                {attempt.score} / {totalMarks} marks
               </div>
             </div>
 
@@ -167,6 +172,15 @@ export function Results({ resultId }: ResultsProps) {
                 Time Taken
               </div>
             </div>
+
+            <div className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-50'} rounded-xl p-4 text-center`}>
+              <div className={`text-2xl sm:text-3xl font-bold mb-1 ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>
+                {skippedCount}
+              </div>
+              <div className={`text-xs sm:text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                Skipped
+              </div>
+            </div>
           </div>
 
           <div className="mt-6">
@@ -179,6 +193,14 @@ export function Results({ resultId }: ResultsProps) {
               />
             </div>
           </div>
+
+          {examRank && (
+            <div className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${
+              isDark ? 'border-amber-500/20 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-700'
+            }`}>
+              Rank in this exam: <span className="font-bold">#{examRank}</span>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -241,13 +263,14 @@ export function Results({ resultId }: ResultsProps) {
             {questions.map((question, index) => {
               const userAnswer = userAnswers.find(a => a.questionId === question.id);
               const isCorrect = userAnswer?.selectedOption === question.correct_index;
+              const isSkipped = !userAnswer || userAnswer.skipped || userAnswer.selectedOption < 0;
               const options = question.options;
 
               return (
                 <div
                   key={question.id}
                   className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-6 border-2 ${
-                    isCorrect ? 'border-green-500/50' : 'border-red-500/50'
+                    isSkipped ? 'border-slate-500/40' : isCorrect ? 'border-green-500/50' : 'border-red-500/50'
                   }`}
                 >
                   <div className="flex items-start gap-4">
@@ -272,6 +295,14 @@ export function Results({ resultId }: ResultsProps) {
                       <h3 className={`text-lg mb-4 leading-relaxed ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         {question.question_text}
                       </h3>
+
+                      {question.image_url && (
+                        <img
+                          src={question.image_url}
+                          alt={`Question ${index + 1}`}
+                          className="mb-4 max-h-80 w-full rounded-xl object-contain"
+                        />
+                      )}
 
                       <div className="space-y-2 mb-4">
                         {options.map((option, optIndex) => {
@@ -301,15 +332,24 @@ export function Results({ resultId }: ResultsProps) {
                                     ? 'border-gray-500 text-gray-400'
                                     : 'border-gray-400 text-gray-500'
                                 }`}>
-                                  {String.fromCharCode(65 + optIndex)}
+                                  {(question.option_label_style ?? 'alphabet') === 'numeric'
+                                    ? optIndex + 1
+                                    : String.fromCharCode(65 + optIndex)}
                                 </span>
-                                <span className={`flex-1 ${
+                                <div className={`flex-1 ${
                                   isCorrectAnswer || isUserAnswer
                                     ? isDark ? 'text-white' : 'text-gray-900'
                                     : isDark ? 'text-gray-400' : 'text-gray-500'
                                 }`}>
-                                  {option}
-                                </span>
+                                  <div>{option}</div>
+                                  {question.option_images?.[optIndex] && (
+                                    <img
+                                      src={question.option_images[optIndex]}
+                                      alt={`Option ${optIndex + 1}`}
+                                      className="mt-2 max-h-40 rounded-xl object-contain"
+                                    />
+                                  )}
+                                </div>
                                 {isCorrectAnswer && (
                                   <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
                                 )}
@@ -320,6 +360,20 @@ export function Results({ resultId }: ResultsProps) {
                             </div>
                           );
                         })}
+                      </div>
+
+                      <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                        isSkipped
+                          ? isDark ? 'border-slate-600 bg-slate-900/40 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-700'
+                          : isCorrect
+                          ? isDark ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-green-200 bg-green-50 text-green-700'
+                          : isDark ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-red-200 bg-red-50 text-red-700'
+                      }`}>
+                        {isSkipped
+                          ? 'You skipped this question.'
+                          : isCorrect
+                          ? `Correct. +${question.marks || 1} marks`
+                          : `Wrong. -${question.negative_marks ?? exam.negative_marking ?? 0} marks`}
                       </div>
 
                       {question.explanation && (

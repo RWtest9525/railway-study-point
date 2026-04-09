@@ -236,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, loadProfile]);
 
   const effectiveRole = useMemo(() => {
-    const role = getEffectiveRole(profile, user?.email);
+    const role = getEffectiveRole(profile, user?.email ?? undefined);
     return role;
   }, [profile, user?.email]);
 
