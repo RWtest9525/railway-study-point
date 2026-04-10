@@ -2,18 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useRouter } from '../../contexts/RouterContext';
 import {
   Category,
   CategoryNode,
-  Exam,
   createCategory,
   createCategoryNode,
   deleteCategory,
   deleteCategoryNode,
   getCategories,
   getCategoryNodes,
-  getExam,
   updateCategory,
   updateCategoryNode,
 } from '../../lib/firestore';
@@ -23,7 +20,6 @@ type QuestionMode = 'manual' | 'screenshot' | 'bulk';
 type StepItem = { entity: 'category' | 'node'; id: string; name: string; categoryId: string };
 
 export function QuestionHub() {
-  const { navigate } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
@@ -31,7 +27,6 @@ export function QuestionHub() {
   const [path, setPath] = useState<StepItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [stepLoading, setStepLoading] = useState(false);
-  const [linkedExam, setLinkedExam] = useState<Exam | null>(null);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
@@ -44,12 +39,10 @@ export function QuestionHub() {
   const selectedCategoryId = path.find((item) => item.entity === 'category')?.id || '';
   const selectedNode = path.length > 0 ? path[path.length - 1] : null;
   const currentNodeParent = path[path.length - 1]?.entity === 'node' ? path[path.length - 1].id : null;
-  const canCreateExamHere = path.length >= 1;
   const canAddQuestionHere = path.length >= 2;
 
   useEffect(() => {
     void loadCategories();
-    void loadExamContext();
   }, []);
 
   useEffect(() => {
@@ -77,7 +70,7 @@ export function QuestionHub() {
 
   const helperText = useMemo(() => {
     if (path.length === 0) return 'Select a category first.';
-    if (path.length === 1) return 'Add sub category here or create exam for this category.';
+    if (path.length === 1) return 'Add sub category here.';
     return 'Add folders here or open the question page linked to this folder.';
   }, [path.length]);
 
@@ -91,17 +84,6 @@ export function QuestionHub() {
       toast.error('Failed to load categories');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadExamContext = async () => {
-    const examId = new URLSearchParams(window.location.search).get('examId');
-    if (!examId) return;
-    try {
-      const exam = await getExam(examId);
-      setLinkedExam(exam);
-    } catch (error) {
-      console.error(error);
     }
   };
 
@@ -309,12 +291,6 @@ export function QuestionHub() {
   return (
     <div className={`${isDark ? 'bg-[#081018]' : 'bg-[#f7fafc]'} min-h-screen p-6`}>
       <div className="mx-auto max-w-5xl">
-        {linkedExam && (
-          <div className={`${isDark ? 'border-teal-500/30 bg-teal-500/10 text-teal-100' : 'border-teal-200 bg-teal-50 text-teal-700'} mb-5 rounded-3xl border px-5 py-4`}>
-            Linked exam: <span className="font-semibold">{linkedExam.title}</span>
-          </div>
-        )}
-
         <div className={`${isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'} rounded-[32px] border shadow-sm`}>
           <div className="flex flex-col gap-4 border-b border-inherit px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
@@ -351,16 +327,6 @@ export function QuestionHub() {
                 >
                   <Plus className="h-4 w-4" />
                   Add Question
-                </button>
-              )}
-              {canCreateExamHere && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/admin/exams?categoryId=${selectedCategoryId}`)}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Exam
                 </button>
               )}
               <button
@@ -404,8 +370,6 @@ export function QuestionHub() {
         isOpen={questionModalOpen}
         onClose={() => setQuestionModalOpen(false)}
         onSuccess={() => toast.success('Question saved')}
-        examId={linkedExam?.id}
-        examTitle={linkedExam?.title}
         categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
         linkedLabel={selectedNode?.name}
         initialMode={questionMode}

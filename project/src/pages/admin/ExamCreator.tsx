@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BarChart3, Camera, Clock, Download, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
+import { BarChart3, Clock, Download, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from '../../contexts/RouterContext';
@@ -32,7 +32,7 @@ export function ExamCreator() {
     instructions: '',
     attempt_limits: 1,
     partial_marking: false,
-    is_premium: false,
+    is_premium: true,
     is_active: true,
     is_private: false,
     pause_resume_enabled: false,
@@ -45,7 +45,7 @@ export function ExamCreator() {
   useEffect(() => {
     const categoryIdFromQuery = new URLSearchParams(window.location.search).get('categoryId');
     if (!categoryIdFromQuery) return;
-    setFormData((prev) => ({ ...prev, category_id: categoryIdFromQuery }));
+    setFormData((prev) => ({ ...prev, category_id: categoryIdFromQuery, is_premium: true }));
     setShowForm(true);
   }, []);
 
@@ -80,7 +80,7 @@ export function ExamCreator() {
       instructions: '',
       attempt_limits: 1,
       partial_marking: false,
-      is_premium: false,
+      is_premium: true,
       is_active: true,
       is_private: false,
       pause_resume_enabled: false,
@@ -161,7 +161,7 @@ export function ExamCreator() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Exam Creator</h1>
-          <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Create the exam first, then open its card to add manual or screenshot questions.</p>
+          <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Create scheduled exams for the lower exam section in the user panel.</p>
         </div>
         <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white">
           <Plus className="h-4 w-4" />
@@ -211,10 +211,6 @@ export function ExamCreator() {
 
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <button onClick={() => handleEdit(exam)} className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">Edit</button>
-                <button onClick={() => navigate(`/admin/questions?examId=${exam.id}`)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
-                  <Camera className="h-4 w-4" />
-                  Add Questions
-                </button>
                 <button onClick={() => navigate(`/admin/student-analytics?examId=${exam.id}`)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700">
                   <BarChart3 className="h-4 w-4" />
                   Results
@@ -239,7 +235,7 @@ export function ExamCreator() {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{editingId ? 'Edit exam' : 'Create exam'}</h2>
-                <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>After saving, use the exam card to open its question bank directly.</p>
+                <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Create the timed exam details here.</p>
               </div>
               <button onClick={resetForm} className={`rounded-2xl px-4 py-2 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Close</button>
             </div>
@@ -326,7 +322,6 @@ export function ExamCreator() {
                     {[
                       ['proctoring_enabled', 'Enable proctoring'],
                       ['is_private', 'Private exam'],
-                      ['is_premium', 'Premium exam'],
                       ['is_active', 'Visible to students'],
                     ].map(([key, label]) => (
                       <label key={key} className={`flex items-center gap-3 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
