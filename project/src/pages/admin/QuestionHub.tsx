@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Download, Import, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useRouter } from '../../contexts/RouterContext';
@@ -199,9 +199,15 @@ export function QuestionHub() {
     try {
       if (editingNode) {
         await updateCategoryNode(editingNode.id, { name: nodeName.trim() });
+        setPath((prev) => prev.map((item) => (item.id === editingNode.id ? { ...item, name: nodeName.trim() } : item)));
         setItems((prev) => prev.map((node) => (node.id === editingNode.id ? { ...node, name: nodeName.trim() } : node)));
         toast.success('Updated');
       } else {
+        const duplicateAncestor = path.some((item) => item.name.trim().toLowerCase() === nodeName.trim().toLowerCase());
+        if (duplicateAncestor) {
+          toast.error('This folder name is already used in the current path');
+          return;
+        }
         const createdId = await createCategoryNode({
           category_id: selectedCategoryId,
           parent_id: currentNodeParent,
@@ -332,7 +338,33 @@ export function QuestionHub() {
             </div>
 
             <div className="flex flex-wrap gap-3">
+              {canAddQuestionHere && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Add question inside "${selectedNode?.name}"?`)) {
+                      setQuestionMode('manual');
+                      setQuestionModalOpen(true);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Question
+                </button>
+              )}
+              {canCreateExamHere && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/admin/exams?categoryId=${selectedCategoryId}`)}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Exam
+                </button>
+              )}
               <button
+                type="button"
                 onClick={() => {
                   if (path.length === 0) {
                     openAddCategory();
@@ -349,27 +381,10 @@ export function QuestionHub() {
           </div>
 
           <div className="px-6 py-5">
-            {path.length > 0 && (
-              <div className="mb-5 flex flex-wrap items-center gap-2">
-                {path.map((item, index) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setPath(path.slice(0, index + 1));
-                      setItems([]);
-                    }}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${index === path.length - 1 ? 'bg-teal-600 text-white' : isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}
-                  >
-                    {item.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
             <div className="grid gap-4">
-              {loading || stepLoading ? (
-                <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
-                  Loading...
+                {loading || stepLoading ? (
+                  <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                    Loading...
                 </div>
               ) : (
                 renderCards()
@@ -379,54 +394,6 @@ export function QuestionHub() {
             {path.length > 0 && items.length === 0 && !loading && !stepLoading && (
               <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                 No child folders here yet. You can add a new one from the top button.
-              </div>
-            )}
-
-            {path.length > 0 && (
-              <div className="mt-5 space-y-5">
-                <div className={`rounded-3xl border p-5 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
-                  <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Current Selection</div>
-                  <div className={`mt-2 text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedNode?.name}</div>
-                  <div className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Use the buttons below for this selected field only.
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  {canCreateExamHere && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/exams?categoryId=${selectedCategoryId}`)}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Create Exam Here
-                    </button>
-                  )}
-                  {canAddQuestionHere && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm(`Add question inside "${selectedNode?.name}"?`)) {
-                        setQuestionMode('manual');
-                        setQuestionModalOpen(true);
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Question
-                  </button>
-                  )}
-                  <button type="button" onClick={() => toast('Import hook is ready here.')} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
-                    <Import className="h-4 w-4" />
-                    Import
-                  </button>
-                  <button type="button" onClick={() => toast('Export hook is ready here.')} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
-                    <Download className="h-4 w-4" />
-                    Export
-                  </button>
-                </div>
               </div>
             )}
           </div>
