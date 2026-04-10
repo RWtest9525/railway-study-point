@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from '../../contexts/RouterContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -39,7 +39,7 @@ import { DatabaseBackup } from '../../components/DatabaseBackup';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
-  const { navigate } = useRouter();
+  const { navigate, currentPath } = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<
     'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'leaderboard' | 'dashboard' | 'activity' | 'backup'
@@ -64,12 +64,39 @@ export function AdminPortal() {
     { id: 'leaderboard' as const, name: 'Leaderboard', icon: Trophy, desc: 'User Learning Stats' },
     { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
     { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
-    { id: 'activity' as const, name: 'Activity', icon: Activity, desc: 'System Logs' },
+    { id: 'activity' as const, name: 'Manage Admins', icon: Activity, desc: 'Admin Accounts & Logs' },
     { id: 'backup' as const, name: 'Backup', icon: Database, desc: 'Export Data' },
   ];
 
+  const tabRouteMap = useMemo(
+    () => ({
+      dashboard: '/admin-portal',
+      questions: '/admin/questions',
+      exams: '/admin/exams',
+      revenue: '/admin/revenue',
+      premium: '/admin/premium',
+      users: '/admin/users',
+      support: '/admin/support',
+      subscription: '/admin/subscription',
+      leaderboard: '/admin/leaderboard',
+      activity: '/admin/manage-admins',
+      backup: '/admin/backup',
+    }),
+    []
+  );
+
+  useEffect(() => {
+    const match = Object.entries(tabRouteMap).find(([, path]) => path === currentPath)?.[0] as typeof activeTab | undefined;
+    if (match) {
+      setActiveTab(match);
+    } else if (currentPath === '/admin' || currentPath === '/admin-portal') {
+      setActiveTab('dashboard');
+    }
+  }, [currentPath, tabRouteMap]);
+
   const handleTabClick = (tabId: typeof activeTab) => {
     setActiveTab(tabId);
+    navigate(tabRouteMap[tabId]);
   };
 
   return (
@@ -229,10 +256,10 @@ export function AdminPortal() {
             {/* Breadcrumbs */}
             <Breadcrumbs 
               items={[
-                { label: 'Admin Portal', onClick: () => setActiveTab('dashboard') },
-                { label: activeTab.charAt(0).toUpperCase() + activeTab.slice(1) }
+                { label: 'Admin Portal', onClick: () => handleTabClick('dashboard') },
+                { label: [...mainTabs, ...managementTabs].find((tab) => tab.id === activeTab)?.name || activeTab }
               ]}
-              onHome={() => setActiveTab('dashboard')}
+              onHome={() => handleTabClick('dashboard')}
             />
 
             {/* Dashboard Tab */}

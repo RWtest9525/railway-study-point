@@ -25,6 +25,7 @@ export function Upgrade() {
   const isDark = theme === 'dark';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [sdkReady, setSdkReady] = useState(false);
   const [pricePaise, setPricePaise] = useState(3900);
   const [validityDays, setValidityDays] = useState(365);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -33,6 +34,7 @@ export function Upgrade() {
   useEffect(() => {
     // Check if Razorpay is already loaded
     if (window.Razorpay) {
+      setSdkReady(true);
       return;
     }
 
@@ -42,12 +44,18 @@ export function Upgrade() {
     script.async = true;
     script.onload = () => {
       console.log('Razorpay SDK loaded successfully');
+      setSdkReady(true);
     };
     script.onerror = () => {
       console.error('Failed to load Razorpay SDK');
       setError('Failed to load payment gateway. Please check your internet connection.');
+      setSdkReady(false);
     };
     document.body.appendChild(script);
+
+    return () => {
+      script.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -93,7 +101,7 @@ export function Upgrade() {
 
     // 2. Script Verification
     const RazorpayConstructor = (window as any).Razorpay;
-    if (!RazorpayConstructor) {
+    if (!RazorpayConstructor || !sdkReady) {
       alert('Razorpay SDK not loaded. Please check your internet connection and reload the page.');
       setError('Razorpay SDK is not loaded. Please refresh the page.');
       return;
@@ -111,14 +119,15 @@ export function Upgrade() {
 
       // Create transaction record in Firestore
       const transactionRef = doc(collection(db, 'transactions'));
+      const planType = validityDays >= 365 ? 'yearly' : validityDays >= 30 ? 'monthly' : 'lifetime';
       await setDoc(transactionRef, {
         user_id: profile.id,
         amount: finalAmount,
         status: 'pending',
+        payment_method: 'razorpay',
+        plan_type: planType,
         created_at: serverTimestamp(),
       });
-
-      const transactionId = transactionRef.id;
 
       // 4. Reconstruct Options Object
       const options = {
@@ -137,6 +146,7 @@ export function Upgrade() {
             await updateDoc(transactionRef, {
               status: 'success',
               razorpay_payment_id: paymentId ?? null,
+              completed_at: new Date().toISOString(),
             });
 
             const newUntil = computePremiumUntil((profile as any).premium_until, validityDays);
@@ -171,16 +181,34 @@ export function Upgrade() {
           color: '#2563eb',
         },
         modal: {
-          ondismiss: () => {
+          ondismiss: async () => {
             console.log('Razorpay modal closed by user');
+            try {
+              await updateDoc(transactionRef, {
+                status: 'cancelled',
+                failure_reason: 'User closed Razorpay popup',
+                updated_at: new Date().toISOString(),
+              });
+            } catch (dismissError) {
+              console.error('Failed to mark transaction cancelled:', dismissError);
+            }
             setLoading(false);
           },
         },
       };
 
       const rzp = new RazorpayConstructor(options);
-      rzp.on('payment.failed', (response: any) => {
+      rzp.on('payment.failed', async (response: any) => {
         console.error('Payment failed:', response.error);
+        try {
+          await updateDoc(transactionRef, {
+            status: 'failed',
+            failure_reason: response.error?.description || 'Payment failed',
+            updated_at: new Date().toISOString(),
+          });
+        } catch (failureUpdateError) {
+          console.error('Failed to update failed transaction:', failureUpdateError);
+        }
         setError(`Payment failed: ${response.error.description}`);
         setLoading(false);
       });
@@ -283,10 +311,10 @@ export function Upgrade() {
             {/* CTA Button */}
             <button
               onClick={handleUpgrade}
-              disabled={loading || !settingsLoaded}
+              disabled={loading || !settingsLoaded || !sdkReady}
               className="w-full bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-yellow-500/30"
             >
-              {loading ? 'Processing…' : `Upgrade Now — ₹${displayRupees}`}
+              {loading ? 'Processing...' : !sdkReady ? 'Loading payment gateway...' : `Upgrade Now - ₹${displayRupees}`}
             </button>
 
             <p className={`text-center text-xs mt-3 flex items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>

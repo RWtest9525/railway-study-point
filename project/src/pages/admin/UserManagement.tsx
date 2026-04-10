@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Search, Shield, UserCheck, UserX, KeyRound } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth, db } from '../../lib/firebase';
 import { useTheme } from '../../contexts/ThemeContext';
-import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
-import { Search, Shield, UserCheck, UserX, Star, Calendar, Gift } from 'lucide-react';
 
-interface User {
+interface UserProfile {
   id: string;
   email: string;
   full_name: string;
   phone?: string;
   is_premium: boolean;
-  premium_until?: string;
+  premium_until?: string | null;
   role: 'admin' | 'student' | 'banned';
   created_at: string;
 }
@@ -18,229 +20,134 @@ interface User {
 export function UserManagement() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    loadUsers();
+    void loadUsers();
   }, []);
 
   const loadUsers = async () => {
+    setLoading(true);
     try {
-      const usersRef = collection(db, 'profiles');
-      const snapshot = await getDocs(usersRef);
-      const usersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-      setUsers(usersList);
+      const snapshot = await getDocs(collection(db, 'profiles'));
+      setUsers(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as UserProfile)));
     } catch (error) {
-      console.error('Error loading users:', error);
+      console.error(error);
+      toast.error('Failed to load users');
     } finally {
       setLoading(false);
     }
   };
 
-  const updateUserRole = async (userId: string, role: 'admin' | 'student' | 'banned') => {
-    try {
-      const userRef = doc(db, 'profiles', userId);
-      await updateDoc(userRef, { role });
-      loadUsers();
-    } catch (error) {
-      console.error('Error updating user role:', error);
-    }
-  };
-
-  const grantPremium = async (userId: string, days: number) => {
-    try {
-      const userRef = doc(db, 'profiles', userId);
-      const premiumUntil = new Date();
-      premiumUntil.setDate(premiumUntil.getDate() + days);
-      
-      await updateDoc(userRef, {
-        is_premium: true,
-        premium_until: premiumUntil.toISOString(),
-        updated_at: new Date().toISOString()
-      });
-      loadUsers();
-      alert(`Successfully granted ${days} days premium to user!`);
-    } catch (error) {
-      console.error('Error granting premium:', error);
-      alert('Error granting premium');
-    }
-  };
-
-  const revokePremium = async (userId: string) => {
-    try {
-      const userRef = doc(db, 'profiles', userId);
-      await updateDoc(userRef, {
-        is_premium: false,
-        premium_until: null,
-        updated_at: new Date().toISOString()
-      });
-      loadUsers();
-      alert('Successfully revoked premium from user!');
-    } catch (error) {
-      console.error('Error revoking premium:', error);
-      alert('Error revoking premium');
-    }
-  };
-
-  const getPremiumStatus = (user: User) => {
-    if (!user.is_premium) return { status: 'Free', color: 'text-gray-400' };
-    
-    if (user.premium_until) {
-      const expiryDate = new Date(user.premium_until);
-      const now = new Date();
-      const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (daysLeft <= 0) {
-        return { status: 'Expired', color: 'text-red-400' };
-      } else {
-        return { status: `Active (${daysLeft} days left)`, color: 'text-green-400' };
-      }
-    }
-    
-    return { status: 'Active (Lifetime)', color: 'text-green-400' };
-  };
-
-  const filteredUsers = users.filter(user => 
-    user.email?.toLowerCase().includes(search.toLowerCase()) ||
-    user.full_name?.toLowerCase().includes(search.toLowerCase())
+  const filteredUsers = useMemo(
+    () =>
+      users.filter((user) =>
+        `${user.full_name} ${user.email}`.toLowerCase().includes(search.toLowerCase())
+      ),
+    [users, search]
   );
 
+  const updateRole = async (user: UserProfile, role: 'admin' | 'student' | 'banned') => {
+    const actionLabel =
+      role === 'admin' ? 'make admin' : role === 'banned' ? 'ban' : 'restore';
+    if (!confirm(`Confirm ${actionLabel} for ${user.full_name || user.email}?`)) return;
+    await updateDoc(doc(db, 'profiles', user.id), {
+      role,
+      updated_at: new Date().toISOString(),
+    });
+    await loadUsers();
+    toast.success(`User updated: ${actionLabel}`);
+  };
+
+  const sendResetLink = async (user: UserProfile) => {
+    if (!confirm(`Send a password reset email to ${user.email}?`)) return;
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      toast.success('Password reset email sent');
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not send reset email');
+    }
+  };
+
   if (loading) {
-    return <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading...</div>;
+    return <div className={`py-10 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Loading users...</div>;
   }
 
   return (
     <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>User Management</h1>
-          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Manage users and permissions</p>
-        </div>
-      </div>
-
       <div className="mb-6">
-        <div className="relative">
-          <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
-          <input
-            type="text"
-            placeholder="Search users by email or name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={`w-full pl-10 pr-4 py-3 rounded-lg border ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'}`}
-          />
-        </div>
+        <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>User Management</h1>
+        <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Manage roles, access state, and password reset help from one place. Premium gifting is handled in the subscription tab.</p>
       </div>
 
-      <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border overflow-hidden`}>
-        <table className="w-full">
-          <thead className={`${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+      <label className="relative mb-6 block">
+        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or email"
+          className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm ${isDark ? 'border-gray-700 bg-gray-800 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+        />
+      </label>
+
+      <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} overflow-x-auto rounded-3xl border shadow-sm`}>
+        <table className="min-w-full">
+          <thead className={isDark ? 'bg-gray-900/70' : 'bg-gray-50'}>
             <tr>
-              <th className={`px-6 py-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>User</th>
-              <th className={`px-6 py-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Email</th>
-              <th className={`px-6 py-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Role</th>
-              <th className={`px-6 py-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Premium</th>
-              <th className={`px-6 py-3 text-right text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Actions</th>
+              {['User', 'Role', 'Premium', 'Joined', 'Actions'].map((head) => (
+                <th key={head} className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{head}</th>
+              ))}
             </tr>
           </thead>
           <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
             {filteredUsers.map((user) => (
-              <tr key={user.id} className={`hover:${isDark ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
-                <td className="px-6 py-4">
-                  <div className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{user.full_name || 'N/A'}</div>
+              <tr key={user.id} className={isDark ? 'hover:bg-gray-900/40' : 'hover:bg-gray-50'}>
+                <td className="px-4 py-4">
+                  <div className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{user.full_name || 'N/A'}</div>
+                  <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{user.email}</div>
                 </td>
-                <td className={`px-6 py-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{user.email}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                    user.role === 'admin' 
-                      ? 'bg-purple-600/20 text-purple-400' 
+                <td className="px-4 py-4">
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    user.role === 'admin'
+                      ? 'bg-purple-100 text-purple-700'
                       : user.role === 'banned'
-                      ? 'bg-red-600/20 text-red-400'
-                      : 'bg-blue-600/20 text-blue-400'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-blue-100 text-blue-700'
                   }`}>
                     {user.role}
                   </span>
                 </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col gap-1">
-                    <span className={`text-sm ${getPremiumStatus(user).color}`}>
-                      {getPremiumStatus(user).status}
-                    </span>
-                    {user.premium_until && user.is_premium && (
-                      <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                        Expires: {new Date(user.premium_until).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
+                <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {user.is_premium ? `Active until ${user.premium_until ? new Date(user.premium_until).toLocaleDateString() : 'lifetime'}` : 'Free'}
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2">
-                    {/* Premium Management */}
-                    {user.role !== 'banned' && user.role !== 'admin' && (
-                      <>
-                        {!user.is_premium ? (
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => grantPremium(user.id, 7)}
-                              className="text-yellow-400 hover:text-yellow-300 p-2"
-                              title="Grant 7 Days Premium"
-                            >
-                              <Gift className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => grantPremium(user.id, 30)}
-                              className="text-yellow-400 hover:text-yellow-300 p-2"
-                              title="Grant 1 Month Premium"
-                            >
-                              <Calendar className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => grantPremium(user.id, 365)}
-                              className="text-yellow-400 hover:text-yellow-300 p-2"
-                              title="Grant 1 Year Premium"
-                            >
-                              <Star className="w-5 h-5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => revokePremium(user.id)}
-                            className="text-red-400 hover:text-red-300 p-2"
-                            title="Revoke Premium"
-                          >
-                            <UserX className="w-5 h-5" />
-                          </button>
-                        )}
-                      </>
-                    )}
-                    
-                    {/* Role Management */}
+                <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button onClick={() => void sendResetLink(user)} className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                      <KeyRound className="h-3.5 w-3.5" />
+                      Reset password
+                    </button>
                     {user.role !== 'admin' && (
-                      <button
-                        onClick={() => updateUserRole(user.id, 'admin')}
-                        className="text-purple-400 hover:text-purple-300 p-2"
-                        title="Make Admin"
-                      >
-                        <Shield className="w-5 h-5" />
+                      <button onClick={() => void updateRole(user, 'admin')} className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700">
+                        <Shield className="h-3.5 w-3.5" />
+                        Make admin
                       </button>
                     )}
                     {user.role !== 'banned' && user.role !== 'admin' && (
-                      <button
-                        onClick={() => updateUserRole(user.id, 'banned')}
-                        className="text-red-400 hover:text-red-300 p-2"
-                        title="Ban User"
-                      >
-                        <UserX className="w-5 h-5" />
+                      <button onClick={() => void updateRole(user, 'banned')} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                        <UserX className="h-3.5 w-3.5" />
+                        Ban
                       </button>
                     )}
                     {user.role === 'banned' && (
-                      <button
-                        onClick={() => updateUserRole(user.id, 'student')}
-                        className="text-green-400 hover:text-green-300 p-2"
-                        title="Unban User"
-                      >
-                        <UserCheck className="w-5 h-5" />
+                      <button onClick={() => void updateRole(user, 'student')} className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">
+                        <UserCheck className="h-3.5 w-3.5" />
+                        Restore
                       </button>
                     )}
                   </div>

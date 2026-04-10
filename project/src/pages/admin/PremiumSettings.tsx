@@ -1,8 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
-import { doc, getDoc, updateDoc, collection, setDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { useEffect, useMemo, useState } from 'react';
 import { Crown, Save } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { useTheme } from '../../contexts/ThemeContext';
+
+const unitToDays = (count: number, unit: 'days' | 'months' | 'years') => {
+  if (unit === 'years') return count * 365;
+  if (unit === 'months') return count * 30;
+  return count;
+};
+
+const daysToBestUnit = (days: number) => {
+  if (days % 365 === 0) return { count: Math.max(1, days / 365), unit: 'years' as const };
+  if (days % 30 === 0) return { count: Math.max(1, days / 30), unit: 'months' as const };
+  return { count: Math.max(1, days), unit: 'days' as const };
+};
 
 export function PremiumSettings() {
   const { theme } = useTheme();
@@ -10,11 +23,12 @@ export function PremiumSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pricePaise, setPricePaise] = useState(3900);
-  const [validityDays, setValidityDays] = useState(365);
+  const [validityCount, setValidityCount] = useState(12);
+  const [validityUnit, setValidityUnit] = useState<'days' | 'months' | 'years'>('months');
   const [popupInterval, setPopupInterval] = useState(60);
 
   useEffect(() => {
-    loadSettings();
+    void loadSettings();
   }, []);
 
   const loadSettings = async () => {
@@ -24,153 +38,125 @@ export function PremiumSettings() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.premium_price_paise) setPricePaise(data.premium_price_paise);
-        if (data.premium_validity_days) setValidityDays(data.premium_validity_days);
+        if (data.premium_validity_days) {
+          const best = daysToBestUnit(data.premium_validity_days);
+          setValidityCount(best.count);
+          setValidityUnit(best.unit);
+        }
         if (data.trial_nudge_interval_seconds) setPopupInterval(data.trial_nudge_interval_seconds);
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error(error);
+      toast.error('Failed to load premium settings');
     } finally {
       setLoading(false);
     }
   };
 
+  const validityDays = useMemo(() => unitToDays(validityCount, validityUnit), [validityCount, validityUnit]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      const docRef = doc(db, 'site_settings', '1');
-      await updateDoc(docRef, {
+      const payload = {
         premium_price_paise: pricePaise,
         premium_validity_days: validityDays,
         trial_nudge_interval_seconds: popupInterval,
         updated_at: new Date().toISOString(),
-      });
-      alert('Settings saved successfully!');
-    } catch (error: any) {
-      if (error.code === 'not-found') {
-        // Create the document if it doesn't exist
-        await setDoc(doc(collection(db, 'site_settings'), '1'), {
-          premium_price_paise: pricePaise,
-          premium_validity_days: validityDays,
-          trial_nudge_interval_seconds: popupInterval,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        alert('Settings created successfully!');
+      };
+      const docRef = doc(db, 'site_settings', '1');
+      const snapshot = await getDoc(docRef);
+      if (snapshot.exists()) {
+        await updateDoc(docRef, payload);
       } else {
-        console.error('Error saving settings:', error);
-        alert('Error saving settings');
+        await setDoc(docRef, { ...payload, created_at: new Date().toISOString() });
       }
+      toast.success('Premium settings saved');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save premium settings');
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading...</div>;
+    return <div className={`py-10 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Loading premium settings...</div>;
   }
 
   return (
     <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
       <div className="mb-6">
-        <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Premium Settings</h1>
-        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Configure premium pricing and validity</p>
+        <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Premium Configuration</h1>
+        <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Define how much premium costs and exactly when access expires after purchase.</p>
       </div>
 
-      <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl border p-6 max-w-lg`}>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-yellow-600/20 flex items-center justify-center">
-            <Crown className="w-6 h-6 text-yellow-500" />
+      <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} max-w-3xl rounded-3xl border p-6 shadow-sm`}>
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+            <Crown className="h-6 w-6" />
           </div>
           <div>
-            <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Pricing Configuration</h2>
-            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Set premium subscription details</p>
+            <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Membership plan</h2>
+            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Premium expiry will be calculated from the user purchase date plus the period below.</p>
           </div>
         </div>
 
         <div className="space-y-6">
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-              Premium Price (₹)
-            </label>
+          <label className="block">
+            <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Premium price</span>
             <div className="relative">
-              <span className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>₹</span>
+              <span className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>₹</span>
               <input
                 type="number"
                 value={pricePaise / 100}
-                onChange={(e) => setPricePaise(Math.round(parseFloat(e.target.value) * 100))}
-                className={`w-full pl-8 pr-4 py-3 rounded-lg border ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                onChange={(e) => setPricePaise(Math.round((Number(e.target.value) || 0) * 100))}
+                className={`w-full rounded-2xl border py-3 pl-9 pr-4 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
               />
             </div>
-            <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-              Current price: ₹{(pricePaise / 100).toFixed(2)}
+          </label>
+
+          <div>
+            <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Premium validity</span>
+            <div className="grid gap-4 md:grid-cols-[160px_1fr]">
+              <input
+                type="number"
+                min="1"
+                value={validityCount}
+                onChange={(e) => setValidityCount(Math.max(1, Number(e.target.value) || 1))}
+                className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+              />
+              <select
+                value={validityUnit}
+                onChange={(e) => setValidityUnit(e.target.value as 'days' | 'months' | 'years')}
+                className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+              >
+                <option value="days">Days</option>
+                <option value="months">Months</option>
+                <option value="years">Years</option>
+              </select>
+            </div>
+            <p className={`mt-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+              Effective validity: {validityDays} day(s). Example: if a user buys on April 10, expiry is purchase date + {validityDays} days.
             </p>
           </div>
 
-           <div>
-             <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-               Premium Validity Period
-             </label>
-             <div className="grid grid-cols-3 gap-3 mb-3">
-               <div>
-                 <label className={`block text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Days</label>
-                 <input
-                   type="number"
-                   value={validityDays}
-                   onChange={(e) => setValidityDays(parseInt(e.target.value) || 0)}
-                   className={`w-full px-3 py-2 rounded-lg border ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-                   placeholder="0"
-                 />
-               </div>
-               <div>
-                 <label className={`block text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Months</label>
-                 <input
-                   type="number"
-                   value={Math.floor(validityDays / 30)}
-                   onChange={(e) => setValidityDays((parseInt(e.target.value) || 0) * 30)}
-                   className={`w-full px-3 py-2 rounded-lg border ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-                   placeholder="0"
-                 />
-               </div>
-               <div>
-                 <label className={`block text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Years</label>
-                 <input
-                   type="number"
-                   value={Math.floor(validityDays / 365)}
-                   onChange={(e) => setValidityDays((parseInt(e.target.value) || 0) * 365)}
-                   className={`w-full px-3 py-2 rounded-lg border ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-                   placeholder="0"
-                 />
-               </div>
-             </div>
-             <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-               Users get access for {validityDays} days ({Math.floor(validityDays/365)} years, {Math.floor((validityDays%365)/30)} months, {validityDays%30} days) after purchase
-             </p>
-           </div>
+          <label className="block">
+            <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Upgrade popup interval</span>
+            <input
+              type="number"
+              min="10"
+              max="3600"
+              value={popupInterval}
+              onChange={(e) => setPopupInterval(Math.max(10, Number(e.target.value) || 10))}
+              className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+            />
+            <p className={`mt-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Controls how often the upgrade reminder appears for non-premium users.</p>
+          </label>
 
-           <div>
-             <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-               Premium Delay Popup Timer (Seconds)
-             </label>
-             <input
-               type="number"
-               value={popupInterval}
-               onChange={(e) => setPopupInterval(parseInt(e.target.value) || 0)}
-               min="10"
-               max="3600"
-               className={`w-full px-4 py-3 rounded-lg border ${isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-             />
-             <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-               Popup appears every {popupInterval} seconds (min: 10s, max: 3600s)
-             </p>
-           </div>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
-          >
-            <Save className="w-5 h-5" />
-            {saving ? 'Saving...' : 'Save Settings'}
+          <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-70">
+            <Save className="h-4 w-4" />
+            {saving ? 'Saving...' : 'Save premium settings'}
           </button>
         </div>
       </div>

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Shield, Trash2, Plus, Edit, LogIn, Download, AlertCircle } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useEffect, useState } from 'react';
+import { AlertCircle, Download, Edit, LogIn, Plus, Shield, Trash2 } from 'lucide-react';
+import { collection, getDocs, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface LogEntry {
   id: string;
@@ -11,6 +11,13 @@ interface LogEntry {
   adminName: string;
   timestamp: Date;
   type: 'delete' | 'create' | 'edit' | 'login' | 'export' | 'warning';
+}
+
+interface AdminProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  created_at?: string;
 }
 
 const iconMap = {
@@ -35,89 +42,81 @@ export function ActivityLogs() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [admins, setAdmins] = useState<AdminProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'activityLogs'),
-      orderBy('timestamp', 'desc'),
-      limit(50)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setLogs(snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate() || new Date(),
-      })) as LogEntry[]);
+    const logsQuery = query(collection(db, 'activityLogs'), orderBy('timestamp', 'desc'), limit(30));
+    const unsubscribe = onSnapshot(logsQuery, (snapshot) => {
+      setLogs(
+        snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+          timestamp: item.data().timestamp?.toDate() || new Date(),
+        })) as LogEntry[]
+      );
       setLoading(false);
     });
-    return () => unsub();
+
+    void getDocs(query(collection(db, 'profiles'), where('role', '==', 'admin'))).then((snapshot) => {
+      setAdmins(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as AdminProfile)));
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleString('en-IN', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
+  const formatTime = (date: Date) =>
+    date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
-  };
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-purple-500/10 rounded-xl flex items-center justify-center">
-          <Shield className="w-5 h-5 text-purple-500" />
-        </div>
-        <div>
-          <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            System Activity Logs
-          </h2>
-          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-            Track all admin actions
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Manage Admins</h2>
+        <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>See every admin account and the latest admin-side activity together.</p>
       </div>
 
-      <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border shadow-lg overflow-hidden`}>
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="animate-pulse space-y-4">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className={`h-16 rounded-xl ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`} />
-              ))}
+      <div className="grid gap-4 md:grid-cols-3">
+        {admins.map((admin) => (
+          <div key={admin.id} className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} rounded-3xl border p-5 shadow-sm`}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">
+                <Shield className="h-5 w-5" />
+              </div>
+              <div>
+                <div className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{admin.full_name || 'Admin'}</div>
+                <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{admin.email}</div>
+              </div>
+            </div>
+            <div className={`mt-3 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+              Joined: {admin.created_at ? new Date(admin.created_at).toLocaleDateString() : 'Unknown'}
             </div>
           </div>
+        ))}
+      </div>
+
+      <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} rounded-3xl border shadow-sm overflow-hidden`}>
+        {loading ? (
+          <div className={`p-8 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Loading admin activity...</div>
         ) : logs.length === 0 ? (
-          <div className="p-12 text-center">
-            <Shield className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-            <p className={`font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              No activity logs yet
-            </p>
-            <p className={`text-sm mt-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
-              Admin actions will appear here automatically
-            </p>
-          </div>
+          <div className={`p-8 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No admin activity logs yet.</div>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          <div className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
             {logs.map((log) => (
-              <div key={log.id} className={`flex items-start gap-4 p-4 hover:${isDark ? 'bg-gray-700/30' : 'bg-gray-50'} transition`}>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${colorMap[log.type]}`}>
-                  {iconMap[log.type]}
+              <div key={log.id} className={`flex items-start gap-4 p-4 ${isDark ? 'hover:bg-gray-900/40' : 'hover:bg-gray-50'}`}>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${colorMap[log.type]}`}>{iconMap[log.type]}</div>
+                <div className="min-w-0 flex-1">
+                  <div className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{log.action}</div>
+                  <div className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{log.detail}</div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    {log.action}
-                  </p>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {log.detail}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className={`text-xs font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    {log.adminName}
-                  </p>
-                  <p className={`text-xs ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
-                    {formatTime(log.timestamp)}
-                  </p>
+                <div className="text-right">
+                  <div className={`text-xs font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{log.adminName}</div>
+                  <div className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{formatTime(log.timestamp)}</div>
                 </div>
               </div>
             ))}
@@ -126,20 +125,4 @@ export function ActivityLogs() {
       </div>
     </div>
   );
-}
-
-export async function logActivity(
-  action: string,
-  detail: string,
-  adminName: string,
-  type: LogEntry['type']
-) {
-  try {
-    await addDoc(collection(db, 'activityLogs'), {
-      action, detail, adminName, type,
-      timestamp: serverTimestamp(),
-    });
-  } catch (e) {
-    console.error('Failed to log activity:', e);
-  }
 }

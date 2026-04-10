@@ -1,778 +1,566 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { deleteQuestion, getAllQuestions, getQuestions, Question, updateQuestion } from '../../lib/firestore';
-import { 
-  Search, Filter, Plus, Folder, FileText, Tag, 
-  Clock, Eye, Edit, Trash2, ChevronRight, ChevronDown,
-  ChevronUp, CheckCircle, XCircle, AlertTriangle,
-  Download, Upload, RefreshCw, LayoutList, LayoutGrid,
-  Check, X, Calendar, Users, TrendingUp, DollarSign
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Download,
+  Eye,
+  FolderPlus,
+  ImagePlus,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
 } from 'lucide-react';
-import { AddQuestionModal } from '../../components/AddQuestionModal';
 import toast from 'react-hot-toast';
+import { useTheme } from '../../contexts/ThemeContext';
+import {
+  Category,
+  Exam,
+  Question,
+  createCategory,
+  deleteCategory,
+  getAllQuestions,
+  getExams,
+  getQuestions,
+  subscribeToCategories,
+  updateCategory,
+  updateQuestion,
+  deleteQuestion,
+} from '../../lib/firestore';
+import { AddQuestionModal } from '../../components/AddQuestionModal';
+
+type ModalMode = 'manual' | 'screenshot' | 'bulk';
 
 interface EnhancedQuestion extends Question {
-  topic?: string;
-  subtopic?: string;
-  difficulty?: 'easy' | 'medium' | 'hard';
-  tags?: string[];
-  image_url?: string;
-  option_images?: string[];
-  video_explanation_url?: string;
-  is_draft?: boolean;
-  version?: number;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  subjects: Subject[];
-}
-
-interface Subject {
-  id: string;
-  name: string;
-  topics: Topic[];
-}
-
-interface Topic {
-  id: string;
-  name: string;
+  examTitle?: string;
+  categoryName?: string;
 }
 
 export function QuestionHub() {
-  const { profile } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [questions, setQuestions] = useState<EnhancedQuestion[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  
-  // Get examId from URL query params
-  const urlParams = new URLSearchParams(window.location.search);
-  const examId = urlParams.get('examId');
-  
-  // Navigation State
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedSubject, setSelectedSubject] = useState<string>('');
-  const [selectedTopic, setSelectedTopic] = useState<string>('');
-  
-  // View State
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [sortBy, setSortBy] = useState<'created_at' | 'subject' | 'difficulty' | 'status'>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  
-  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [difficultyFilter, setDifficultyFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [tagsFilter, setTagsFilter] = useState<string>('');
-  
-  // Selection State
-  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-  
-  // Categories Structure
-  const categories: Category[] = [
-    {
-      id: 'rrb',
-      name: 'RRB Exams',
-      subjects: [
-        {
-          id: 'maths',
-          name: 'Mathematics',
-          topics: [
-            { id: 'algebra', name: 'Algebra' },
-            { id: 'geometry', name: 'Geometry' },
-            { id: 'trigonometry', name: 'Trigonometry' },
-            { id: 'calculus', name: 'Calculus' }
-          ]
-        },
-        {
-          id: 'reasoning',
-          name: 'Reasoning',
-          topics: [
-            { id: 'verbal', name: 'Verbal Reasoning' },
-            { id: 'non-verbal', name: 'Non-Verbal Reasoning' },
-            { id: 'logical', name: 'Logical Reasoning' }
-          ]
-        },
-        {
-          id: 'science',
-          name: 'General Science',
-          topics: [
-            { id: 'physics', name: 'Physics' },
-            { id: 'chemistry', name: 'Chemistry' },
-            { id: 'biology', name: 'Biology' }
-          ]
-        },
-        {
-          id: 'gk',
-          name: 'General Knowledge',
-          topics: [
-            { id: 'current-affairs', name: 'Current Affairs' },
-            { id: 'history', name: 'History' },
-            { id: 'geography', name: 'Geography' },
-            { id: 'polity', name: 'Polity' }
-          ]
-        }
-      ]
-    },
-    {
-      id: 'ssc',
-      name: 'SSC Exams',
-      subjects: [
-        {
-          id: 'english',
-          name: 'English',
-          topics: [
-            { id: 'grammar', name: 'Grammar' },
-            { id: 'vocabulary', name: 'Vocabulary' },
-            { id: 'comprehension', name: 'Comprehension' }
-          ]
-        },
-        {
-          id: 'quantitative',
-          name: 'Quantitative Aptitude',
-          topics: [
-            { id: 'arithmetic', name: 'Arithmetic' },
-            { id: 'data-interpretation', name: 'Data Interpretation' }
-          ]
-        }
-      ]
-    }
-  ];
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedExamId, setSelectedExamId] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedTopic, setSelectedTopic] = useState('');
+  const [selectedSubtopic, setSelectedSubtopic] = useState('');
+  const [difficultyFilter, setDifficultyFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [modalMode, setModalMode] = useState<ModalMode>('manual');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [categoryFormOpen, setCategoryFormOpen] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    description: '',
+    color: '#2563eb',
+    iconUrl: '',
+    is_active: true,
+  });
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const examIdFromQuery = urlParams.get('examId') || '';
 
   useEffect(() => {
-    loadQuestions();
+    const unsubscribe = subscribeToCategories((cats) => setCategories(cats));
+    return () => unsubscribe();
   }, []);
 
-  const loadQuestions = async () => {
+  useEffect(() => {
+    setSelectedExamId(examIdFromQuery);
+    void loadData(examIdFromQuery);
+  }, [examIdFromQuery]);
+
+  const loadData = async (examId?: string) => {
     setLoading(true);
-    setError('');
     try {
-      const allQuestions = examId ? await getQuestions(examId) : await getAllQuestions();
-      setQuestions(allQuestions as EnhancedQuestion[]);
-    } catch (error: any) {
-      console.error('Error loading questions:', error);
-      setError('Failed to load questions. Please check your database connection and try again.');
-      setQuestions([]);
+      const [allExams, allQuestions] = await Promise.all([
+        getExams(undefined, true),
+        examId ? getQuestions(examId) : getAllQuestions(),
+      ]);
+
+      const examMap = new Map(allExams.map((exam) => [exam.id, exam]));
+      const categoryMap = new Map(categories.map((category) => [category.id, category]));
+
+      setExams(allExams);
+      setQuestions(
+        (allQuestions as EnhancedQuestion[]).map((question) => {
+          const exam = examMap.get(question.exam_id);
+          return {
+            ...question,
+            examTitle: exam?.title,
+            categoryName: categoryMap.get(exam?.category_id || '')?.name || exam?.category_id,
+          };
+        })
+      );
+    } catch (error) {
+      console.error('Error loading question hub:', error);
+      toast.error('Failed to load question hub data');
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter questions based on current selection
-  const filteredQuestions = questions.filter(q => {
-    if (selectedCategory && q.subject) {
-      const category = categories.find(c => c.subjects.some(s => s.id === q.subject));
-      if (!category || category.id !== selectedCategory) return false;
-    }
-    if (selectedSubject && q.subject !== selectedSubject) return false;
-    if (selectedTopic && q.topic !== selectedTopic) return false;
-    if (searchQuery && !q.question_text.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (difficultyFilter && q.difficulty !== difficultyFilter) return false;
-    if (statusFilter) {
-      if (statusFilter === 'live' && q.is_draft) return false;
-      if (statusFilter === 'draft' && !q.is_draft) return false;
-    }
-    if (tagsFilter && q.tags && !q.tags.some(tag => tag.toLowerCase().includes(tagsFilter.toLowerCase()))) return false;
-    return true;
-  }).sort((a, b) => {
-    let aVal: any = '';
-    let bVal: any = '';
-    switch (sortBy) {
-      case 'created_at':
-        aVal = a.created_at || new Date(0);
-        bVal = b.created_at || new Date(0);
-        break;
-      case 'subject':
-        aVal = a.subject || '';
-        bVal = b.subject || '';
-        break;
-      case 'difficulty':
-        aVal = a.difficulty || '';
-        bVal = b.difficulty || '';
-        break;
-      case 'status':
-        aVal = a.is_draft ? 'Draft' : 'Live';
-        bVal = b.is_draft ? 'Draft' : 'Live';
-        break;
-    }
-    const comparison = String(aVal).localeCompare(String(bVal));
-    return sortOrder === 'asc' ? comparison : -comparison;
-  });
-
-  const getCurrentPath = () => {
-    const path = [];
-    if (selectedCategory) {
-      const category = categories.find(c => c.id === selectedCategory);
-      if (category) path.push(category.name);
-      if (selectedSubject) {
-        const subject = category?.subjects.find(s => s.id === selectedSubject);
-        if (subject) path.push(subject.name);
-        if (selectedTopic) {
-          const topic = subject?.topics.find(t => t.id === selectedTopic);
-          if (topic) path.push(topic.name);
-        }
-      }
-    }
-    return path;
-  };
-
-  const handleSelectAll = () => {
-    if (selectAll) {
-      setSelectedQuestions([]);
-    } else {
-      setSelectedQuestions(filteredQuestions.map(q => q.id));
-    }
-    setSelectAll(!selectAll);
-  };
-
-  const handleQuestionSelect = (questionId: string) => {
-    setSelectedQuestions(prev => 
-      prev.includes(questionId)
-        ? prev.filter(id => id !== questionId)
-        : [...prev, questionId]
+  useEffect(() => {
+    if (exams.length === 0) return;
+    setQuestions((prev) =>
+      prev.map((question) => {
+        const exam = exams.find((item) => item.id === question.exam_id);
+        return {
+          ...question,
+          examTitle: exam?.title,
+          categoryName: categories.find((category) => category.id === exam?.category_id)?.name || exam?.category_id,
+        };
+      })
     );
+  }, [categories, exams]);
+
+  const visibleExams = useMemo(
+    () => (selectedCategoryId ? exams.filter((exam) => exam.category_id === selectedCategoryId) : exams),
+    [exams, selectedCategoryId]
+  );
+
+  const subjects = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          questions
+            .filter((question) => !selectedExamId || question.exam_id === selectedExamId)
+            .map((question) => question.subject)
+            .filter(Boolean)
+        )
+      ),
+    [questions, selectedExamId]
+  );
+
+  const topics = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          questions
+            .filter((question) => (!selectedExamId || question.exam_id === selectedExamId) && (!selectedSubject || question.subject === selectedSubject))
+            .map((question) => question.topic)
+            .filter(Boolean)
+        )
+      ) as string[],
+    [questions, selectedExamId, selectedSubject]
+  );
+
+  const subtopics = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          questions
+            .filter(
+              (question) =>
+                (!selectedExamId || question.exam_id === selectedExamId) &&
+                (!selectedSubject || question.subject === selectedSubject) &&
+                (!selectedTopic || question.topic === selectedTopic)
+            )
+            .map((question) => question.subtopic)
+            .filter(Boolean)
+        )
+      ) as string[],
+    [questions, selectedExamId, selectedSubject, selectedTopic]
+  );
+
+  const filteredQuestions = useMemo(() => {
+    return questions.filter((question) => {
+      const exam = exams.find((item) => item.id === question.exam_id);
+      if (selectedCategoryId && exam?.category_id !== selectedCategoryId) return false;
+      if (selectedExamId && question.exam_id !== selectedExamId) return false;
+      if (selectedSubject && question.subject !== selectedSubject) return false;
+      if (selectedTopic && question.topic !== selectedTopic) return false;
+      if (selectedSubtopic && question.subtopic !== selectedSubtopic) return false;
+      if (difficultyFilter && question.difficulty !== difficultyFilter) return false;
+      if (statusFilter === 'live' && question.is_draft) return false;
+      if (statusFilter === 'draft' && !question.is_draft) return false;
+      if (
+        searchQuery &&
+        !`${question.question_text} ${question.examTitle || ''} ${question.topic || ''} ${question.subtopic || ''}`
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [
+    questions,
+    exams,
+    selectedCategoryId,
+    selectedExamId,
+    selectedSubject,
+    selectedTopic,
+    selectedSubtopic,
+    difficultyFilter,
+    statusFilter,
+    searchQuery,
+  ]);
+
+  const openCreateCategory = () => {
+    setEditingCategoryId(null);
+    setCategoryForm({
+      name: '',
+      description: '',
+      color: '#2563eb',
+      iconUrl: '',
+      is_active: true,
+    });
+    setCategoryFormOpen(true);
   };
 
-  const getDifficultyBadgeColor = (difficulty?: string) => {
-    switch (difficulty) {
-      case 'easy': return isDark ? 'bg-green-900/30 text-green-400 border-green-700' : 'bg-green-100 text-green-800 border-green-200';
-      case 'medium': return isDark ? 'bg-yellow-900/30 text-yellow-400 border-yellow-700' : 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'hard': return isDark ? 'bg-red-900/30 text-red-400 border-red-700' : 'bg-red-100 text-red-800 border-red-200';
-      default: return isDark ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-800 border-gray-200';
+  const openEditCategory = (category: Category) => {
+    setEditingCategoryId(category.id);
+    setCategoryForm({
+      name: category.name,
+      description: category.description || '',
+      color: category.color || '#2563eb',
+      iconUrl: category.iconUrl || '',
+      is_active: category.is_active,
+    });
+    setCategoryFormOpen(true);
+  };
+
+  const handleCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingCategoryId) {
+        await updateCategory(editingCategoryId, categoryForm);
+        toast.success('Category updated');
+      } else {
+        await createCategory({ ...categoryForm, order: categories.length + 1 });
+        toast.success('Category created');
+      }
+      setCategoryFormOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save category');
     }
   };
 
-  const getStatusBadgeColor = (isDraftQ?: boolean) => {
-    return isDraftQ 
-      ? isDark ? 'bg-yellow-900/30 text-yellow-400 border-yellow-700' : 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      : isDark ? 'bg-green-900/30 text-green-400 border-green-700' : 'bg-green-100 text-green-800 border-green-200';
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!confirm('Delete this category? Exams already linked to it may need reassignment.')) return;
+    await deleteCategory(categoryId);
+    if (selectedCategoryId === categoryId) setSelectedCategoryId('');
+    toast.success('Category deleted');
   };
 
   const handleDeleteQuestion = async (questionId: string) => {
-    if (!confirm('Delete this question from the bank?')) return;
+    if (!confirm('Delete this question from the question bank?')) return;
     await deleteQuestion(questionId);
-    await loadQuestions();
+    await loadData(selectedExamId || undefined);
+    toast.success('Question deleted');
   };
 
   const toggleDraftState = async (question: EnhancedQuestion) => {
-    await updateQuestion(question.id, { is_draft: !question.is_draft, updated_at: new Date().toISOString() });
-    await loadQuestions();
+    await updateQuestion(question.id, {
+      is_draft: !question.is_draft,
+      updated_at: new Date().toISOString(),
+    });
+    await loadData(selectedExamId || undefined);
+    toast.success(question.is_draft ? 'Question published' : 'Question moved to draft');
+  };
+
+  const exportCsv = () => {
+    const headers = ['Exam', 'Category', 'Subject', 'Topic', 'Subtopic', 'Difficulty', 'Status', 'Question'];
+    const rows = filteredQuestions.map((question) => [
+      question.examTitle || '',
+      question.categoryName || '',
+      question.subject || '',
+      question.topic || '',
+      question.subtopic || '',
+      question.difficulty || '',
+      question.is_draft ? 'Draft' : 'Live',
+      `"${(question.question_text || '').replace(/"/g, '""')}"`,
+    ]);
+    const blob = new Blob([[headers.join(','), ...rows.map((row) => row.join(','))].join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `question-hub-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
-      {/* Top Navigation Bar */}
-      <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-40`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Breadcrumb Navigation */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => {
-                  setSelectedCategory('');
-                  setSelectedSubject('');
-                  setSelectedTopic('');
-                }}
-                className={`${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors`}
-              >
-                <Folder className="w-5 h-5" />
-              </button>
-              {getCurrentPath().map((item, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
-                  <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{item}</span>
+    <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen`}>
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
+          <aside className="space-y-6">
+            <section className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border p-5 shadow-sm`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Categories</h2>
+                  <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Add and manage exam categories here.</p>
                 </div>
-              ))}
-            </div>
+                <button onClick={openCreateCategory} className="rounded-2xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white">
+                  Add
+                </button>
+              </div>
 
-            {/* Search Bar */}
-            <div className="flex-1 max-w-lg mx-8">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  className={`block w-full pl-10 pr-3 py-2 border rounded-lg leading-5 ${
-                    isDark 
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
+              <div className="mt-4 space-y-3">
+                <button
+                  onClick={() => setSelectedCategoryId('')}
+                  className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-medium ${
+                    !selectedCategoryId
+                      ? 'bg-blue-600 text-white'
+                      : isDark
+                      ? 'bg-gray-900 text-gray-300'
+                      : 'bg-gray-100 text-gray-700'
                   }`}
-                  placeholder="Search questions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* View Toggle */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg ${
-                  viewMode === 'list' 
-                    ? 'bg-blue-600 text-white' 
-                    : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <LayoutList className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg ${
-                  viewMode === 'grid' 
-                    ? 'bg-blue-600 text-white' 
-                    : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <LayoutGrid className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Sidebar - Category Navigation */}
-          <div className="col-span-3">
-            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border`}>
-              <div className={`p-6 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-                <h2 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Categories</h2>
-                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'} mt-1`}>Navigate through exam categories</p>
-              </div>
-              
-              <div className="p-4 space-y-4">
+                >
+                  All categories
+                </button>
                 {categories.map((category) => (
-                  <div key={category.id} className="space-y-2">
+                  <div key={category.id} className={`rounded-2xl border p-3 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
                     <button
                       onClick={() => {
-                        setSelectedCategory(category.id);
-                        setSelectedSubject('');
-                        setSelectedTopic('');
+                        setSelectedCategoryId(category.id);
+                        setSelectedExamId('');
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedCategory === category.id
-                          ? isDark ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
+                      className={`w-full text-left text-sm font-semibold ${selectedCategoryId === category.id ? 'text-blue-500' : isDark ? 'text-white' : 'text-gray-900'}`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center space-x-2">
-                          <Folder className="w-4 h-4" />
-                          <span>{category.name}</span>
-                        </span>
-                        <ChevronRight className="w-4 h-4" />
-                      </div>
+                      {category.name}
                     </button>
-                    
-                    {selectedCategory === category.id && (
-                      <div className="ml-6 space-y-1">
-                        {category.subjects.map((subject) => (
-                          <div key={subject.id}>
-                            <button
-                              onClick={() => {
-                                setSelectedSubject(subject.id);
-                                setSelectedTopic('');
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                                selectedSubject === subject.id
-                                  ? isDark ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                                  : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-50'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="flex items-center space-x-2">
-                                  <FileText className="w-4 h-4" />
-                                  <span>{subject.name}</span>
-                                </span>
-                                <ChevronRight className="w-4 h-4" />
-                              </div>
-                            </button>
-                            
-                            {selectedSubject === subject.id && (
-                              <div className="ml-6 space-y-1">
-                                {subject.topics.map((topic) => (
-                                  <button
-                                    key={topic.id}
-                                    onClick={() => setSelectedTopic(topic.id)}
-                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                                      selectedTopic === topic.id
-                                        ? isDark ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-medium' : 'bg-blue-50 text-blue-700 border border-blue-200 font-medium'
-                                        : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:bg-gray-50'
-                                    }`}
-                                  >
-                                    <div className="flex items-center space-x-2">
-                                      <Tag className="w-3 h-3" />
-                                      <span>{topic.name}</span>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <div className="mt-2 flex gap-2">
+                      <button onClick={() => openEditCategory(category)} className="rounded-xl border border-slate-500/30 px-3 py-1 text-xs text-slate-300">Edit</button>
+                      <button onClick={() => void handleDeleteCategory(category.id)} className="rounded-xl border border-red-500/30 px-3 py-1 text-xs text-red-300">Delete</button>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            {/* Bulk Actions */}
-            {selectedQuestions.length > 0 && (
-              <div className={`mt-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border p-6`}>
-                <h3 className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'} mb-4`}>Bulk Actions</h3>
-                <div className="space-y-3">
-                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-400 hover:bg-red-400/10 rounded-lg transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                    <span>Delete Selected</span>
-                  </button>
-                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors">
-                    <Folder className="w-4 h-4" />
-                    <span>Move to Category</span>
-                  </button>
-                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-green-400 hover:bg-green-400/10 rounded-lg transition-colors">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Publish Selected</span>
-                  </button>
-                </div>
-                <div className={`mt-4 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Selected: {selectedQuestions.length} questions
-                </div>
-              </div>
-            )}
-          </div>
+            <section className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border p-5 shadow-sm`}>
+              <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Link questions fast</h3>
+              <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Create the exam first, then choose it here to add questions directly into that exam card flow.</p>
 
-          {/* Main Content */}
-          <div className="col-span-9">
-            {/* Filters and Actions Bar */}
-            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border p-6 mb-6`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-4">
-                  <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    {examId ? 'Exam Question Hub' : 'Question Hub'}
-                  </h2>
-                  <span className={`text-sm ${isDark ? 'text-gray-400 bg-gray-700' : 'text-gray-500 bg-gray-100'} px-3 py-1 rounded-full`}>
-                    {filteredQuestions.length} questions
-                  </span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button 
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>{examId ? 'Add Question to Exam' : 'Add Question'}</span>
-                  </button>
-                  <button className={`flex items-center space-x-2 px-4 py-2 border rounded-lg transition-colors ${
-                    isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}>
-                    <Upload className="w-4 h-4" />
-                    <span>Bulk Import</span>
-                  </button>
-                  <button className={`flex items-center space-x-2 px-4 py-2 border rounded-lg transition-colors ${
-                    isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}>
-                    <Download className="w-4 h-4" />
-                    <span>Export CSV</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Filter Controls */}
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Difficulty</label>
+              <div className="mt-4 space-y-3">
+                <label className="block">
+                  <span className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Exam</span>
                   <select
-                    value={difficultyFilter}
-                    onChange={(e) => setDifficultyFilter(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'
-                    }`}
+                    value={selectedExamId}
+                    onChange={(e) => setSelectedExamId(e.target.value)}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
                   >
-                    <option value="">All Difficulties</option>
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Status</label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="">All Status</option>
-                    <option value="live">Live</option>
-                    <option value="draft">Draft</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Sort By</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="created_at">Date Created</option>
-                    <option value="subject">Subject</option>
-                    <option value="difficulty">Difficulty</option>
-                    <option value="status">Status</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Order</label>
-                  <select
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value as any)}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isDark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="desc">Descending</option>
-                    <option value="asc">Ascending</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Questions List/Grid */}
-            {loading ? (
-              <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border p-8`}>
-                <div className="animate-pulse">
-                  <div className={`h-4 ${isDark ? 'bg-gray-700' : 'bg-gray-200'} rounded w-1/4 mb-4`}></div>
-                  <div className="space-y-3">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div key={i} className={`h-16 ${isDark ? 'bg-gray-700' : 'bg-gray-200'} rounded`}></div>
+                    <option value="">All exams</option>
+                    {visibleExams.map((exam) => (
+                      <option key={exam.id} value={exam.id}>{exam.title}</option>
                     ))}
-                  </div>
-                </div>
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Subject</span>
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => {
+                      setSelectedSubject(e.target.value);
+                      setSelectedTopic('');
+                      setSelectedSubtopic('');
+                    }}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+                  >
+                    <option value="">All subjects</option>
+                    {subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Topic</span>
+                  <select
+                    value={selectedTopic}
+                    onChange={(e) => {
+                      setSelectedTopic(e.target.value);
+                      setSelectedSubtopic('');
+                    }}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+                  >
+                    <option value="">All topics</option>
+                    {topics.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Subtopic</span>
+                  <select
+                    value={selectedSubtopic}
+                    onChange={(e) => setSelectedSubtopic(e.target.value)}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+                  >
+                    <option value="">All subtopics</option>
+                    {subtopics.map((subtopic) => <option key={subtopic} value={subtopic}>{subtopic}</option>)}
+                  </select>
+                </label>
               </div>
-            ) : filteredQuestions.length === 0 ? (
-              <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border p-8 text-center`}>
+            </section>
+          </aside>
+
+          <main className="space-y-6">
+            <section className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border p-5 shadow-sm`}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <FileText className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-                  <p className={`text-lg font-medium ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>No questions found</p>
-                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Try adjusting your filters or add new questions</p>
+                  <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Question Hub</h1>
+                  <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Add questions manually or from single/bulk screenshots, then manage draft/live status from one place.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={() => { setModalMode('manual'); setIsAddModalOpen(true); }} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">
+                    <Plus className="h-4 w-4" />
+                    Manual
+                  </button>
+                  <button onClick={() => { setModalMode('screenshot'); setIsAddModalOpen(true); }} className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
+                    <ImagePlus className="h-4 w-4" />
+                    Upload SS
+                  </button>
+                  <button onClick={() => { setModalMode('bulk'); setIsAddModalOpen(true); }} className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
+                    <Upload className="h-4 w-4" />
+                    Bulk SS
+                  </button>
+                  <button onClick={exportCsv} className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
+                    <Download className="h-4 w-4" />
+                    Export
+                  </button>
                 </div>
               </div>
-            ) : viewMode === 'list' ? (
-              <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-sm border overflow-hidden`}>
+
+              <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_repeat(3,minmax(0,1fr))]">
+                <label className="relative block">
+                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search question, exam, topic"
+                    className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+                  />
+                </label>
+                <select value={difficultyFilter} onChange={(e) => setDifficultyFilter(e.target.value)} className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}>
+                  <option value="">All difficulty</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}>
+                  <option value="">All status</option>
+                  <option value="live">Live</option>
+                  <option value="draft">Draft</option>
+                </select>
+                <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}>
+                  {filteredQuestions.length} question(s)
+                </div>
+              </div>
+            </section>
+
+            <section className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border shadow-sm overflow-hidden`}>
+              {loading ? (
+                <div className={`p-10 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Loading questions...</div>
+              ) : filteredQuestions.length === 0 ? (
+                <div className={`p-10 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No questions found for the current filters.</div>
+              ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-700">
-                    <thead className={isDark ? 'bg-gray-700/50' : 'bg-gray-50'}>
+                  <table className="min-w-full">
+                    <thead className={isDark ? 'bg-gray-900/70' : 'bg-gray-50'}>
                       <tr>
-                        <th className="px-6 py-3 text-left">
-                          <input
-                            type="checkbox"
-                            checked={selectAll}
-                            onChange={handleSelectAll}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                        </th>
-                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Question Preview
-                        </th>
-                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Subject
-                        </th>
-                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Topic
-                        </th>
-                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Difficulty
-                        </th>
-                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Status
-                        </th>
-                        <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Tags
-                        </th>
-                        <th className={`px-6 py-3 text-right text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Actions
-                        </th>
+                        {['Question', 'Exam', 'Category', 'Subject', 'Topic', 'Status', 'Actions'].map((head) => (
+                          <th key={head} className={`px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{head}</th>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody className={`${isDark ? 'bg-gray-800 divide-gray-700' : 'bg-white divide-gray-200'} divide-y`}>
+                    <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
                       {filteredQuestions.map((question) => (
-                        <tr key={question.id} className={isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <input
-                              type="checkbox"
-                              checked={selectedQuestions.includes(question.id)}
-                              onChange={() => handleQuestionSelect(question.id)}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center space-x-3">
-                              {question.image_url && (
-                                <img src={question.image_url} alt="Question" className="w-12 h-12 object-cover rounded" />
-                              )}
-                              <div>
-                                <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'} max-w-md truncate`}>
-                                  {question.question_text.substring(0, 100)}
-                                  {question.question_text.length > 100 ? '...' : ''}
+                        <tr key={question.id} className={isDark ? 'hover:bg-gray-900/50' : 'hover:bg-gray-50'}>
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              {question.image_url ? (
+                                <img src={question.image_url} alt="Question" className="h-12 w-12 rounded-xl object-cover" />
+                              ) : (
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${isDark ? 'bg-gray-900 text-gray-500' : 'bg-gray-100 text-gray-400'}`}>
+                                  <Eye className="h-4 w-4" />
                                 </div>
-                                <div className="flex items-center space-x-2 mt-1">
-                                  {question.video_explanation_url && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-900/30 text-red-400 border border-red-700">
-                                      <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
-                                      Video
-                                    </span>
-                                  )}
-                                  {question.option_images && question.option_images.length > 0 && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-900/30 text-blue-400 border border-blue-700">
-                                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
-                                      Images
-                                    </span>
-                                  )}
+                              )}
+                              <div className="min-w-0">
+                                <div className={`max-w-sm truncate text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{question.question_text || 'Screenshot question'}</div>
+                                <div className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                                  {question.difficulty || 'medium'} • {question.marks || 1} mark(s)
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-900/30 text-purple-400 border border-purple-700">
-                              {question.subject || 'Unknown'}
-                            </span>
-                          </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
-                            {question.topic || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {question.difficulty && (
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getDifficultyBadgeColor(question.difficulty)}`}>
-                                {question.difficulty.toUpperCase()}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadgeColor(question.is_draft)}`}>
+                          <td className={`px-5 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{question.examTitle || '-'}</td>
+                          <td className={`px-5 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{question.categoryName || '-'}</td>
+                          <td className={`px-5 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{question.subject || '-'}</td>
+                          <td className={`px-5 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{[question.topic, question.subtopic].filter(Boolean).join(' / ') || '-'}</td>
+                          <td className="px-5 py-4">
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${question.is_draft ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                               {question.is_draft ? 'Draft' : 'Live'}
                             </span>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-1">
-                              {question.tags?.slice(0, 2).map((tag, i) => (
-                                <span key={i} className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-800 border-gray-200'} border`}>
-                                  {tag}
-                                </span>
-                              ))}
-                              {question.tags && question.tags.length > 2 && (
-                                <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>+{question.tags.length - 2}</span>
-                              )}
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => void toggleDraftState(question)} className="rounded-xl border border-slate-300 p-2 text-slate-600">
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => void handleDeleteQuestion(question.id)} className="rounded-xl border border-red-300 p-2 text-red-500">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <button className="text-blue-400 hover:text-blue-300">
-                              <Eye className="w-4 h-4" />
-                            </button>
-                    <button
-                      onClick={() => void toggleDraftState(question)}
-                      className="text-green-400 hover:text-green-300"
-                      title={question.is_draft ? 'Publish question' : 'Move to draft'}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => void handleDeleteQuestion(question.id)}
-                      className="text-red-400 hover:text-red-300"
-                      title="Delete question"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredQuestions.map((question) => (
-                  <div key={question.id} className={`${isDark ? 'bg-gray-800 border-gray-700 hover:border-gray-500' : 'bg-white border-gray-200 hover:shadow-md'} rounded-xl shadow-sm border p-6 transition-shadow`}>
-                    <div className="flex items-start justify-between mb-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedQuestions.includes(question.id)}
-                        onChange={() => handleQuestionSelect(question.id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1"
-                      />
-                      <div className="flex space-x-2">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusBadgeColor(question.is_draft)}`}>
-                          {question.is_draft ? 'Draft' : 'Live'}
-                        </span>
-                        {question.difficulty && (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyBadgeColor(question.difficulty)}`}>
-                            {question.difficulty.toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      {question.image_url && (
-                        <img src={question.image_url} alt="Question" className="w-full h-32 object-cover rounded-lg mb-3" />
-                      )}
-                      <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'} line-clamp-3`}>
-                        {question.question_text}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-900/30 text-purple-400 border border-purple-700">
-                          {question.subject || 'Unknown'}
-                        </span>
-                        {question.topic && (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-800 border-gray-200'} border`}>
-                            {question.topic}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex space-x-2">
-                        <button className={`p-2 ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}>
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button className={`p-2 ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}>
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button className={`p-2 ${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-400 hover:text-gray-600'}`}>
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+              )}
+            </section>
+          </main>
         </div>
       </div>
 
-      {/* Add Question Modal */}
-      <AddQuestionModal 
+      <AddQuestionModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSuccess={() => {
-          loadQuestions();
-          toast.success('Question added successfully!');
-        }}
-        examId={examId || undefined}
+        onSuccess={() => void loadData(selectedExamId || undefined)}
+        examId={selectedExamId || examIdFromQuery || undefined}
+        initialMode={modalMode}
       />
+
+      {categoryFormOpen && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70 p-4">
+          <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} w-full max-w-lg rounded-3xl border p-6 shadow-2xl`}>
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{editingCategoryId ? 'Edit category' : 'Add category'}</h3>
+                <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Keep category management directly inside the question workflow.</p>
+              </div>
+              <button onClick={() => setCategoryFormOpen(false)} className="rounded-xl border border-slate-300 p-2 text-slate-500">
+                <FolderPlus className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCategorySubmit} className="space-y-4">
+              <input value={categoryForm.name} onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Category name" className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
+              <textarea value={categoryForm.description} onChange={(e) => setCategoryForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="Description" rows={3} className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
+              <div className="grid grid-cols-2 gap-4">
+                <input value={categoryForm.iconUrl} onChange={(e) => setCategoryForm((prev) => ({ ...prev, iconUrl: e.target.value }))} placeholder="Icon URL" className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
+                <input type="color" value={categoryForm.color} onChange={(e) => setCategoryForm((prev) => ({ ...prev, color: e.target.value }))} className="h-12 w-full rounded-2xl" />
+              </div>
+              <label className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-gray-50 text-gray-700'}`}>
+                <input type="checkbox" checked={categoryForm.is_active} onChange={(e) => setCategoryForm((prev) => ({ ...prev, is_active: e.target.checked }))} />
+                Active category
+              </label>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setCategoryFormOpen(false)} className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancel</button>
+                <button type="submit" className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">Save category</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

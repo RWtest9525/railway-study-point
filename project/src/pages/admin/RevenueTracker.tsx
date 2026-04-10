@@ -1,321 +1,211 @@
-import { useEffect, useState } from 'react';
-import { collection, getDocs, query, orderBy, limit, where, Timestamp } from 'firebase/firestore';
+import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle, Clock, CreditCard, Download, RefreshCw, TrendingUp, XCircle } from 'lucide-react';
+import { collection, doc, getDocs, orderBy, query, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { formatDate, formatDateTime } from '../../lib/dateUtils';
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, Users, Download, AlertTriangle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
+import { formatDateTime } from '../../lib/dateUtils';
+import { useTheme } from '../../contexts/ThemeContext';
+import toast from 'react-hot-toast';
 
 interface Transaction {
   id: string;
   user_id: string;
   amount: number;
-  status: 'success' | 'pending' | 'failed';
-  payment_method: string;
-  plan_type: 'monthly' | 'yearly' | 'lifetime';
-  created_at: string;
+  status?: string;
+  payment_method?: string;
+  plan_type?: 'monthly' | 'yearly' | 'lifetime';
+  created_at?: string;
   razorpay_order_id?: string;
   razorpay_payment_id?: string;
+  failure_reason?: string;
 }
 
-interface RevenueStats {
-  totalRevenue: number;
-  monthlyRevenue: number;
-  weeklyGrowth: number;
-  pendingTransactions: number;
-  failedTransactions: number;
-  activeSubscriptions: number;
-}
+const normalizeAmount = (amount: number) => (amount > 1000 ? amount / 100 : amount);
+
+const normalizeStatus = (transaction: Transaction) => {
+  if (transaction.razorpay_payment_id || transaction.status === 'success') return 'success';
+  if (transaction.status === 'cancelled' || transaction.status === 'failed') return 'cancelled';
+  return 'pending';
+};
 
 export function RevenueTracker() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [stats, setStats] = useState<RevenueStats>({
-    totalRevenue: 0,
-    monthlyRevenue: 0,
-    weeklyGrowth: 0,
-    pendingTransactions: 0,
-    failedTransactions: 0,
-    activeSubscriptions: 0,
-  });
   const [loading, setLoading] = useState(true);
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [dateRange, setDateRange] = useState<string>('30');
+  const [selectedStatus, setSelectedStatus] = useState('all');
 
   useEffect(() => {
-    loadRevenueData();
-  }, [dateRange]);
+    void loadRevenueData();
+  }, []);
 
   const loadRevenueData = async () => {
     setLoading(true);
     try {
-      // Load transactions
-      const transactionsRef = collection(db, 'transactions');
-      const q = query(transactionsRef, orderBy('created_at', 'desc'), limit(100));
-      const snapshot = await getDocs(q);
-      const txns = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Transaction));
-      setTransactions(txns);
-
-      // Calculate stats
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-      const successfulTxns = txns.filter(t => t.status === 'success');
-      const totalRevenue = successfulTxns.reduce((sum, t) => sum + t.amount, 0);
-      
-      const monthlyTxns = successfulTxns.filter(t => {
-        const date = new Date(t.created_at);
-        return date >= thirtyDaysAgo;
-      });
-      const monthlyRevenue = monthlyTxns.reduce((sum, t) => sum + t.amount, 0);
-
-      const weeklyTxns = successfulTxns.filter(t => {
-        const date = new Date(t.created_at);
-        return date >= sevenDaysAgo;
-      });
-      const weeklyRevenue = weeklyTxns.reduce((sum, t) => sum + t.amount, 0);
-
-      const prevWeekTxns = successfulTxns.filter(t => {
-        const date = new Date(t.created_at);
-        return date >= thirtyDaysAgo && date < sevenDaysAgo;
-      });
-      const prevWeekRevenue = prevWeekTxns.reduce((sum, t) => sum + t.amount, 0);
-
-      const weeklyGrowth = prevWeekRevenue > 0 ? ((weeklyRevenue - prevWeekRevenue) / prevWeekRevenue) * 100 : 0;
-
-      setStats({
-        totalRevenue: totalRevenue,
-        monthlyRevenue: monthlyRevenue,
-        weeklyGrowth: weeklyGrowth,
-        pendingTransactions: txns.filter(t => t.status === 'pending').length,
-        failedTransactions: txns.filter(t => t.status === 'failed').length,
-        activeSubscriptions: successfulTxns.length,
-      });
+      const snapshot = await getDocs(query(collection(db, 'transactions'), orderBy('created_at', 'desc')));
+      setTransactions(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Transaction)));
     } catch (error) {
-      console.error('Error loading revenue data:', error);
+      console.error(error);
+      toast.error('Failed to load revenue data');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredTransactions = transactions.filter(t => {
-    if (selectedStatus !== 'all' && t.status !== selectedStatus) {
-      return false;
-    }
-    return true;
-  });
+  const filteredTransactions = useMemo(
+    () =>
+      transactions.filter((transaction) => selectedStatus === 'all' || normalizeStatus(transaction) === selectedStatus),
+    [transactions, selectedStatus]
+  );
 
-  const handleApproveTransaction = async (txnId: string) => {
-    try {
-      // Update transaction status in Firestore
-      // This would be implemented with updateDoc
-      alert(`Approved transaction: ${txnId}`);
-      loadRevenueData();
-    } catch (error) {
-      console.error('Error approving transaction:', error);
-    }
+  const stats = useMemo(() => {
+    const successful = transactions.filter((transaction) => normalizeStatus(transaction) === 'success');
+    const pending = transactions.filter((transaction) => normalizeStatus(transaction) === 'pending');
+    const cancelled = transactions.filter((transaction) => normalizeStatus(transaction) === 'cancelled');
+    return {
+      totalRevenue: successful.reduce((sum, transaction) => sum + normalizeAmount(transaction.amount), 0),
+      successCount: successful.length,
+      pendingCount: pending.length,
+      cancelledCount: cancelled.length,
+    };
+  }, [transactions]);
+
+  const handleApproveTransaction = async (transaction: Transaction) => {
+    if (normalizeStatus(transaction) !== 'pending') return;
+    if (!confirm('Approve this stuck payment manually? Use this only if payment was actually received.')) return;
+    await updateDoc(doc(db, 'transactions', transaction.id), {
+      status: 'success',
+      updated_at: new Date().toISOString(),
+    });
+    await loadRevenueData();
+    toast.success('Transaction marked as success');
   };
 
   const handleExportCSV = () => {
     const headers = ['Date', 'User ID', 'Amount', 'Status', 'Payment Method', 'Plan Type', 'Order ID', 'Payment ID'];
-    const rows = transactions.map(t => [
-      formatDateTime(t.created_at),
-      t.user_id,
-      t.amount,
-      t.status,
-      t.payment_method,
-      t.plan_type,
-      t.razorpay_order_id || '',
-      t.razorpay_payment_id || ''
+    const rows = filteredTransactions.map((transaction) => [
+      formatDateTime(transaction.created_at || ''),
+      transaction.user_id,
+      normalizeAmount(transaction.amount),
+      normalizeStatus(transaction),
+      transaction.payment_method || 'razorpay',
+      transaction.plan_type || '-',
+      transaction.razorpay_order_id || '',
+      transaction.razorpay_payment_id || '',
     ]);
-
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `revenue_report_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `revenue-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
     URL.revokeObjectURL(url);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount);
-  };
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Revenue Tracker</h1>
-          <p className="text-gray-400">Monitor income, transactions, and financial analytics</p>
+          <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Revenue Tracker</h1>
+          <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Cancelled payments show as cancelled, completed payments show as success, and manual approval is only for real stuck payments.</p>
         </div>
-        <button
-          onClick={handleExportCSV}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition"
-        >
-          <Download className="w-5 h-5" />
+        <button onClick={handleExportCSV} className="inline-flex items-center gap-2 rounded-2xl bg-green-600 px-5 py-3 text-sm font-semibold text-white">
+          <Download className="h-4 w-4" />
           Export CSV
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-            <DollarSign className="w-4 h-4" />
-            Total Revenue
+      <div className="grid gap-4 md:grid-cols-4">
+        {[
+          { label: 'Revenue', value: `₹${stats.totalRevenue.toFixed(0)}`, icon: CreditCard, tone: 'text-blue-500' },
+          { label: 'Success', value: stats.successCount, icon: CheckCircle, tone: 'text-green-500' },
+          { label: 'Pending', value: stats.pendingCount, icon: Clock, tone: 'text-amber-500' },
+          { label: 'Cancelled', value: stats.cancelledCount, icon: XCircle, tone: 'text-red-500' },
+        ].map((item) => (
+          <div key={item.label} className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} rounded-3xl border p-5 shadow-sm`}>
+            <div className="flex items-center gap-3">
+              <item.icon className={`h-5 w-5 ${item.tone}`} />
+              <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{item.label}</span>
+            </div>
+            <div className={`mt-3 text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.value}</div>
           </div>
-          <div className="text-2xl font-bold text-white">{formatCurrency(stats.totalRevenue)}</div>
-          <div className="text-xs text-gray-500 mt-1">All time</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-            <TrendingUp className="w-4 h-4" />
-            Monthly Revenue
-          </div>
-          <div className="text-2xl font-bold text-green-400">{formatCurrency(stats.monthlyRevenue)}</div>
-          <div className="text-xs text-gray-500 mt-1">Last 30 days</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-            <TrendingUp className={`w-4 h-4 ${stats.weeklyGrowth >= 0 ? 'text-green-400' : 'text-red-400'}`} />
-            Weekly Growth
-          </div>
-          <div className={`text-2xl font-bold ${stats.weeklyGrowth >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {stats.weeklyGrowth >= 0 ? '+' : ''}{stats.weeklyGrowth.toFixed(1)}%
-          </div>
-          <div className="text-xs text-gray-500 mt-1">vs previous week</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-            <CreditCard className="w-4 h-4" />
-            Active Subscriptions
-          </div>
-          <div className="text-2xl font-bold text-purple-400">{stats.activeSubscriptions}</div>
-          <div className="text-xs text-gray-500 mt-1">
-            {stats.pendingTransactions} pending, {stats.failedTransactions} failed
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-4 mb-6">
-        <select
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-          className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700"
-        >
-          <option value="all">All Status</option>
-          <option value="success">Success</option>
-          <option value="pending">Pending</option>
-          <option value="failed">Failed</option>
-        </select>
-        <select
-          value={dateRange}
-          onChange={(e) => setDateRange(e.target.value)}
-          className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700"
-        >
-          <option value="7">Last 7 days</option>
-          <option value="30">Last 30 days</option>
-          <option value="90">Last 90 days</option>
-          <option value="365">Last year</option>
-        </select>
-      </div>
-
-      {/* Transactions Table */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">Recent Transactions</h2>
+      <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} mt-6 rounded-3xl border p-5 shadow-sm`}>
+        <div className="mb-5 flex flex-wrap gap-3">
+          {['all', 'success', 'pending', 'cancelled'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setSelectedStatus(status)}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
+                selectedStatus === status
+                  ? 'bg-blue-600 text-white'
+                  : isDark
+                  ? 'bg-gray-900 text-gray-300'
+                  : 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
         </div>
+
         {loading ? (
-          <div className="p-8 text-center text-gray-400">Loading transactions...</div>
-        ) : filteredTransactions.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">No transactions found</div>
+          <div className={`py-10 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Loading transactions...</div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Date</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">User</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Amount</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Payment Method</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Plan</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-300">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-700">
-              {filteredTransactions.map((txn) => (
-                <tr key={txn.id} className="hover:bg-gray-700/50">
-                  <td className="px-6 py-4 text-gray-300 text-sm">
-                    {formatDateTime(txn.created_at)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-gray-300 text-sm font-mono">
-                      {txn.user_id.substring(0, 12)}...
-                    </div>
-                    <div className="text-gray-500 text-xs">
-                      {txn.razorpay_payment_id?.substring(0, 12) || 'N/A'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-white font-bold">{formatCurrency(txn.amount)}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                      txn.status === 'success' ? 'bg-green-900/50 text-green-300 border border-green-500/30' :
-                      txn.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30' :
-                      'bg-red-900/50 text-red-300 border border-red-500/30'
-                    }`}>
-                      {txn.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-400 text-sm capitalize">
-                    {txn.payment_method}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="bg-purple-900/30 text-purple-300 px-3 py-1 rounded-full text-xs font-bold capitalize">
-                      {txn.plan_type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {txn.status === 'pending' && (
-                      <button
-                        onClick={() => handleApproveTransaction(txn.id)}
-                        className="text-green-400 hover:text-green-300 p-2"
-                        title="Approve"
-                      >
-                        <CheckCircle className="w-5 h-5" />
-                      </button>
-                    )}
-                    {txn.status === 'failed' && (
-                      <button
-                        onClick={() => loadRevenueData()}
-                        className="text-yellow-400 hover:text-yellow-300 p-2"
-                        title="Retry"
-                      >
-                        <RefreshCw className="w-5 h-5" />
-                      </button>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className={isDark ? 'bg-gray-900/70' : 'bg-gray-50'}>
+                <tr>
+                  {['Date', 'User', 'Amount', 'Status', 'Method', 'Plan', 'Actions'].map((head) => (
+                    <th key={head} className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{head}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                {filteredTransactions.map((transaction) => {
+                  const status = normalizeStatus(transaction);
+                  return (
+                    <tr key={transaction.id} className={isDark ? 'hover:bg-gray-900/40' : 'hover:bg-gray-50'}>
+                      <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{formatDateTime(transaction.created_at || '')}</td>
+                      <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{transaction.user_id}</td>
+                      <td className={`px-4 py-4 text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>₹{normalizeAmount(transaction.amount).toFixed(2)}</td>
+                      <td className="px-4 py-4">
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          status === 'success'
+                            ? 'bg-green-100 text-green-700'
+                            : status === 'pending'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{transaction.payment_method || 'razorpay'}</td>
+                      <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{transaction.plan_type || '-'}</td>
+                      <td className="px-4 py-4">
+                        {status === 'pending' ? (
+                          <button onClick={() => void handleApproveTransaction(transaction)} className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            Approve if paid
+                          </button>
+                        ) : status === 'cancelled' ? (
+                          <span className="text-xs text-slate-500">{transaction.failure_reason || 'No payment completed'}</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600">
+                            <TrendingUp className="h-3.5 w-3.5" />
+                            Success
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
-
-      {/* Revenue Chart Placeholder */}
-      <div className="mt-6 bg-gray-800 rounded-xl border border-gray-700 p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Revenue Trend</h2>
-        <div className="h-64 bg-gray-700/30 rounded-lg flex items-center justify-center text-gray-400">
-          Revenue chart visualization would appear here
-        </div>
       </div>
     </div>
   );
