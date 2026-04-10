@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Download, FolderPlus, Import, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, Download, Import, Pencil, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
@@ -325,74 +325,69 @@ export function QuestionHub() {
         </aside>
 
         <main className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} rounded-3xl border p-6 shadow-sm`}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-5">
             <div>
               <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {canAddQuestions ? `${selectedNode?.name} actions` : 'Question actions'}
+                {canAddQuestions ? 'Question Management' : 'Select Question Folder'}
               </h2>
               <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                 {canAddQuestions
-                  ? 'You are inside the selected folder. Add, import, or export questions from here.'
-                  : 'Choose category and folder first. Question actions should not appear before a real final selection.'}
+                  ? 'This is the final selected folder. Use one button to open the add-question page, then choose manual or screenshot inside that page.'
+                  : 'Choose category, then subcategory, then folder. Question add button will appear only after final selection.'}
               </p>
             </div>
 
-            {canAddQuestions && (
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => {
-                    if (confirm(`Are you sure you want to add question in "${selectedNode?.name}"?`)) {
-                      setQuestionMode('manual');
-                      setQuestionModalOpen(true);
-                    }
-                  }}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add question
-                </button>
-                <button onClick={importPlaceholder} className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                  <Import className="h-4 w-4" />
-                  Import
-                </button>
-                <button onClick={exportPlaceholder} className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                  <Download className="h-4 w-4" />
-                  Export
-                </button>
+            <div className={`grid gap-4 ${canAddQuestions ? 'md:grid-cols-[1fr_auto]' : ''}`}>
+              <div className={`rounded-3xl border p-5 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
+                <div className={`text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Selected path</div>
+                <div className={`mt-3 text-base font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {path.length === 0 ? 'No category selected yet' : path.map((item) => item.name).join(' / ')}
+                </div>
+                <div className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {canAddQuestions ? 'This folder will receive new questions directly.' : 'Go deeper until the final test paper folder is selected.'}
+                </div>
               </div>
-            )}
-          </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {[
-              { title: 'Manual', desc: 'Write question and options manually' },
-              { title: 'Single Screenshot', desc: 'Upload one image question' },
-              { title: 'Bulk Screenshot', desc: 'Upload many screenshots together' },
-            ].map((item, index) => (
-              <button
-                key={item.title}
-                disabled={!canAddQuestions}
-                onClick={() => {
-                  if (!canAddQuestions) return;
-                  if (confirm(`Are you sure you want to add question in "${selectedNode?.name}"?`)) {
-                    setQuestionMode(index === 0 ? 'manual' : index === 1 ? 'screenshot' : 'bulk');
-                    setQuestionModalOpen(true);
-                  }
-                }}
-                className={`rounded-3xl border p-5 text-left transition ${
-                  !canAddQuestions
-                    ? isDark
-                      ? 'cursor-not-allowed border-gray-700 bg-gray-900 text-gray-500'
-                      : 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-                    : isDark
-                    ? 'border-gray-700 bg-gray-900 text-white hover:border-blue-500'
-                    : 'border-gray-200 bg-gray-50 text-gray-900 hover:border-blue-400'
-                }`}
-              >
-                <div className="text-base font-bold">{item.title}</div>
-                <div className="mt-2 text-sm opacity-80">{item.desc}</div>
-              </button>
-            ))}
+              {canAddQuestions && (
+                <div className="flex flex-wrap gap-3 md:w-[240px] md:flex-col">
+                  <button
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to add question in "${selectedNode?.name}"?`)) {
+                        setQuestionMode('manual');
+                        setQuestionModalOpen(true);
+                      }
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add question
+                  </button>
+                  <button onClick={importPlaceholder} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                    <Import className="h-4 w-4" />
+                    Import
+                  </button>
+                  <button onClick={exportPlaceholder} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                    <Download className="h-4 w-4" />
+                    Export
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className={`rounded-3xl border p-5 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'}`}>
+              <div className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>How this page works</div>
+              <div className={`mt-3 grid gap-3 md:grid-cols-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                <div className={`rounded-2xl px-4 py-4 ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}>
+                  1. Choose category
+                </div>
+                <div className={`rounded-2xl px-4 py-4 ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}>
+                  2. Choose subcategory and test folder
+                </div>
+                <div className={`rounded-2xl px-4 py-4 ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}>
+                  3. Click add question and choose method inside
+                </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>

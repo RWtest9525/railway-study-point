@@ -43,7 +43,7 @@ export function AdminPortal() {
   const { navigate, currentPath } = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'leaderboard' | 'dashboard' | 'activity' | 'backup' | 'links'
+    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'leaderboard' | 'dashboard' | 'activity' | 'backup' | 'links' | 'notifications'
   >('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -56,6 +56,7 @@ export function AdminPortal() {
     { id: 'dashboard' as const, name: 'Dashboard', icon: BarChart3, desc: 'Analytics & Overview' },
     { id: 'questions' as const, name: 'Questions', icon: FileText, desc: 'Manage Question Bank' },
     { id: 'exams' as const, name: 'Exams', icon: PlusCircle, desc: 'Create & Edit Exams' },
+    { id: 'notifications' as const, name: 'Notifications', icon: MessageSquare, desc: 'Send User Updates' },
     { id: 'support' as const, name: 'Support', icon: MessageSquare, desc: 'Student Help Tickets' },
   ];
 
@@ -75,6 +76,7 @@ export function AdminPortal() {
       dashboard: '/admin-portal',
       questions: '/admin/questions',
       exams: '/admin/exams',
+      notifications: '/admin/notifications',
       revenue: '/admin/revenue',
       premium: '/admin/premium',
       users: '/admin/users',
@@ -277,9 +279,7 @@ export function AdminPortal() {
                       Overview of system performance and analytics
                     </p>
                   </div>
-                  <div className="hidden md:flex gap-3">
-                    <GlobalAnnouncement />
-                  </div>
+                <div className="hidden md:flex gap-3" />
                 </div>
                 
                 <AdminDashboardCharts />
@@ -296,6 +296,7 @@ export function AdminPortal() {
             {/* Other Tabs */}
             {activeTab === 'questions' && <QuestionHub />}
             {activeTab === 'exams' && <ExamCreator />}
+            {activeTab === 'notifications' && <GlobalAnnouncement />}
             {activeTab === 'revenue' && <RevenueTracker />}
             {activeTab === 'premium' && <PremiumSettings />}
             {activeTab === 'users' && <UserManagement />}
