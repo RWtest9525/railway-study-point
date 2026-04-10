@@ -12,18 +12,14 @@ import {
   LayoutDashboard,
   ShieldCheck,
   ChevronRight,
-  Menu,
-  X,
   CreditCard,
-  Folder,
   Moon,
   Sun,
   ChevronLeft,
   Trophy,
   BarChart3,
   Activity,
-  Database,
-  Search
+  Database
 } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionHub } from './QuestionHub';
@@ -33,7 +29,6 @@ import { PremiumSettings } from './PremiumSettings';
 import { UserManagement } from './UserManagement';
 import { SupportInbox } from './SupportInbox';
 import { SubscriptionManagement } from './SubscriptionManagement';
-import { CategoryManagement } from './CategoryManagement';
 import { AdminLeaderboard } from './AdminLeaderboard';
 import { AdminDashboardCharts } from '../../components/AdminDashboardCharts';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
@@ -41,7 +36,6 @@ import { ActivityLogs } from './ActivityLogs';
 import { GlobalAnnouncement } from '../../components/GlobalAnnouncement';
 import { TopStudentsWidget } from '../../components/TopStudentsWidget';
 import { DatabaseBackup } from '../../components/DatabaseBackup';
-import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
@@ -78,38 +72,16 @@ export function AdminPortal() {
     setActiveTab(tabId);
   };
 
-  if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-    return (
-      <div className="min-h-screen bg-slate-100 px-5 py-10">
-        <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-xl">
-          <div className="mb-4 flex justify-center">
-            <BrandLogo variant="nav" className="ring-1 ring-slate-200" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Admin Panel Desktop Only</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            For better management, exam editing, analytics, and question upload, please open the admin panel on a laptop or desktop screen.
-          </p>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="mt-6 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
-          >
-            Back to Student Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row relative ${
+    <div className={`min-h-screen overflow-x-auto ${
       theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'
     }`}>
+      <div className="flex min-h-screen min-w-[1180px] flex-row relative">
       {/* Sidebar Navigation */}
       <aside className={`
-        fixed inset-y-0 left-0 ${isSidebarCollapsed ? 'md:w-20' : 'w-64'} 
+        ${isSidebarCollapsed ? 'w-20' : 'w-64'} 
         ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} 
-        border-r flex flex-col shrink-0 z-[150] transition-all duration-300 transform
-        md:translate-x-0 md:static md:z-[100]
+        border-r flex flex-col shrink-0 z-[150] transition-all duration-300
         overflow-hidden
       `}>
         <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} flex items-center gap-3`}>
@@ -305,6 +277,7 @@ export function AdminPortal() {
           </div>
         </div>
       </main>
+      </div>
     </div>
   );
 }

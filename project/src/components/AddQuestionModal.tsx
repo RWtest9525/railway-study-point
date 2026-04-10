@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Image as ImageIcon, Loader2, Plus, Save, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, Image as ImageIcon, Loader2, Save, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { createQuestion, getExams, getQuestions, Exam } from '../lib/firestore';
@@ -15,7 +15,6 @@ interface AddQuestionModalProps {
 interface OptionDraft {
   id: string;
   text: string;
-  image_url: string;
 }
 
 const SUBJECTS = ['Maths', 'Reasoning', 'GK', 'Science', 'English', 'Quantitative'];
@@ -29,11 +28,16 @@ const TOPIC_MAP: Record<string, string[]> = {
 };
 
 const defaultOptions = (): OptionDraft[] => [
-  { id: '1', text: '', image_url: '' },
-  { id: '2', text: '', image_url: '' },
-  { id: '3', text: '', image_url: '' },
-  { id: '4', text: '', image_url: '' },
+  { id: '1', text: '' },
+  { id: '2', text: '' },
+  { id: '3', text: '' },
+  { id: '4', text: '' },
 ];
+
+const buildFallbackOptions = (style: 'alphabet' | 'numeric') =>
+  Array.from({ length: 4 }, (_, index) =>
+    style === 'numeric' ? `Option ${index + 1}` : `Option ${String.fromCharCode(65 + index)}`
+  );
 
 export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQuestionModalProps) {
   const { profile } = useAuth();
@@ -103,19 +107,8 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
     onClose();
   };
 
-  const updateOption = (id: string, patch: Partial<OptionDraft>) => {
-    setOptions((prev) => prev.map((option) => (option.id === id ? { ...option, ...patch } : option)));
-  };
-
-  const addOption = () => {
-    setOptions((prev) => [...prev, { id: String(prev.length + 1), text: '', image_url: '' }]);
-  };
-
-  const removeOption = (id: string) => {
-    if (options.length <= 2) return;
-    const next = options.filter((option) => option.id !== id).map((option, index) => ({ ...option, id: String(index + 1) }));
-    setOptions(next);
-    setCorrectIndex((current) => Math.min(current, next.length - 1));
+  const updateOption = (id: string, text: string) => {
+    setOptions((prev) => prev.map((option) => (option.id === id ? { ...option, text } : option)));
   };
 
   const uploadQuestionImage = async (file: File) => {
@@ -131,33 +124,13 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
     try {
       const uploaded = await uploadImage(file, `questions/${Date.now()}-${file.name}`);
       setFormData((prev) => ({ ...prev, image_url: uploaded.url }));
-      toast.success('Question image uploaded');
+      toast.success('Question screenshot uploaded');
     } catch (uploadError: any) {
-      const message = uploadError?.message || 'Failed to upload question image';
+      const message = uploadError?.message || 'Failed to upload question screenshot';
       setError(message);
       toast.error(message);
     } finally {
       setUploadingQuestionImage(false);
-    }
-  };
-
-  const uploadOptionImage = async (optionId: string, file: File) => {
-    const validation = validateImage(file);
-    if (!validation.valid) {
-      const message = validation.errors.join(', ');
-      setError(message);
-      toast.error(message);
-      return;
-    }
-
-    try {
-      const uploaded = await uploadImage(file, `questions/options/${Date.now()}-${optionId}-${file.name}`);
-      updateOption(optionId, { image_url: uploaded.url });
-      toast.success('Option image uploaded');
-    } catch (uploadError: any) {
-      const message = uploadError?.message || 'Failed to upload option image';
-      setError(message);
-      toast.error(message);
     }
   };
 
@@ -170,16 +143,14 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
       if (!profile?.id) throw new Error('Please sign in again.');
       if (!formData.exam_id) throw new Error('Please select an exam.');
       if (!formData.topic) throw new Error('Please select a topic.');
-      if (!formData.question_text.trim() && !formData.image_url.trim()) {
-        throw new Error('Add question text or upload a question image.');
-      }
+      if (!formData.image_url.trim()) throw new Error('Please upload the screenshot of the full question.');
 
-      const preparedOptions = options
-        .map((option) => ({ ...option, text: option.text.trim(), image_url: option.image_url.trim() }))
-        .filter((option) => option.text || option.image_url);
+      const typedOptions = options.map((option) => option.text.trim());
+      const finalOptions = typedOptions.some(Boolean)
+        ? typedOptions.map((option, index) => option || buildFallbackOptions(formData.option_label_style)[index])
+        : buildFallbackOptions(formData.option_label_style);
 
-      if (preparedOptions.length < 2) throw new Error('At least 2 options are required.');
-      if (correctIndex >= preparedOptions.length) throw new Error('Please choose a correct answer.');
+      if (correctIndex >= finalOptions.length) throw new Error('Please choose a correct answer.');
 
       const existingQuestions = await getQuestions(formData.exam_id);
 
@@ -189,10 +160,7 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
         topic: formData.topic,
         subtopic: formData.subtopic || undefined,
         question_text: formData.question_text.trim(),
-        options: preparedOptions.map((option) => option.text || 'Image option'),
-        option_images: preparedOptions.some((option) => option.image_url)
-          ? preparedOptions.map((option) => option.image_url || '')
-          : undefined,
+        options: finalOptions,
         option_label_style: formData.option_label_style,
         correct_index: correctIndex,
         explanation: formData.explanation.trim() || undefined,
@@ -228,8 +196,8 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
       <div className="mx-auto max-h-[92vh] max-w-5xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-700 px-4 py-4 sm:px-6">
           <div>
-            <h2 className="text-xl font-semibold text-white">Create Photo Question</h2>
-            <p className="text-sm text-slate-400">Real Firestore save with image upload and answer-style control.</p>
+            <h2 className="text-xl font-semibold text-white">Create Screenshot Question</h2>
+            <p className="text-sm text-slate-400">Upload one screenshot with question and options. Students will answer using clean boxes.</p>
           </div>
           <button onClick={handleClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
             <X className="h-5 w-5" />
@@ -302,13 +270,13 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-200">Question text</span>
+              <span className="mb-2 block text-sm font-medium text-slate-200">Short title</span>
               <textarea
                 value={formData.question_text}
                 onChange={(e) => setFormData((prev) => ({ ...prev, question_text: e.target.value }))}
-                rows={4}
+                rows={3}
                 className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                placeholder="Type the question, or upload a question image below."
+                placeholder="Optional title or note. The screenshot can already contain the full question and options."
               />
             </label>
 
@@ -348,7 +316,7 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
 
             <div className="rounded-3xl border border-slate-700 bg-slate-950/70 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-200">Question image</span>
+                <span className="text-sm font-medium text-slate-200">Question screenshot</span>
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-100">
                   {uploadingQuestionImage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                   Upload
@@ -369,18 +337,18 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
                 value={formData.image_url}
                 onChange={(e) => setFormData((prev) => ({ ...prev, image_url: e.target.value }))}
                 className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                placeholder="https://question-image-url"
+                placeholder="https://question-screenshot-url"
               />
+              <p className="mt-3 text-xs leading-5 text-slate-400">
+                Upload one screenshot containing the full question and all options. Students will see the screenshot and use the answer boxes below to choose.
+              </p>
               {formData.image_url && <img src={formData.image_url} alt="Question" className="mt-4 max-h-64 w-full rounded-2xl object-contain" />}
             </div>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">Options</h3>
-                <button type="button" onClick={addOption} className="rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-100">
-                  <Plus className="mr-1 inline h-3.5 w-3.5" />
-                  Add option
-                </button>
+                <h3 className="text-sm font-semibold text-white">Answer boxes</h3>
+                <div className="text-xs text-slate-400">Keep text empty if the screenshot already shows all options.</div>
               </div>
               {options.map((option, index) => (
                 <div key={option.id} className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
@@ -394,43 +362,19 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
                     >
                       {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
                     </button>
-                    <div className="flex items-center gap-2">
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-100">
-                        <Upload className="h-3.5 w-3.5" />
-                        Image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) void uploadOptionImage(option.id, file);
-                            e.currentTarget.value = '';
-                          }}
-                        />
-                      </label>
-                      {options.length > 2 && (
-                        <button type="button" onClick={() => removeOption(option.id)} className="rounded-xl p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-300">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+                    <span className="text-xs text-slate-400">Mark correct answer</span>
                   </div>
                   <textarea
                     value={option.text}
-                    onChange={(e) => updateOption(option.id, { text: e.target.value })}
+                    onChange={(e) => updateOption(option.id, e.target.value)}
                     rows={2}
                     className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                    placeholder="Option text"
+                    placeholder={`Optional text for ${formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}`}
                   />
-                  {option.image_url ? (
-                    <img src={option.image_url} alt={`Option ${index + 1}`} className="mt-3 h-28 rounded-2xl object-cover" />
-                  ) : (
-                    <div className="mt-3 flex h-24 items-center justify-center rounded-2xl border border-dashed border-slate-700 text-slate-500">
-                      <ImageIcon className="mr-2 h-4 w-4" />
-                      Option image preview
-                    </div>
-                  )}
+                  <div className="mt-3 flex h-16 items-center justify-center rounded-2xl border border-dashed border-slate-700 text-xs text-slate-500">
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    Students will tap this answer box
+                  </div>
                 </div>
               ))}
             </div>
@@ -463,7 +407,7 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
               <div className="space-y-3">
                 <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
                   <div className="mb-2 text-xs text-slate-400">{formData.subject} • {formData.marks} mark(s)</div>
-                  <div className="text-sm text-white">{formData.question_text || 'Question preview'}</div>
+                  <div className="text-sm text-white">{formData.question_text || 'Question screenshot preview'}</div>
                   {formData.image_url && <img src={formData.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl object-contain" />}
                 </div>
                 {options.map((option, index) => (
@@ -473,8 +417,9 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
                         {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm text-slate-100">{option.text || 'Option text'}</div>
-                        {option.image_url && <img src={option.image_url} alt={`Option ${index + 1}`} className="mt-2 max-h-28 rounded-xl object-cover" />}
+                        <div className="text-sm text-slate-100">
+                          {option.text || (formData.option_label_style === 'numeric' ? `Choose option ${index + 1}` : `Choose option ${String.fromCharCode(65 + index)}`)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -487,13 +432,13 @@ export function AddQuestionModal({ isOpen, onClose, onSuccess, examId }: AddQues
               <div className="space-y-2">
                 <div>{formData.exam_id ? '✓' : '•'} Exam selected</div>
                 <div>{formData.topic ? '✓' : '•'} Topic chosen</div>
-                <div>{formData.question_text.trim() || formData.image_url ? '✓' : '•'} Question content added</div>
-                <div>{options.filter((option) => option.text || option.image_url).length >= 2 ? '✓' : '•'} Enough options added</div>
+                <div>{formData.image_url ? '✓' : '•'} Screenshot uploaded</div>
+                <div>✓ Four answer boxes ready</div>
               </div>
             </div>
           </div>
 
-          <div className="sm:col-span-2 flex items-center justify-end gap-3 border-t border-slate-700 pt-2">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-700 pt-2 sm:col-span-2">
             <button type="button" onClick={handleClose} className="rounded-2xl border border-slate-600 px-5 py-3 text-sm font-medium text-slate-200">
               Cancel
             </button>

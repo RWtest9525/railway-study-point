@@ -22,7 +22,6 @@ import { MockTests } from './pages/MockTests';
 import { SubjectQuizzes } from './pages/SubjectQuizzes';
 import { PreviousYearPapers } from './pages/PreviousYearPapers';
 import { AdminPortal } from './pages/admin/AdminPortal';
-import { StudentDashboard } from './pages/StudentDashboard';
 import { StudentAnalytics } from './pages/admin/StudentAnalytics';
 
 function AppContent() {
@@ -119,11 +118,17 @@ function AppContent() {
   // If not logged in, go to login
   if (!user) return <Login />;
 
+  const isAdminRoute =
+    currentPath === '/admin' ||
+    currentPath === '/admin-portal' ||
+    currentPath.startsWith('/admin/');
+
   // ADMIN OVERRIDE: If admin, prioritize Admin Portal
   if (isAdmin) {
     if (
       currentPath === '/dashboard' ||
       currentPath === '/' ||
+      currentPath === '/admin' ||
       currentPath === '/admin-portal'
     ) {
       return (
@@ -250,7 +255,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/admin-portal') {
+  if (currentPath === '/admin' || currentPath === '/admin-portal') {
     return (
       <ProtectedRoute requireAdmin>
         <AdminPortal />
@@ -266,11 +271,14 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <Login />;
-  }
-
   if (effectiveRole === 'admin') {
+    if (isAdminRoute) {
+      return (
+        <ProtectedRoute requireAdmin>
+          <AdminPortal />
+        </ProtectedRoute>
+      );
+    }
     return (
       <ProtectedRoute requireAdmin>
         <AdminPortal />
@@ -278,11 +286,7 @@ function AppContent() {
     );
   }
 
-  return (
-    <ProtectedRoute>
-      <StudentDashboard />
-    </ProtectedRoute>
-  );
+  return <Login />;
 }
 
 function App() {

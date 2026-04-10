@@ -225,6 +225,12 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     return style === 'numeric' ? String(index + 1) : String.fromCharCode(65 + index);
   };
 
+  const getOptionText = (question: QuestionWithSubject | undefined, option: string | undefined, index: number) => {
+    if (option?.trim()) return option;
+    const label = getOptionLabel(question, index);
+    return `Choose option ${label}`;
+  };
+
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Proctoring Warning */}
@@ -364,7 +370,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                         {getOptionLabel(currentQuestion, index)}
                       </span>
                       <div className="flex-1 pt-1">
-                        <div>{option}</div>
+                        <div>{getOptionText(currentQuestion, option, index)}</div>
                         {currentQuestion.option_images?.[index] && (
                           <img
                             src={currentQuestion.option_images[index]}

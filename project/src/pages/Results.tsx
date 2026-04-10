@@ -102,6 +102,14 @@ export function Results({ resultId }: ResultsProps) {
     s.percentage = s.total > 0 ? (s.correct / s.total) * 100 : 0;
   });
 
+  const getOptionLabel = (question: QuestionWithSubject, index: number) =>
+    (question.option_label_style ?? 'alphabet') === 'numeric'
+      ? String(index + 1)
+      : String.fromCharCode(65 + index);
+
+  const getOptionText = (question: QuestionWithSubject, option: string | undefined, index: number) =>
+    option?.trim() ? option : `Choose option ${getOptionLabel(question, index)}`;
+
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Header with back arrow */}
@@ -332,16 +340,14 @@ export function Results({ resultId }: ResultsProps) {
                                     ? 'border-gray-500 text-gray-400'
                                     : 'border-gray-400 text-gray-500'
                                 }`}>
-                                  {(question.option_label_style ?? 'alphabet') === 'numeric'
-                                    ? optIndex + 1
-                                    : String.fromCharCode(65 + optIndex)}
+                                  {getOptionLabel(question, optIndex)}
                                 </span>
                                 <div className={`flex-1 ${
                                   isCorrectAnswer || isUserAnswer
                                     ? isDark ? 'text-white' : 'text-gray-900'
                                     : isDark ? 'text-gray-400' : 'text-gray-500'
                                 }`}>
-                                  <div>{option}</div>
+                                  <div>{getOptionText(question, option, optIndex)}</div>
                                   {question.option_images?.[optIndex] && (
                                     <img
                                       src={question.option_images[optIndex]}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronRight, Clock3, Crown, FileText, PlayCircle, Target, Trophy } from 'lucide-react';
+import { Bell, ChevronRight, Clock3, Crown, FileText, PlayCircle, Sparkles, Target, Trophy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -46,6 +46,12 @@ export function ExamSelection() {
     if (ok) navigate(`/exam/${exam.id}`);
   };
 
+  const heroCards = [
+    { label: 'Categories', value: categories.length, tone: 'from-sky-500 to-cyan-500' },
+    { label: 'Live exams', value: featuredExams.length, tone: 'from-amber-500 to-orange-500' },
+    { label: 'Mode', value: 'Mobile', tone: 'from-slate-800 to-slate-600' },
+  ];
+
   if (loading) {
     return (
       <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-slate-50'} flex items-center justify-center`}>
@@ -67,7 +73,7 @@ export function ExamSelection() {
             <BrandLogo variant="nav" className={`${isDark ? 'ring-white/10' : 'ring-slate-200'} ring-1`} />
             <div className="min-w-0">
               <div className={`truncate text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Railway Study Point</div>
-              <div className={`truncate text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Mobile-first student dashboard</div>
+              <div className={`truncate text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Study dashboard</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -77,23 +83,18 @@ export function ExamSelection() {
             >
               <Bell className="h-5 w-5" />
             </button>
-            <button
-              onClick={() => setUserPanelOpen(true)}
-              className={`rounded-2xl px-3 py-2 text-xs font-semibold ${isDark ? 'bg-gray-800 text-white' : 'bg-slate-900 text-white'}`}
-            >
-              Open Panel
-            </button>
+            <button onClick={() => setUserPanelOpen(true)} className={`rounded-2xl px-3 py-2 text-xs font-semibold ${isDark ? 'bg-gray-800 text-white' : 'bg-slate-900 text-white'}`}>Account</button>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-5">
-        <section className={`overflow-hidden rounded-[28px] border p-5 ${
+        <section className={`overflow-hidden rounded-[30px] border p-5 ${
           isDark
             ? 'border-blue-500/20 bg-gradient-to-br from-blue-900/30 via-gray-900 to-amber-900/20'
-            : 'border-sky-100 bg-gradient-to-br from-sky-50 via-white to-amber-50'
+            : 'border-sky-100 bg-gradient-to-br from-sky-50 via-white to-orange-50 shadow-sm'
         }`}>
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
               {effectiveRole === 'admin' && (
                 <button onClick={() => navigate('/admin-portal')} className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 ring-1 ring-red-200">
@@ -113,13 +114,30 @@ export function ExamSelection() {
               ) : null}
             </div>
 
-            <div>
-              <h1 className={`text-2xl font-bold leading-tight sm:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                Choose category, open subcategory, then start your test fast.
-              </h1>
-              <p className={`mt-2 text-sm leading-6 sm:text-base ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
-                Optimized for phone users first. Pick NTPC, Group D, mock tests, subject quizzes, or previous-year papers and move directly into available exams.
-              </p>
+            <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+              <div>
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isDark ? 'bg-gray-800 text-gray-200' : 'bg-white text-slate-700 ring-1 ring-slate-200'}`}>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Railway exam practice
+                </div>
+                <h1 className={`mt-3 text-2xl font-bold leading-tight sm:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Practice smarter with clean categories and quick exam entry.
+                </h1>
+                <p className={`mt-2 max-w-2xl text-sm leading-6 sm:text-base ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+                  Select NTPC or any category, open the subcategory, then enter the test in a few taps.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 lg:grid-cols-1">
+                {heroCards.map((card) => (
+                  <div key={card.label} className={`rounded-[24px] bg-gradient-to-br p-[1px] ${card.tone}`}>
+                    <div className="rounded-[23px] bg-white px-4 py-4 text-left">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{card.label}</div>
+                      <div className="mt-2 text-xl font-bold text-slate-900">{card.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -190,7 +208,7 @@ export function ExamSelection() {
                         {exam.is_premium && <Crown className="h-4 w-4 text-amber-500" />}
                       </div>
                       <div className={`mt-2 flex flex-wrap gap-2 text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                        <span className={`rounded-full px-3 py-1 ${isDark ? 'bg-gray-700' : 'bg-slate-100'}`}>{exam.category_id}</span>
+                        <span className={`rounded-full px-3 py-1 ${isDark ? 'bg-gray-700' : 'bg-sky-50 text-sky-700'}`}>{exam.category_id}</span>
                         <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 ${isDark ? 'bg-gray-700' : 'bg-slate-100'}`}>
                           <Clock3 className="h-3.5 w-3.5" />
                           {exam.duration_minutes} min
