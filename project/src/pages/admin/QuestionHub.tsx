@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Download, Import, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Download, Import, Pencil, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
@@ -18,51 +18,58 @@ import {
 } from '../../lib/firestore';
 import { AddQuestionModal } from '../../components/AddQuestionModal';
 
-type LevelEntity = 'category' | 'node';
 type QuestionMode = 'manual' | 'screenshot' | 'bulk';
+type StepItem = { entity: 'category' | 'node'; id: string; name: string; categoryId: string };
 
 export function QuestionHub() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
-  const [path, setPath] = useState<Array<{ entity: LevelEntity; id: string; name: string; categoryId: string }>>([]);
-  const [currentItems, setCurrentItems] = useState<CategoryNode[]>([]);
+  const [items, setItems] = useState<CategoryNode[]>([]);
+  const [path, setPath] = useState<StepItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [linkedExam, setLinkedExam] = useState<Exam | null>(null);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [editingNode, setEditingNode] = useState<CategoryNode | null>(null);
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
   const [questionMode, setQuestionMode] = useState<QuestionMode>('manual');
-  const [linkedExam, setLinkedExam] = useState<Exam | null>(null);
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#2563eb', iconUrl: '', is_active: true });
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingNode, setEditingNode] = useState<CategoryNode | null>(null);
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#0f766e', iconUrl: '', is_active: true });
   const [nodeName, setNodeName] = useState('');
 
   const selectedCategoryId = path.find((item) => item.entity === 'category')?.id || '';
   const selectedNode = path.length > 0 ? path[path.length - 1] : null;
-  const currentLevel = Math.max(0, path.length - 1);
-  const canAddQuestions = path.length >= 2;
+  const currentNodeParent = path[path.length - 1]?.entity === 'node' ? path[path.length - 1].id : null;
+  const isFinalPage = path.length >= 2 && items.length === 0;
 
   useEffect(() => {
     void loadCategories();
-  }, []);
-
-  useEffect(() => {
     void loadExamContext();
   }, []);
 
   useEffect(() => {
-    void loadCurrentItems();
-  }, [path.length, selectedCategoryId, selectedNode?.id]);
+    void loadStepItems();
+  }, [selectedCategoryId, currentNodeParent, path.length]);
 
-  useEffect(() => {
-    if (!linkedExam || categories.length === 0 || path.length > 0) return;
+  const pageTitle = useMemo(() => {
+    if (path.length === 0) return 'Category';
+    if (path.length === 1) return path[0].name;
+    return path[path.length - 1].name;
+  }, [path]);
 
-    const examCategory = categories.find((category) => category.id === linkedExam.category_id);
-    if (!examCategory) return;
+  const addButtonLabel = useMemo(() => {
+    if (path.length === 0) return 'Add Category';
+    if (path.length === 1) return 'Add Sub Category';
+    return 'Add Sub Sub Category';
+  }, [path.length]);
 
-    setPath([{ entity: 'category', id: examCategory.id, name: examCategory.name, categoryId: examCategory.id }]);
-  }, [linkedExam, categories, path.length]);
+  const helperText = useMemo(() => {
+    if (isFinalPage) return 'You reached the last page. Now you can add, import, or export questions.';
+    if (path.length === 0) return 'Select category first. Do not show add question here.';
+    if (path.length === 1) return 'Select sub category first. Do not show add question here.';
+    return 'Go to the last page folder first. Then the question page will open.';
+  }, [isFinalPage, path.length]);
 
   const loadCategories = async () => {
     setLoading(true);
@@ -77,44 +84,34 @@ export function QuestionHub() {
     }
   };
 
-  const loadCurrentItems = async () => {
-    if (!selectedCategoryId || path.length === 0) {
-      setCurrentItems([]);
-      return;
-    }
-
-    const parentNode = path[path.length - 1].entity === 'node' ? path[path.length - 1].id : null;
-    const nodes = await getCategoryNodes(selectedCategoryId, parentNode);
-    setCurrentItems(nodes);
-  };
-
   const loadExamContext = async () => {
     const examId = new URLSearchParams(window.location.search).get('examId');
     if (!examId) return;
-
     try {
       const exam = await getExam(examId);
       setLinkedExam(exam);
     } catch (error) {
       console.error(error);
-      toast.error('Failed to load exam link');
     }
   };
 
-  const sectionTitle = useMemo(() => {
-    if (path.length === 0) return 'Choose category';
-    if (path.length === 1) return 'Choose subcategory';
-    if (path.length === 2) return 'Choose next folder';
-    if (path.length === 3) return 'Choose test paper';
-    return 'Choose next folder';
-  }, [path.length]);
+  const loadStepItems = async () => {
+    if (path.length === 0) return;
+    try {
+      const nodes = await getCategoryNodes(selectedCategoryId, currentNodeParent);
+      setItems(nodes);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load items');
+    }
+  };
 
   const openAddCategory = (category?: Category) => {
     setEditingCategory(category || null);
     setCategoryForm({
       name: category?.name || '',
       description: category?.description || '',
-      color: category?.color || '#2563eb',
+      color: category?.color || '#0f766e',
       iconUrl: category?.iconUrl || '',
       is_active: category?.is_active ?? true,
     });
@@ -129,35 +126,31 @@ export function QuestionHub() {
 
   const saveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (!categoryForm.name.trim()) {
-        toast.error('Enter category name');
-        return;
-      }
-
-      const duplicateCategory = categories.find(
-        (category) =>
-          category.id !== editingCategory?.id &&
-          category.name.trim().toLowerCase() === categoryForm.name.trim().toLowerCase()
-      );
-      if (duplicateCategory) {
-        toast.error('Category name already exists');
-        return;
-      }
-
-      if (editingCategory) {
-        await updateCategory(editingCategory.id, categoryForm);
-        toast.success('Category updated');
-      } else {
-        await createCategory({ ...categoryForm, order: categories.length + 1 });
-        toast.success('Category created');
-      }
-      setCategoryModalOpen(false);
-      await loadCategories();
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to save category');
+    if (!categoryForm.name.trim()) {
+      toast.error('Enter category name');
+      return;
     }
+
+    const duplicateCategory = categories.find(
+      (category) =>
+        category.id !== editingCategory?.id &&
+        category.name.trim().toLowerCase() === categoryForm.name.trim().toLowerCase()
+    );
+    if (duplicateCategory) {
+      toast.error('Category already exists');
+      return;
+    }
+
+    if (editingCategory) {
+      await updateCategory(editingCategory.id, categoryForm);
+      toast.success('Category updated');
+    } else {
+      await createCategory({ ...categoryForm, order: categories.length + 1 });
+      toast.success('Category created');
+    }
+
+    setCategoryModalOpen(false);
+    await loadCategories();
   };
 
   const saveNode = async (e: React.FormEvent) => {
@@ -166,230 +159,210 @@ export function QuestionHub() {
       toast.error('Choose category first');
       return;
     }
-    try {
-      if (!nodeName.trim()) {
-        toast.error('Enter folder name');
-        return;
-      }
-
-      const duplicateNode = currentItems.find(
-        (node) =>
-          node.id !== editingNode?.id &&
-          node.name.trim().toLowerCase() === nodeName.trim().toLowerCase()
-      );
-
-      if (duplicateNode) {
-        toast.error('This name already exists in the selected level');
-        return;
-      }
-
-      if (editingNode) {
-        await updateCategoryNode(editingNode.id, { name: nodeName });
-        toast.success('Folder updated');
-      } else {
-        await createCategoryNode({
-          category_id: selectedCategoryId,
-          parent_id: selectedNode?.entity === 'node' ? selectedNode.id : null,
-          name: nodeName,
-          level: currentLevel + 1,
-          order: currentItems.length + 1,
-          is_active: true,
-        });
-        toast.success('Folder created');
-      }
-      setNodeModalOpen(false);
-      setNodeName('');
-      await loadCurrentItems();
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to save folder');
+    if (!nodeName.trim()) {
+      toast.error('Enter name');
+      return;
     }
+
+    const duplicateNode = items.find(
+      (node) =>
+        node.id !== editingNode?.id &&
+        node.name.trim().toLowerCase() === nodeName.trim().toLowerCase()
+    );
+    if (duplicateNode) {
+      toast.error('This name already exists here');
+      return;
+    }
+
+    if (editingNode) {
+      await updateCategoryNode(editingNode.id, { name: nodeName.trim() });
+      toast.success('Updated');
+    } else {
+      await createCategoryNode({
+        category_id: selectedCategoryId,
+        parent_id: currentNodeParent,
+        name: nodeName.trim(),
+        level: path.length,
+        order: items.length + 1,
+        is_active: true,
+      });
+      toast.success('Created');
+    }
+
+    setNodeModalOpen(false);
+    setNodeName('');
+    await loadStepItems();
   };
 
   const removeCategory = async (category: Category) => {
-    if (!confirm(`Delete category "${category.name}"?`)) return;
+    if (!confirm(`Delete "${category.name}"?`)) return;
     await deleteCategory(category.id);
-    if (selectedCategoryId === category.id) setPath([]);
+    setPath([]);
     await loadCategories();
   };
 
   const removeNode = async (node: CategoryNode) => {
     if (!confirm(`Delete "${node.name}"?`)) return;
     await deleteCategoryNode(node.id);
-    await loadCurrentItems();
+    await loadStepItems();
   };
 
-  const exportPlaceholder = () => toast('Export hook is ready here.');
-  const importPlaceholder = () => toast('Import hook is ready here.');
+  const renderCards = () => {
+    if (path.length === 0) {
+      return categories.map((category) => (
+        <ItemCard
+          key={category.id}
+          title={category.name}
+          subtitle={category.description || 'Open category'}
+          isDark={isDark}
+          onOpen={() => {
+            setPath([{ entity: 'category', id: category.id, name: category.name, categoryId: category.id }]);
+            setItems([]);
+          }}
+          onEdit={() => openAddCategory(category)}
+          onDelete={() => void removeCategory(category)}
+        />
+      ));
+    }
+
+    return items.map((node) => (
+      <ItemCard
+        key={node.id}
+        title={node.name}
+        subtitle="Open next page"
+        isDark={isDark}
+        onOpen={() =>
+          setPath((prev) => [
+            ...prev,
+            { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId },
+          ])
+        }
+        onEdit={() => openAddNode(node)}
+        onDelete={() => void removeNode(node)}
+      />
+    ));
+  };
 
   return (
-    <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Question Categories</h1>
-          <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Simple flow: category, subcategory, next folder, test paper. Question actions appear only after a real folder is selected.</p>
-        </div>
-        <button onClick={() => openAddCategory()} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white">
-          <Plus className="h-4 w-4" />
-          Add category
-        </button>
-      </div>
-
-      {linkedExam && (
-        <div className={`${isDark ? 'border-blue-500/30 bg-blue-500/10 text-blue-100' : 'border-blue-200 bg-blue-50 text-blue-700'} mb-5 rounded-3xl border px-5 py-4`}>
-          <div className="text-sm font-semibold">Questions will link to exam: {linkedExam.title}</div>
-          <div className={`mt-1 text-xs ${isDark ? 'text-blue-200/80' : 'text-blue-600'}`}>
-            Choose the correct category path first, then add questions into the selected folder for this exam.
+    <div className={`${isDark ? 'bg-[#081018]' : 'bg-[#f7fafc]'} min-h-screen p-6`}>
+      <div className="mx-auto max-w-5xl">
+        {linkedExam && (
+          <div className={`${isDark ? 'border-teal-500/30 bg-teal-500/10 text-teal-100' : 'border-teal-200 bg-teal-50 text-teal-700'} mb-5 rounded-3xl border px-5 py-4`}>
+            Linked exam: <span className="font-semibold">{linkedExam.title}</span>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="mb-5 flex flex-wrap items-center gap-2 text-sm">
-        <button onClick={() => setPath([])} className={`rounded-xl px-3 py-2 font-semibold ${path.length === 0 ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-700'}`}>
-          Categories
-        </button>
-        {path.map((item, index) => (
-          <div key={item.id} className="flex items-center gap-2">
-            <ChevronRight className="h-4 w-4 text-slate-400" />
-            <button
-              onClick={() => setPath(path.slice(0, index + 1))}
-              className={`rounded-xl px-3 py-2 font-semibold ${index === path.length - 1 ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-700'}`}
-            >
-              {item.name}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-        <aside className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} rounded-3xl border p-5 shadow-sm`}>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{sectionTitle}</h2>
-              <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Only one clean tree flow, no extra clutter.</p>
-            </div>
-            {path.length > 0 && (
-              <button onClick={() => openAddNode()} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white">
-                Add {path.length === 1 ? 'subcategory' : 'folder'}
+        <div className={`${isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'} rounded-[32px] border shadow-sm`}>
+          <div className="flex flex-col gap-4 border-b border-inherit px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => {
+                  if (path.length === 0) return;
+                  setPath((prev) => prev.slice(0, -1));
+                  setItems([]);
+                }}
+                className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-200 bg-slate-50 text-slate-900'}`}
+              >
+                <ArrowLeft className="h-5 w-5" />
               </button>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            {path.length === 0
-              ? categories.map((category) => (
-                  <div key={category.id} className={`rounded-2xl border p-3 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
-                    <button
-                      onClick={() => setPath([{ entity: 'category', id: category.id, name: category.name, categoryId: category.id }])}
-                      className={`w-full text-left text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}
-                    >
-                      {category.name}
-                    </button>
-                    <div className="mt-2 flex gap-2">
-                      <button onClick={() => openAddCategory(category)} className="rounded-xl border border-slate-300 px-3 py-1 text-xs text-slate-600">Edit</button>
-                      <button onClick={() => void removeCategory(category)} className="rounded-xl border border-red-300 px-3 py-1 text-xs text-red-600">Delete</button>
-                    </div>
-                  </div>
-                ))
-              : currentItems.map((node) => (
-                  <div key={node.id} className={`rounded-2xl border p-3 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
-                    <button
-                      onClick={() =>
-                        setPath([
-                          ...path,
-                          {
-                            entity: 'node',
-                            id: node.id,
-                            name: node.name,
-                            categoryId: selectedCategoryId,
-                          },
-                        ])
-                      }
-                      className={`w-full text-left text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}
-                    >
-                      {node.name}
-                    </button>
-                    <div className="mt-2 flex gap-2">
-                      <button onClick={() => openAddNode(node)} className="rounded-xl border border-slate-300 px-3 py-1 text-xs text-slate-600">Edit</button>
-                      <button onClick={() => void removeNode(node)} className="rounded-xl border border-red-300 px-3 py-1 text-xs text-red-600">Delete</button>
-                    </div>
-                  </div>
-                ))}
-
-            {path.length > 0 && currentItems.length === 0 && (
-              <div className={`rounded-2xl border p-5 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
-                No folder here yet. Use the add button above.
+              <div>
+                <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                  {path.length === 0 ? 'Page 1' : `Page ${path.length + 1}`}
+                </div>
+                <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle}</h1>
+                <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{helperText}</p>
               </div>
-            )}
-          </div>
-        </aside>
-
-        <main className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} rounded-3xl border p-6 shadow-sm`}>
-          <div className="space-y-5">
-            <div>
-              <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {canAddQuestions ? 'Question Management' : 'Select Question Folder'}
-              </h2>
-              <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                {canAddQuestions
-                  ? 'This is the final selected folder. Use one button to open the add-question page, then choose manual or screenshot inside that page.'
-                  : 'Choose category, then subcategory, then folder. Question add button will appear only after final selection.'}
-              </p>
             </div>
 
-            <div className={`grid gap-4 ${canAddQuestions ? 'md:grid-cols-[1fr_auto]' : ''}`}>
-              <div className={`rounded-3xl border p-5 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
-                <div className={`text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Selected path</div>
-                <div className={`mt-3 text-base font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  {path.length === 0 ? 'No category selected yet' : path.map((item) => item.name).join(' / ')}
-                </div>
-                <div className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {canAddQuestions ? 'This folder will receive new questions directly.' : 'Go deeper until the final test paper folder is selected.'}
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => {
+                  if (path.length === 0) {
+                    openAddCategory();
+                  } else {
+                    openAddNode();
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-2xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white"
+              >
+                <Plus className="h-4 w-4" />
+                {addButtonLabel}
+              </button>
+            </div>
+          </div>
 
-              {canAddQuestions && (
-                <div className="flex flex-wrap gap-3 md:w-[240px] md:flex-col">
+          <div className="px-6 py-5">
+            {path.length > 0 && (
+              <div className="mb-5 flex flex-wrap items-center gap-2">
+                {path.map((item, index) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setPath(path.slice(0, index + 1));
+                      setItems([]);
+                    }}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${index === path.length - 1 ? 'bg-teal-600 text-white' : isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {!isFinalPage && (
+              <div className="grid gap-4">
+                {loading ? (
+                  <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                    Loading...
+                  </div>
+                ) : (
+                  renderCards()
+                )}
+              </div>
+            )}
+
+            {path.length > 0 && !isFinalPage && items.length === 0 && !loading && (
+              <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                No more items here. Go one more proper level or create a new folder from the top button.
+              </div>
+            )}
+
+            {isFinalPage && (
+              <div className="space-y-5">
+                <div className={`rounded-3xl border p-5 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Final Page</div>
+                  <div className={`mt-2 text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedNode?.name}</div>
+                  <div className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Now the add question page can open. Before this page, no question page is shown.
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => {
-                      if (confirm(`Are you sure you want to add question in "${selectedNode?.name}"?`)) {
+                      if (confirm(`Add question inside "${selectedNode?.name}"?`)) {
                         setQuestionMode('manual');
                         setQuestionModalOpen(true);
                       }
                     }}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white"
                   >
                     <Plus className="h-4 w-4" />
-                    Add question
+                    Add Question
                   </button>
-                  <button onClick={importPlaceholder} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                  <button onClick={() => toast('Import hook is ready here.')} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
                     <Import className="h-4 w-4" />
                     Import
                   </button>
-                  <button onClick={exportPlaceholder} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                  <button onClick={() => toast('Export hook is ready here.')} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
                     <Download className="h-4 w-4" />
                     Export
                   </button>
                 </div>
-              )}
-            </div>
-
-            <div className={`rounded-3xl border p-5 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'}`}>
-              <div className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>How this page works</div>
-              <div className={`mt-3 grid gap-3 md:grid-cols-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                <div className={`rounded-2xl px-4 py-4 ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}>
-                  1. Choose category
-                </div>
-                <div className={`rounded-2xl px-4 py-4 ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}>
-                  2. Choose subcategory and test folder
-                </div>
-                <div className={`rounded-2xl px-4 py-4 ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}>
-                  3. Click add question and choose method inside
-                </div>
               </div>
-            </div>
+            )}
           </div>
-        </main>
+        </div>
       </div>
 
       <AddQuestionModal
@@ -399,46 +372,98 @@ export function QuestionHub() {
         examId={linkedExam?.id}
         examTitle={linkedExam?.title}
         categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
-        linkedLabel={selectedNode ? `${selectedNode.name} selected` : undefined}
+        linkedLabel={selectedNode?.name}
         initialMode={questionMode}
       />
 
       {categoryModalOpen && (
-        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70 p-4">
-          <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} w-full max-w-lg rounded-3xl border p-6 shadow-2xl`}>
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{editingCategory ? 'Edit category' : 'Add category'}</h3>
-              <button onClick={() => setCategoryModalOpen(false)} className="rounded-xl p-2 text-slate-500"><Trash2 className="h-4 w-4" /></button>
-            </div>
-            <form onSubmit={saveCategory} className="space-y-4">
-              <input value={categoryForm.name} onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Category name" className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
-              <textarea value={categoryForm.description} onChange={(e) => setCategoryForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="Description" rows={3} className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setCategoryModalOpen(false)} className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancel</button>
-                <button type="submit" className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModalShell isDark={isDark} title={editingCategory ? 'Edit Category' : 'Add Category'} onClose={() => setCategoryModalOpen(false)}>
+          <form onSubmit={saveCategory} className="space-y-4">
+            <input
+              value={categoryForm.name}
+              onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="Enter title"
+              className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-white text-slate-900'}`}
+            />
+            <button type="submit" className="w-full rounded-2xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white">Submit</button>
+          </form>
+        </ModalShell>
       )}
 
       {nodeModalOpen && (
-        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70 p-4">
-          <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} w-full max-w-lg rounded-3xl border p-6 shadow-2xl`}>
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{editingNode ? 'Edit folder' : path.length === 1 ? 'Add subcategory' : 'Add folder'}</h3>
-              <button onClick={() => setNodeModalOpen(false)} className="rounded-xl p-2 text-slate-500"><Pencil className="h-4 w-4" /></button>
-            </div>
-            <form onSubmit={saveNode} className="space-y-4">
-              <input value={nodeName} onChange={(e) => setNodeName(e.target.value)} placeholder="Folder name" className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setNodeModalOpen(false)} className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancel</button>
-                <button type="submit" className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModalShell isDark={isDark} title={editingNode ? 'Edit Item' : addButtonLabel} onClose={() => setNodeModalOpen(false)}>
+          <form onSubmit={saveNode} className="space-y-4">
+            <input
+              value={nodeName}
+              onChange={(e) => setNodeName(e.target.value)}
+              placeholder="Enter title"
+              className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-white text-slate-900'}`}
+            />
+            <button type="submit" className="w-full rounded-2xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white">Submit</button>
+          </form>
+        </ModalShell>
       )}
+    </div>
+  );
+}
+
+function ItemCard({
+  title,
+  subtitle,
+  isDark,
+  onOpen,
+  onEdit,
+  onDelete,
+}: {
+  title: string;
+  subtitle: string;
+  isDark: boolean;
+  onOpen: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className={`rounded-[28px] border p-4 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+      <button onClick={onOpen} className="w-full rounded-[24px] border-2 border-slate-300 px-5 py-6 text-left transition hover:border-teal-500">
+        <div className="text-base font-semibold text-slate-900">{title}</div>
+        <div className="mt-2 text-sm text-slate-500">{subtitle}</div>
+      </button>
+      <div className="mt-3 flex gap-2">
+        <button onClick={onEdit} className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-700">
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </button>
+        <button onClick={onDelete} className="inline-flex items-center gap-1 rounded-xl border border-red-300 px-3 py-2 text-xs text-red-600">
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ModalShell({
+  isDark,
+  title,
+  onClose,
+  children,
+}: {
+  isDark: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70 p-4">
+      <div className={`${isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'} w-full max-w-lg rounded-[28px] border p-6 shadow-2xl`}>
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</h3>
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-500">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }
