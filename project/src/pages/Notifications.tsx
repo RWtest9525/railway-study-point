@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Bell, CheckCheck, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, CheckCheck, Sparkles, Zap } from 'lucide-react';
 import { useRouter } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getUserNotifications, markNotificationRead, Notification, timestampToString } from '../lib/firestore';
 
 export function Notifications() {
-  const { navigate } = useRouter();
+  const { navigate, goBack } = useRouter();
   const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -57,7 +57,7 @@ export function Notifications() {
       <header className={`${isDark ? 'bg-gray-900/95 border-gray-800' : 'bg-white/95 border-slate-200'} sticky top-0 z-50 border-b backdrop-blur-md`}>
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => window.history.back()} className={`rounded-full p-2 ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+            <button onClick={() => goBack()} className={`rounded-full p-2 ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
               <ArrowLeft className={`h-5 w-5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`} />
             </button>
             <div>
@@ -66,14 +66,12 @@ export function Notifications() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="relative inline-flex">
-              <Bell className={`h-5 w-5 ${isDark ? 'text-gray-200' : 'text-slate-700'}`} />
-              {unreadCount > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white animate-pulse">
-                  {unreadCount}
-                </span>
-              )}
-            </span>
+            <button
+              onClick={() => navigate('/notifications/push')}
+              className={`rounded-2xl px-3 py-2 text-xs font-semibold ${isDark ? 'bg-gray-800 text-gray-200' : 'bg-slate-100 text-slate-700'}`}
+            >
+              Push Alert
+            </button>
             <button
               onClick={() => void markAllAsRead()}
               disabled={unreadCount === 0}
@@ -92,32 +90,10 @@ export function Notifications() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className={`mb-5 rounded-[28px] border p-5 ${isDark ? 'border-gray-700 bg-gray-800' : 'border-slate-200 bg-white shadow-sm'}`}>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className={`text-xs uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Inbox</div>
-              <div className={`mt-2 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{notifications.length}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className={`rounded-2xl px-4 py-3 ${isDark ? 'bg-gray-900 text-gray-200' : 'bg-slate-50 text-slate-700'}`}>
-                <div className="text-xs text-slate-500">Unread</div>
-                <div className="mt-1 text-lg font-bold">{unreadCount}</div>
-              </div>
-              <div className={`rounded-2xl px-4 py-3 ${isDark ? 'bg-gray-900 text-gray-200' : 'bg-slate-50 text-slate-700'}`}>
-                <div className="text-xs text-slate-500">Push</div>
-                <div className="mt-1 text-sm font-semibold">Coming Soon</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {loading ? (
           <div className={`py-10 text-center text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Loading notifications...</div>
         ) : notifications.length === 0 ? (
           <div className={`rounded-[28px] border p-8 text-center ${isDark ? 'border-gray-700 bg-gray-800' : 'border-slate-200 bg-white shadow-sm'}`}>
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
-              <Bell className="h-8 w-8" />
-            </div>
             <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>No notifications yet</h2>
             <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>When admin sends updates, they will appear here.</p>
           </div>

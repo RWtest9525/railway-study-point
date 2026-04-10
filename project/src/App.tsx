@@ -17,6 +17,7 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Membership } from './pages/Membership';
 import { ContactSupport } from './pages/ContactSupport';
 import { Notifications } from './pages/Notifications';
+import { PushNotificationsInfo } from './pages/PushNotificationsInfo';
 import { Settings } from './pages/Settings';
 import { MockTests } from './pages/MockTests';
 import { SubjectQuizzes } from './pages/SubjectQuizzes';
@@ -219,6 +220,14 @@ function AppContent() {
     return (
       <ProtectedRoute>
         <Notifications />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/notifications/push') {
+    return (
+      <ProtectedRoute>
+        <PushNotificationsInfo />
       </ProtectedRoute>
     );
   }

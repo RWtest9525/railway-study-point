@@ -26,7 +26,7 @@ function getExamState(exam: Exam) {
 }
 
 export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
-  const { navigate } = useRouter();
+  const { navigate, goBack } = useRouter();
   const { theme } = useTheme();
   const { canAccessTests, isPremium, trialExpiredNeedsPremium } = useAuth();
   const isDark = theme === 'dark';
@@ -128,7 +128,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
               if (path.length > 0) {
                 setPath((prev) => prev.slice(0, -1));
               } else {
-                navigate('/dashboard');
+                goBack();
               }
             }}
             className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
@@ -147,28 +147,6 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        <div className={`mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-[28px] border p-4`}>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <button
-              onClick={() => setPath([])}
-              className={`rounded-full px-3 py-1 font-semibold ${path.length === 0 ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-900 text-gray-300' : 'bg-slate-100 text-slate-700'}`}
-            >
-              {category?.name || 'Category'}
-            </button>
-            {path.map((node, index) => (
-              <div key={node.id} className="flex items-center gap-2">
-                <ChevronRight className="h-4 w-4 text-slate-400" />
-                <button
-                  onClick={() => setPath(path.slice(0, index + 1))}
-                  className={`rounded-full px-3 py-1 font-semibold ${index === path.length - 1 ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-900 text-gray-300' : 'bg-slate-100 text-slate-700'}`}
-                >
-                  {node.name}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {isLocked && (
           <div className={`mb-5 rounded-[24px] border px-4 py-4 text-sm ${isDark ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-red-200 bg-red-50 text-red-700'}`}>
             Free trial ended. Take premium to unlock category boxes and exams.

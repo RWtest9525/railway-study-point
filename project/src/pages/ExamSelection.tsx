@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getUserNotifications, getExams, subscribeToCategories, Category, Exam, Notification, timestampToString } from '../lib/firestore';
-import { trialWholeDaysLeft } from '../lib/authUtils';
 import { BrandLogo } from '../components/BrandLogo';
 import { BottomNav } from '../components/BottomNav';
 import { UserPanel } from '../components/UserPanel';
@@ -29,14 +28,13 @@ function getExamState(exam: Exam) {
 export function ExamSelection() {
   const { navigate } = useRouter();
   const { theme } = useTheme();
-  const { profile, user, isPremium, effectiveRole, canAccessTests, trialExpiredNeedsPremium } = useAuth();
+  const { user, isPremium, effectiveRole, canAccessTests, trialExpiredNeedsPremium } = useAuth();
   const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredExams, setFeaturedExams] = useState<Exam[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [userPanelOpen, setUserPanelOpen] = useState(false);
-  const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile as any), [profile]);
   const unreadCount = useMemo(() => notifications.filter((item) => !item.is_read).length, [notifications]);
   const hasLockedAccess = !canAccessTests || trialExpiredNeedsPremium;
 
@@ -145,57 +143,16 @@ export function ExamSelection() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-5">
-        <section className={`overflow-hidden rounded-[30px] border p-5 ${
-          isDark
-            ? 'border-blue-500/20 bg-gradient-to-br from-blue-900/20 via-gray-900 to-amber-900/20'
-            : 'border-sky-100 bg-gradient-to-br from-sky-50 via-white to-orange-50 shadow-sm'
-        }`}>
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-wrap gap-2">
-              {effectiveRole === 'admin' && (
-                <button onClick={() => navigate('/admin-portal')} className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 ring-1 ring-red-200">
-                  Admin Panel
-                </button>
-              )}
-              {isPremium ? (
-                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">Premium Active</span>
-              ) : trialExpiredNeedsPremium ? (
-                <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">Free trial ended</span>
-              ) : (
-                <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
-                  {daysLeftTrial ?? 0} day(s) left
-                </span>
-              )}
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div>
-                <h1 className={`text-2xl font-bold leading-tight sm:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  Practice by category, open the test, and enter in one tap.
-                </h1>
-                <p className={`mt-2 text-sm leading-6 sm:text-base ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
-                  Category cards stay simple, exams stay visible below, and important admin notifications appear at the top.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <MetricCard label="Categories" value={String(categories.length || 4)} />
-                <MetricCard label="Exams" value={String(featuredExams.length || 6)} />
-                <MetricCard label="Unread" value={String(unreadCount)} />
-                <button
-                  onClick={() => navigate('/leaderboard')}
-                  className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-sm"
-                >
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
-                    <Trophy className="h-4 w-4 text-amber-500" />
-                    Leaderboard
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">Weekly reset every Monday</div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
+        {effectiveRole === 'admin' && (
+          <section className="mb-5">
+            <button
+              onClick={() => navigate('/admin-portal')}
+              className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 ring-1 ring-red-200"
+            >
+              Open Admin Panel
+            </button>
+          </section>
+        )}
 
         {upcomingNotificationsPreview.length > 0 && (
           <section className="mt-6 space-y-3">
@@ -229,7 +186,7 @@ export function ExamSelection() {
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Choose Category</h2>
-            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>2 column mobile layout</span>
+            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Tap a box to continue</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -270,6 +227,33 @@ export function ExamSelection() {
               );
             })}
           </div>
+        </section>
+
+        <section className="mt-7">
+          <button
+            onClick={() => navigate('/leaderboard')}
+            className={`w-full rounded-[28px] border px-5 py-5 text-left ${
+              isDark
+                ? 'border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-gray-800 text-white'
+                : 'border-amber-100 bg-gradient-to-r from-amber-50 to-white text-slate-900 shadow-sm'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                  <Trophy className="h-4 w-4" />
+                  Leaderboard
+                </div>
+                <div className={`mt-2 text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Check weekly overall exam ranking
+                </div>
+                <div className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                  Updates every Monday
+                </div>
+              </div>
+              <ChevronRight className={`h-5 w-5 ${isDark ? 'text-amber-300' : 'text-amber-500'}`} />
+            </div>
+          </button>
         </section>
 
         <section className="mt-8">
@@ -352,15 +336,6 @@ export function ExamSelection() {
       </main>
 
       <BottomNav />
-    </div>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-sm">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-2 text-xl font-bold text-slate-900">{value}</div>
     </div>
   );
 }

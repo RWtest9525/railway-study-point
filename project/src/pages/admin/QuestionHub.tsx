@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Download, Import, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Download, Import, Pencil, Plus, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
@@ -28,6 +28,7 @@ export function QuestionHub() {
   const [items, setItems] = useState<CategoryNode[]>([]);
   const [path, setPath] = useState<StepItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stepLoading, setStepLoading] = useState(false);
   const [linkedExam, setLinkedExam] = useState<Exam | null>(null);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
@@ -96,13 +97,19 @@ export function QuestionHub() {
   };
 
   const loadStepItems = async () => {
-    if (path.length === 0) return;
+    if (path.length === 0) {
+      setItems([]);
+      return;
+    }
+    setStepLoading(true);
     try {
       const nodes = await getCategoryNodes(selectedCategoryId, currentNodeParent);
       setItems(nodes);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load items');
+    } finally {
+      setStepLoading(false);
     }
   };
 
@@ -178,7 +185,7 @@ export function QuestionHub() {
       await updateCategoryNode(editingNode.id, { name: nodeName.trim() });
       toast.success('Updated');
     } else {
-      await createCategoryNode({
+      const createdId = await createCategoryNode({
         category_id: selectedCategoryId,
         parent_id: currentNodeParent,
         name: nodeName.trim(),
@@ -186,11 +193,26 @@ export function QuestionHub() {
         order: items.length + 1,
         is_active: true,
       });
+      setItems((prev) => [
+        ...prev,
+        {
+          id: createdId,
+          category_id: selectedCategoryId,
+          parent_id: currentNodeParent,
+          name: nodeName.trim(),
+          level: path.length,
+          order: items.length + 1,
+          is_active: true,
+          created_at: '',
+          updated_at: '',
+        },
+      ]);
       toast.success('Created');
     }
 
     setNodeModalOpen(false);
     setNodeName('');
+    setEditingNode(null);
     await loadStepItems();
   };
 
@@ -311,7 +333,7 @@ export function QuestionHub() {
 
             {!isFinalPage && (
               <div className="grid gap-4">
-                {loading ? (
+                {loading || stepLoading ? (
                   <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                     Loading...
                   </div>
@@ -321,7 +343,7 @@ export function QuestionHub() {
               </div>
             )}
 
-            {path.length > 0 && !isFinalPage && items.length === 0 && !loading && (
+            {path.length > 0 && !isFinalPage && items.length === 0 && !loading && !stepLoading && (
               <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                 No more items here. Go one more proper level or create a new folder from the top button.
               </div>
@@ -459,7 +481,7 @@ function ModalShell({
         <div className="mb-5 flex items-center justify-between">
           <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</h3>
           <button onClick={onClose} className="rounded-xl p-2 text-slate-500">
-            <Trash2 className="h-4 w-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
         {children}
