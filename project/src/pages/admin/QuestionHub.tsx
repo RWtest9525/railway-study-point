@@ -148,16 +148,22 @@ export function QuestionHub() {
       return;
     }
 
-    if (editingCategory) {
-      await updateCategory(editingCategory.id, categoryForm);
-      toast.success('Category updated');
-    } else {
-      await createCategory({ ...categoryForm, order: categories.length + 1 });
-      toast.success('Category created');
-    }
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, categoryForm);
+        toast.success('Category updated');
+      } else {
+        await createCategory({ ...categoryForm, order: categories.length + 1 });
+        toast.success('Category created');
+      }
 
-    setCategoryModalOpen(false);
-    await loadCategories();
+      setCategoryModalOpen(false);
+      setEditingCategory(null);
+      await loadCategories();
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not save category');
+    }
   };
 
   const saveNode = async (e: React.FormEvent) => {
@@ -181,52 +187,71 @@ export function QuestionHub() {
       return;
     }
 
-    if (editingNode) {
-      await updateCategoryNode(editingNode.id, { name: nodeName.trim() });
-      toast.success('Updated');
-    } else {
-      const createdId = await createCategoryNode({
-        category_id: selectedCategoryId,
-        parent_id: currentNodeParent,
-        name: nodeName.trim(),
-        level: path.length,
-        order: items.length + 1,
-        is_active: true,
-      });
-      setItems((prev) => [
-        ...prev,
-        {
-          id: createdId,
+    try {
+      if (editingNode) {
+        await updateCategoryNode(editingNode.id, { name: nodeName.trim() });
+        toast.success('Updated');
+      } else {
+        const createdId = await createCategoryNode({
           category_id: selectedCategoryId,
           parent_id: currentNodeParent,
           name: nodeName.trim(),
           level: path.length,
           order: items.length + 1,
           is_active: true,
-          created_at: '',
-          updated_at: '',
-        },
-      ]);
-      toast.success('Created');
-    }
+        });
+        setItems((prev) => [
+          ...prev,
+          {
+            id: createdId,
+            category_id: selectedCategoryId,
+            parent_id: currentNodeParent,
+            name: nodeName.trim(),
+            level: path.length,
+            order: items.length + 1,
+            is_active: true,
+            created_at: '',
+            updated_at: '',
+          },
+        ]);
+        toast.success('Created');
+      }
 
-    setNodeModalOpen(false);
-    setNodeName('');
-    setEditingNode(null);
-    await loadStepItems();
+      setNodeModalOpen(false);
+      setNodeName('');
+      setEditingNode(null);
+      await loadStepItems();
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not save this item');
+    }
   };
 
   const removeCategory = async (category: Category) => {
     if (!confirm(`Delete "${category.name}"?`)) return;
-    await deleteCategory(category.id);
-    setPath([]);
-    await loadCategories();
+    try {
+      await deleteCategory(category.id);
+      setPath([]);
+      setItems([]);
+      await loadCategories();
+      toast.success('Category deleted');
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not delete category');
+    }
   };
 
   const removeNode = async (node: CategoryNode) => {
     if (!confirm(`Delete "${node.name}"?`)) return;
-    await deleteCategoryNode(node.id);
-    await loadStepItems();
+    try {
+      await deleteCategoryNode(node.id);
+      setItems((prev) => prev.filter((item) => item.id !== node.id));
+      await loadStepItems();
+      toast.success('Item deleted');
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not delete item');
+    }
   };
 
   const renderCards = () => {
@@ -446,16 +471,36 @@ function ItemCard({
 }) {
   return (
     <div className={`rounded-[28px] border p-4 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-      <button onClick={onOpen} className="w-full rounded-[24px] border-2 border-slate-300 px-5 py-6 text-left transition hover:border-teal-500">
-        <div className="text-base font-semibold text-slate-900">{title}</div>
-        <div className="mt-2 text-sm text-slate-500">{subtitle}</div>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`w-full rounded-[24px] border-2 px-5 py-6 text-left transition ${
+          isDark
+            ? 'border-slate-700 bg-slate-900 hover:border-teal-500'
+            : 'border-slate-300 bg-white hover:border-teal-500'
+        }`}
+      >
+        <div className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</div>
+        <div className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{subtitle}</div>
       </button>
       <div className="mt-3 flex gap-2">
-        <button onClick={onEdit} className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-700">
+        <button
+          type="button"
+          onClick={onEdit}
+          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs ${
+            isDark ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-700'
+          }`}
+        >
           <Pencil className="h-3.5 w-3.5" />
           Edit
         </button>
-        <button onClick={onDelete} className="inline-flex items-center gap-1 rounded-xl border border-red-300 px-3 py-2 text-xs text-red-600">
+        <button
+          type="button"
+          onClick={onDelete}
+          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs ${
+            isDark ? 'border-red-500/40 text-red-300' : 'border-red-300 text-red-600'
+          }`}
+        >
           <Trash2 className="h-3.5 w-3.5" />
           Delete
         </button>
