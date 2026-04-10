@@ -52,7 +52,7 @@ export function UserPanel({ isOpen, onClose, notificationCount = 0 }: UserPanelP
     { title: 'Profile', subtitle: 'Manage your details', icon: User, action: () => go('/profile') },
     { title: 'Notifications', subtitle: notificationCount > 0 ? `${notificationCount} new update(s)` : 'Check admin updates', icon: Bell, action: () => go('/notifications') },
     { title: 'Leaderboard', subtitle: 'See top performers', icon: Trophy, action: () => go('/leaderboard') },
-    { title: isPremium ? 'Premium plan' : 'Upgrade plan', subtitle: isPremium ? 'Membership active' : 'Unlock premium tests', icon: Crown, action: () => go('/upgrade') },
+    { title: 'Membership', subtitle: isPremium ? 'See current premium details' : 'See trial and premium details', icon: Crown, action: () => go('/membership') },
   ];
 
   return (
@@ -120,9 +120,9 @@ export function UserPanel({ isOpen, onClose, notificationCount = 0 }: UserPanelP
                     </span>
                   )}
                 </button>
-                <button onClick={() => go('/upgrade')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left">
+                <button onClick={() => go('/membership')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left">
                   <div className="text-xs uppercase tracking-wide text-slate-400">Access</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-900">{isPremium ? 'Premium Active' : 'Manage Plan'}</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{isPremium ? 'Membership Details' : 'Manage Plan'}</div>
                 </button>
               </div>
             </div>
@@ -166,8 +166,8 @@ export function UserPanel({ isOpen, onClose, notificationCount = 0 }: UserPanelP
                     : 'Unavailable'}
                 </div>
               </div>
-              <button onClick={() => go('/upgrade')} className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">
-                {isPremium ? 'Manage Premium' : 'Upgrade to Premium'}
+              <button onClick={() => go('/membership')} className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">
+                {isPremium ? 'Open Membership Details' : 'Open Membership'}
               </button>
             </div>
 

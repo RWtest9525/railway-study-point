@@ -42,6 +42,13 @@ export function ExamCreator() {
     void loadData();
   }, []);
 
+  useEffect(() => {
+    const categoryIdFromQuery = new URLSearchParams(window.location.search).get('categoryId');
+    if (!categoryIdFromQuery) return;
+    setFormData((prev) => ({ ...prev, category_id: categoryIdFromQuery }));
+    setShowForm(true);
+  }, []);
+
   const loadData = async () => {
     setLoading(true);
     try {

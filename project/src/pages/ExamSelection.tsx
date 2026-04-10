@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronRight, Clock3, Crown, Lock, PlayCircle, Trophy } from 'lucide-react';
+import { Bell, ChevronRight, Clock3, Crown, Lock, PlayCircle, Trophy, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
@@ -135,8 +135,11 @@ export function ExamSelection() {
                 </span>
               )}
             </button>
-            <button onClick={() => setUserPanelOpen(true)} className={`rounded-2xl px-3 py-2 text-xs font-semibold ${isDark ? 'bg-gray-800 text-white' : 'bg-slate-900 text-white'}`}>
-              Account
+            <button
+              onClick={() => setUserPanelOpen(true)}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${isDark ? 'bg-gray-800 text-white' : 'bg-slate-900 text-white'}`}
+            >
+              <User className="h-4 w-4" />
             </button>
           </div>
         </div>

@@ -69,10 +69,13 @@ export function BottomNav() {
 
             {/* Premium */}
             {isPremium ? (
-              <div className={`flex flex-col items-center justify-center w-full h-full py-2 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
+              <button
+                onClick={() => navigate('/membership')}
+                className={`flex flex-col items-center justify-center w-full h-full py-2 transition ${isDark ? 'text-yellow-400 hover:text-yellow-300' : 'text-yellow-600 hover:text-yellow-700'}`}
+              >
                 <Crown className="w-5 h-5 mb-1" />
                 <span className="text-[10px] font-medium">Premium</span>
-              </div>
+              </button>
             ) : (
               <button
                 onClick={() => navigate('/upgrade')}

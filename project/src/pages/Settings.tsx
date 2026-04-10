@@ -17,7 +17,7 @@ import {
 export function Settings() {
   const { profile, signOut, isPremium } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { navigate } = useRouter();
+  const { navigate, goBack } = useRouter();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -34,6 +34,17 @@ export function Settings() {
       day: 'numeric', 
       month: 'long', 
       year: 'numeric' 
+    });
+  };
+
+  const formatDateTime = (dateString?: string) => {
+    if (!dateString) return 'Unavailable';
+    return new Date(dateString).toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
     });
   };
 
@@ -64,13 +75,13 @@ export function Settings() {
     },
     {
       icon: Crown,
-      title: isPremium ? 'Manage Premium' : 'Upgrade to Premium',
+      title: 'Membership Details',
       description: isPremium 
         ? `Premium until ${profile?.premium_until ? formatDate(profile.premium_until) : 'N/A'}`
-        : 'Unlock all features',
+        : 'See free trial and premium status',
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10',
-      action: () => navigate('/upgrade')
+      action: () => navigate('/membership')
     }
   ];
 
@@ -86,7 +97,7 @@ export function Settings() {
       } border-b`}>
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
           <button
-            onClick={() => window.history.back()}
+            onClick={() => goBack()}
             className={`p-2 rounded-full transition ${
               theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
             }`}
@@ -130,6 +141,33 @@ export function Settings() {
                   <span className="text-xs text-amber-400 font-medium">Premium Member</span>
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className={`mt-5 grid gap-3 md:grid-cols-2`}>
+            <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'border-gray-700 bg-gray-900/60' : 'border-slate-200 bg-white/80'}`}>
+              <div className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${theme === 'dark' ? 'text-gray-500' : 'text-slate-500'}`}>
+                Membership
+              </div>
+              <div className={`mt-2 text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {isPremium ? 'Premium Active' : 'Free Trial / Free User'}
+              </div>
+              <div className={`mt-1 text-xs leading-6 ${theme === 'dark' ? 'text-gray-400' : 'text-slate-500'}`}>
+                {isPremium
+                  ? `Ends on ${formatDateTime((profile as any)?.premium_until)}`
+                  : `Trial based on joined date ${profile?.created_at ? formatDate(profile.created_at) : 'Unavailable'}`}
+              </div>
+            </div>
+            <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'border-gray-700 bg-gray-900/60' : 'border-slate-200 bg-white/80'}`}>
+              <div className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${theme === 'dark' ? 'text-gray-500' : 'text-slate-500'}`}>
+                Premium Start
+              </div>
+              <div className={`mt-2 text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {(profile as any)?.premium_started_at ? formatDateTime((profile as any).premium_started_at) : 'Unavailable'}
+              </div>
+              <div className={`mt-1 text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-slate-500'}`}>
+                Shown only when premium has been activated successfully.
+              </div>
             </div>
           </div>
         </div>

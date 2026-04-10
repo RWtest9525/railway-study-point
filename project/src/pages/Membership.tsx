@@ -12,7 +12,7 @@ import { BottomNav } from '../components/BottomNav';
 
 export function Membership() {
   const { profile, effectiveRole } = useAuth();
-  const { navigate } = useRouter();
+  const { navigate, goBack } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -20,13 +20,26 @@ export function Membership() {
   const inTrial = effectiveRole !== 'admin' && !premiumActive && isWithinFreeTrial(profile);
   const daysLeft = trialWholeDaysLeft(profile);
 
+  const premiumStart = (profile as any)?.premium_started_at;
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return 'Unavailable';
+    return new Date(value).toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Header with back arrow */}
       <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
         <div className="max-w-lg mx-auto px-4 h-16 flex items-center gap-4">
           <button 
-            onClick={() => window.history.back()}
+            onClick={() => goBack()}
             className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
           >
             <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
@@ -67,6 +80,15 @@ export function Membership() {
               </div>
               
               <div className={`${isDark ? 'bg-gray-700/30 border-gray-700/50' : 'bg-gray-50 border-gray-200'} rounded-2xl p-5 space-y-4 border`}>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center shrink-0">
+                    <Clock className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div>
+                    <span className={`${isDark ? 'text-gray-500' : 'text-gray-500'} block text-[10px] uppercase font-bold tracking-widest mb-0.5`}>Started On</span>
+                    <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatDateTime(premiumStart)}</span>
+                  </div>
+                </div>
                 {profile?.premium_until && (
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-amber-600/20 rounded-lg flex items-center justify-center shrink-0">

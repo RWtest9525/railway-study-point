@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Download, Import, Pencil, Plus, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useRouter } from '../../contexts/RouterContext';
 import {
   Category,
   CategoryNode,
@@ -22,6 +23,7 @@ type QuestionMode = 'manual' | 'screenshot' | 'bulk';
 type StepItem = { entity: 'category' | 'node'; id: string; name: string; categoryId: string };
 
 export function QuestionHub() {
+  const { navigate } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
@@ -42,7 +44,8 @@ export function QuestionHub() {
   const selectedCategoryId = path.find((item) => item.entity === 'category')?.id || '';
   const selectedNode = path.length > 0 ? path[path.length - 1] : null;
   const currentNodeParent = path[path.length - 1]?.entity === 'node' ? path[path.length - 1].id : null;
-  const isFinalPage = path.length >= 2 && items.length === 0;
+  const canCreateExamHere = path.length >= 1;
+  const canAddQuestionHere = path.length >= 2;
 
   useEffect(() => {
     void loadCategories();
@@ -59,18 +62,24 @@ export function QuestionHub() {
     return path[path.length - 1].name;
   }, [path]);
 
+  const pageBadge = useMemo(() => {
+    if (path.length === 0) return 'Category Page';
+    if (path.length === 1) return 'Sub Category Page';
+    if (path.length === 2) return 'Folder Page';
+    return 'Next Folder Page';
+  }, [path.length]);
+
   const addButtonLabel = useMemo(() => {
     if (path.length === 0) return 'Add Category';
     if (path.length === 1) return 'Add Sub Category';
-    return 'Add Sub Sub Category';
+    return 'Add Next Folder';
   }, [path.length]);
 
   const helperText = useMemo(() => {
-    if (isFinalPage) return 'You reached the last page. Now you can add, import, or export questions.';
-    if (path.length === 0) return 'Select category first. Do not show add question here.';
-    if (path.length === 1) return 'Select sub category first. Do not show add question here.';
-    return 'Go to the last page folder first. Then the question page will open.';
-  }, [isFinalPage, path.length]);
+    if (path.length === 0) return 'Select a category first.';
+    if (path.length === 1) return 'Add sub category here or create exam for this category.';
+    return 'Add folders here or open the question page linked to this folder.';
+  }, [path.length]);
 
   const loadCategories = async () => {
     setLoading(true);
@@ -190,6 +199,7 @@ export function QuestionHub() {
     try {
       if (editingNode) {
         await updateCategoryNode(editingNode.id, { name: nodeName.trim() });
+        setItems((prev) => prev.map((node) => (node.id === editingNode.id ? { ...node, name: nodeName.trim() } : node)));
         toast.success('Updated');
       } else {
         const createdId = await createCategoryNode({
@@ -314,7 +324,7 @@ export function QuestionHub() {
               </button>
               <div>
                 <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                  {path.length === 0 ? 'Page 1' : `Page ${path.length + 1}`}
+                  {pageBadge}
                 </div>
                 <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle}</h1>
                 <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{helperText}</p>
@@ -356,36 +366,46 @@ export function QuestionHub() {
               </div>
             )}
 
-            {!isFinalPage && (
-              <div className="grid gap-4">
-                {loading || stepLoading ? (
-                  <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
-                    Loading...
-                  </div>
-                ) : (
-                  renderCards()
-                )}
-              </div>
-            )}
+            <div className="grid gap-4">
+              {loading || stepLoading ? (
+                <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                  Loading...
+                </div>
+              ) : (
+                renderCards()
+              )}
+            </div>
 
-            {path.length > 0 && !isFinalPage && items.length === 0 && !loading && !stepLoading && (
+            {path.length > 0 && items.length === 0 && !loading && !stepLoading && (
               <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
-                No more items here. Go one more proper level or create a new folder from the top button.
+                No child folders here yet. You can add a new one from the top button.
               </div>
             )}
 
-            {isFinalPage && (
-              <div className="space-y-5">
+            {path.length > 0 && (
+              <div className="mt-5 space-y-5">
                 <div className={`rounded-3xl border p-5 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
-                  <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Final Page</div>
+                  <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Current Selection</div>
                   <div className={`mt-2 text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedNode?.name}</div>
                   <div className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Now the add question page can open. Before this page, no question page is shown.
+                    Use the buttons below for this selected field only.
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
+                  {canCreateExamHere && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/exams?categoryId=${selectedCategoryId}`)}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create Exam Here
+                    </button>
+                  )}
+                  {canAddQuestionHere && (
                   <button
+                    type="button"
                     onClick={() => {
                       if (confirm(`Add question inside "${selectedNode?.name}"?`)) {
                         setQuestionMode('manual');
@@ -397,11 +417,12 @@ export function QuestionHub() {
                     <Plus className="h-4 w-4" />
                     Add Question
                   </button>
-                  <button onClick={() => toast('Import hook is ready here.')} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
+                  )}
+                  <button type="button" onClick={() => toast('Import hook is ready here.')} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
                     <Import className="h-4 w-4" />
                     Import
                   </button>
-                  <button onClick={() => toast('Export hook is ready here.')} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
+                  <button type="button" onClick={() => toast('Export hook is ready here.')} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
                     <Download className="h-4 w-4" />
                     Export
                   </button>
