@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { getAttempts, getUsers } from '../../lib/firestore';
+import { getAllAttempts, getUsers } from '../../lib/firestore';
 import { Trophy, Medal, Award, TrendingUp } from 'lucide-react';
 
 interface LeaderboardEntry {
@@ -25,7 +25,7 @@ export function AdminLeaderboard() {
 
   const loadLeaderboard = async () => {
     try {
-      const attempts = await getAttempts('');
+      const attempts = await getAllAttempts();
       const users = await getUsers();
       
       // Group attempts by user
@@ -80,7 +80,7 @@ export function AdminLeaderboard() {
     <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
       <div className="mb-6">
         <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Leaderboard</h1>
-        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Top performing students</p>
+        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Overall exam score leaderboard. Weekly motivation board updates every Monday.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

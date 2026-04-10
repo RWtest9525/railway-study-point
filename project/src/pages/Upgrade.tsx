@@ -4,16 +4,10 @@ import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { doc, getDoc, updateDoc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Check, Crown, Zap, BookOpen, Trophy, BarChart3, X, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, BarChart3, BookOpen, Check, Crown, Trophy, X, Zap } from 'lucide-react';
 
-function computePremiumUntil(
-  currentUntil: string | null | undefined,
-  validityDays: number
-): string {
-  const base =
-    currentUntil && new Date(currentUntil) > new Date()
-      ? new Date(currentUntil)
-      : new Date();
+function computePremiumUntil(currentUntil: string | null | undefined, validityDays: number): string {
+  const base = currentUntil && new Date(currentUntil) > new Date() ? new Date(currentUntil) : new Date();
   base.setDate(base.getDate() + validityDays);
   return base.toISOString();
 }
@@ -30,26 +24,19 @@ export function Upgrade() {
   const [validityDays, setValidityDays] = useState(365);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
-  // Load Razorpay SDK dynamically
   useEffect(() => {
-    // Check if Razorpay is already loaded
-    if (window.Razorpay) {
+    if ((window as any).Razorpay) {
       setSdkReady(true);
       return;
     }
 
-    // Create script element
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
-    script.onload = () => {
-      console.log('Razorpay SDK loaded successfully');
-      setSdkReady(true);
-    };
+    script.onload = () => setSdkReady(true);
     script.onerror = () => {
-      console.error('Failed to load Razorpay SDK');
-      setError('Failed to load payment gateway. Please check your internet connection.');
       setSdkReady(false);
+      setError('Failed to load payment gateway. Please refresh and try again.');
     };
     document.body.appendChild(script);
 
@@ -70,7 +57,6 @@ export function Upgrade() {
         }
       } catch (e) {
         console.error('Error loading site settings:', e);
-        /* keep defaults if settings not found */
       } finally {
         setSettingsLoaded(true);
       }
@@ -79,30 +65,17 @@ export function Upgrade() {
 
   const displayRupees = (pricePaise / 100).toFixed(pricePaise % 100 === 0 ? 0 : 2);
 
-  if (authLoading || !settingsLoaded) {
-    return (
-      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center`}>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
   const handleUpgrade = async () => {
     if (!profile) return;
 
-    // 1. Explicit Key Loading and Verification
     const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
-    console.log('Razorpay Key Verification:', key ? `${key.substring(0, 8)}...` : 'MISSING');
-
     if (!key || String(key).trim() === '') {
       setError('Razorpay is not configured. Add VITE_RAZORPAY_KEY_ID in your environment.');
       return;
     }
 
-    // 2. Script Verification
     const RazorpayConstructor = (window as any).Razorpay;
     if (!RazorpayConstructor || !sdkReady) {
-      alert('Razorpay SDK not loaded. Please check your internet connection and reload the page.');
       setError('Razorpay SDK is not loaded. Please refresh the page.');
       return;
     }
@@ -111,15 +84,10 @@ export function Upgrade() {
     setError('');
 
     try {
-      // 3. Amount Formatting: Ensuring it is in paise (Price * 100 if stored in rupees)
-      // Since pricePaise is stored in paise (e.g., 3900 for ₹39), we use it directly.
-      // We will log it to confirm the amount being sent.
-      const finalAmount = pricePaise; 
-      console.log('Processing payment for amount (paise):', finalAmount);
-
-      // Create transaction record in Firestore
+      const finalAmount = pricePaise;
       const transactionRef = doc(collection(db, 'transactions'));
       const planType = validityDays >= 365 ? 'yearly' : validityDays >= 30 ? 'monthly' : 'lifetime';
+
       await setDoc(transactionRef, {
         user_id: profile.id,
         amount: finalAmount,
@@ -129,46 +97,39 @@ export function Upgrade() {
         created_at: serverTimestamp(),
       });
 
-      // 4. Reconstruct Options Object
       const options = {
-        key: key,
+        key,
         amount: finalAmount,
         currency: 'INR',
         name: 'Railway Study Point',
-        description: `Premium Access — ${validityDays} Days`,
+        description: `Premium Access - ${validityDays} Days`,
         image: '/railway-study-point-logo.png',
         handler: async (response: any) => {
-          console.log('Payment successful! Response:', response);
           try {
-            const paymentId = response.razorpay_payment_id;
-            
-            // Update transaction status
             await updateDoc(transactionRef, {
               status: 'success',
-              razorpay_payment_id: paymentId ?? null,
+              razorpay_payment_id: response.razorpay_payment_id ?? null,
               completed_at: new Date().toISOString(),
             });
 
+            const profileRef = doc(db, 'profiles', profile.id);
             const newUntil = computePremiumUntil((profile as any).premium_until, validityDays);
             const wasActive = (profile as any).premium_until && new Date((profile as any).premium_until) > new Date();
-            
-            // Update user profile
-            const profileRef = doc(db, 'profiles', profile.id);
             const premiumPatch: any = {
               is_premium: true,
               premium_until: newUntil,
             };
+
             if (!wasActive || !(profile as any).premium_started_at) {
               premiumPatch.premium_started_at = new Date().toISOString();
             }
 
             await updateDoc(profileRef, premiumPatch);
-
             await refreshProfile();
             navigate('/dashboard');
           } catch (err) {
             console.error('Error updating profile after payment:', err);
-            setError('Payment recorded but updating your account failed. Contact support with your payment ID.');
+            setError('Payment recorded but account update failed. Contact support with your payment ID.');
           } finally {
             setLoading(false);
           }
@@ -182,7 +143,6 @@ export function Upgrade() {
         },
         modal: {
           ondismiss: async () => {
-            console.log('Razorpay modal closed by user');
             try {
               await updateDoc(transactionRef, {
                 status: 'cancelled',
@@ -199,7 +159,6 @@ export function Upgrade() {
 
       const rzp = new RazorpayConstructor(options);
       rzp.on('payment.failed', async (response: any) => {
-        console.error('Payment failed:', response.error);
         try {
           await updateDoc(transactionRef, {
             status: 'failed',
@@ -220,81 +179,79 @@ export function Upgrade() {
     }
   };
 
+  if (authLoading || !settingsLoaded) {
+    return (
+      <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center`}>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-500" />
+      </div>
+    );
+  }
+
   return (
-    <div className={`min-h-screen overflow-hidden pb-24 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
-      {/* Animated background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-yellow-600/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/2 -left-40 w-60 h-60 bg-blue-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -right-40 -top-40 h-80 w-80 rounded-full bg-yellow-600/10 blur-3xl animate-pulse" />
+        <div className="absolute -left-40 top-1/2 h-60 w-60 rounded-full bg-blue-600/10 blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute -bottom-40 right-1/3 h-72 w-72 rounded-full bg-purple-600/10 blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Header */}
-      <header className={`relative ${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-4">
-          <button 
-            onClick={() => window.history.back()}
-            className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
-          >
-            <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+      <header className={`relative ${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 border-b backdrop-blur-md`}>
+        <div className="mx-auto flex h-16 max-w-3xl items-center gap-4 px-4">
+          <button onClick={() => window.history.back()} className={`rounded-full p-2 transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+            <ArrowLeft className={`h-5 w-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
           </button>
-          <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Go Premium</h1>
+          <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Go Premium</h1>
         </div>
       </header>
 
-      <main className="relative max-w-3xl mx-auto px-4 py-8 space-y-6">
-        {/* Hero Section */}
-        <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-700 mb-4 shadow-lg shadow-yellow-500/30">
-            <Crown className="w-8 h-8 text-white" />
+      <main className="relative mx-auto max-w-3xl space-y-6 px-4 py-8">
+        <div className="animate-in slide-in-from-bottom-4 text-center duration-700">
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-yellow-500 to-yellow-700 shadow-lg shadow-yellow-500/30">
+            <Crown className="h-8 w-8 text-white" />
           </div>
-          <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
+          <h1 className={`mb-2 text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
             Unlock <span className="text-yellow-400">Premium</span>
           </h1>
           <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>Get unlimited access to all features</p>
         </div>
 
-        {/* Pricing Card */}
-        <div className={`relative rounded-2xl p-6 border shadow-xl ${isDark ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-yellow-500/30 shadow-yellow-500/10' : 'bg-white border-yellow-300 shadow-yellow-100'}`}>
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent rounded-2xl pointer-events-none" />
-          
+        <div className={`relative rounded-2xl border p-6 shadow-xl ${isDark ? 'border-yellow-500/30 bg-gradient-to-br from-gray-800 to-gray-900 shadow-yellow-500/10' : 'border-yellow-300 bg-white shadow-yellow-100'}`}>
+          <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-yellow-500/5 to-transparent" />
+
           <div className="relative">
-            {/* Price */}
-            <div className="text-center mb-6">
-              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 border ${isDark ? 'bg-yellow-600/20 border-yellow-500/30' : 'bg-yellow-100 border-yellow-300'}`}>
-                <Zap className={`w-3 h-3 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} />
+            <div className="mb-6 text-center">
+              <div className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 ${isDark ? 'border-yellow-500/30 bg-yellow-600/20' : 'border-yellow-300 bg-yellow-100'}`}>
+                <Zap className={`h-3 w-3 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} />
                 <span className={`${isDark ? 'text-yellow-400' : 'text-yellow-700'} text-xs font-bold uppercase tracking-wider`}>Limited Offer</span>
               </div>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className={`text-xl ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>₹</span>
+              <div className="flex items-baseline justify-center gap-2">
+                <span className={`text-xl ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Rs</span>
                 <span className={`text-5xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{displayRupees}</span>
               </div>
-              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mt-2`}>
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} mt-2 text-sm`}>
                 {settingsLoaded ? `${validityDays} days access` : 'Loading...'}
               </p>
             </div>
 
-            {/* Features */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="mb-6 grid grid-cols-2 gap-3">
               {[
                 { icon: BookOpen, text: 'All Exams', color: 'text-blue-400' },
                 { icon: Zap, text: 'Unlimited', color: 'text-yellow-400' },
                 { icon: Trophy, text: 'Analytics', color: 'text-green-400' },
                 { icon: BarChart3, text: 'Solutions', color: 'text-purple-400' },
-              ].map((feature, i) => (
-                <div key={i} className={`flex items-center gap-2 p-2 rounded-lg ${isDark ? 'bg-gray-700/30' : 'bg-gray-100'}`}>
-                  <feature.icon className={`w-4 h-4 ${feature.color}`} />
+              ].map((feature, index) => (
+                <div key={index} className={`flex items-center gap-2 rounded-lg p-2 ${isDark ? 'bg-gray-700/30' : 'bg-gray-100'}`}>
+                  <feature.icon className={`h-4 w-4 ${feature.color}`} />
                   <span className={`${isDark ? 'text-gray-200' : 'text-gray-700'} text-sm`}>{feature.text}</span>
                 </div>
               ))}
             </div>
 
-            {/* More Features */}
-            <div className="space-y-2 mb-6">
-              {['Priority support', 'Ad-free experience', 'All devices'].map((feature, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded-full flex items-center justify-center ${isDark ? 'bg-green-600/20' : 'bg-green-100'}`}>
-                    <Check className={`w-2 h-2 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
+            <div className="mb-6 space-y-2">
+              {['Priority support', 'Ad-free experience', 'All devices'].map((feature, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div className={`flex h-4 w-4 items-center justify-center rounded-full ${isDark ? 'bg-green-600/20' : 'bg-green-100'}`}>
+                    <Check className={`h-2 w-2 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
                   </div>
                   <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>{feature}</span>
                 </div>
@@ -302,32 +259,30 @@ export function Upgrade() {
             </div>
 
             {error && (
-              <div className={`${isDark ? 'bg-red-900/30 border-red-500/50 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} rounded-lg p-3 mb-4 flex items-center gap-2 border`}>
-                <X className={`w-4 h-4 ${isDark ? 'text-red-400' : 'text-red-600'} shrink-0`} />
+              <div className={`${isDark ? 'border-red-500/50 bg-red-900/30 text-red-200' : 'border-red-200 bg-red-50 text-red-700'} mb-4 flex items-center gap-2 rounded-lg border p-3`}>
+                <X className={`h-4 w-4 shrink-0 ${isDark ? 'text-red-400' : 'text-red-600'}`} />
                 <span className="text-sm">{error}</span>
               </div>
             )}
 
-            {/* CTA Button */}
             <button
               onClick={handleUpgrade}
               disabled={loading || !settingsLoaded || !sdkReady}
-              className="w-full bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-yellow-500/30"
+              className="w-full rounded-xl bg-gradient-to-r from-yellow-600 to-yellow-500 py-3 font-bold text-white shadow-lg shadow-yellow-500/30 transition-all hover:from-yellow-500 hover:to-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Processing...' : !sdkReady ? 'Loading payment gateway...' : `Upgrade Now - ₹${displayRupees}`}
+              {loading ? 'Processing...' : !sdkReady ? 'Loading payment gateway...' : `Upgrade Now - Rs ${displayRupees}`}
             </button>
 
-            <p className={`text-center text-xs mt-3 flex items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+            <p className={`mt-3 flex items-center justify-center gap-1 text-center text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" /></svg>
               Secure payment via Razorpay
             </p>
           </div>
         </div>
 
-        {/* Guarantee */}
         <div className="text-center">
-          <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 border ${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-100 border-gray-200'}`}>
-            <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDark ? 'bg-green-500' : 'bg-green-600'}`} />
+          <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${isDark ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-100'}`}>
+            <div className={`h-1.5 w-1.5 rounded-full animate-pulse ${isDark ? 'bg-green-500' : 'bg-green-600'}`} />
             <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-xs`}>30-day money-back guarantee</span>
           </div>
         </div>

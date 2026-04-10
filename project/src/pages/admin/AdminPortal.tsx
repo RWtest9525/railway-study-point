@@ -36,13 +36,14 @@ import { ActivityLogs } from './ActivityLogs';
 import { GlobalAnnouncement } from '../../components/GlobalAnnouncement';
 import { TopStudentsWidget } from '../../components/TopStudentsWidget';
 import { DatabaseBackup } from '../../components/DatabaseBackup';
+import { ManageLinks } from './ManageLinks';
 
 export function AdminPortal() {
   const { profile, signOut } = useAuth();
   const { navigate, currentPath } = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<
-    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'leaderboard' | 'dashboard' | 'activity' | 'backup'
+    'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'leaderboard' | 'dashboard' | 'activity' | 'backup' | 'links'
   >('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -65,6 +66,7 @@ export function AdminPortal() {
     { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
     { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
     { id: 'activity' as const, name: 'Manage Admins', icon: Activity, desc: 'Admin Accounts & Logs' },
+    { id: 'links' as const, name: 'Manage Links', icon: Database, desc: 'Category WhatsApp Links' },
     { id: 'backup' as const, name: 'Backup', icon: Database, desc: 'Export Data' },
   ];
 
@@ -80,6 +82,7 @@ export function AdminPortal() {
       subscription: '/admin/subscription',
       leaderboard: '/admin/leaderboard',
       activity: '/admin/manage-admins',
+      links: '/admin/manage-links',
       backup: '/admin/backup',
     }),
     []
@@ -301,6 +304,7 @@ export function AdminPortal() {
             {activeTab === 'leaderboard' && <AdminLeaderboard />}
             {activeTab === 'activity' && <ActivityLogs />}
             {activeTab === 'backup' && <DatabaseBackup />}
+            {activeTab === 'links' && <ManageLinks />}
           </div>
         </div>
       </main>

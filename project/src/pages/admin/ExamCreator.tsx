@@ -24,7 +24,7 @@ export function ExamCreator() {
     duration_minutes: 90,
     total_marks: 100,
     passing_marks: 40,
-    negative_marking: 0.25,
+    negative_marking: 0,
     schedule_date: '',
     schedule_time: '',
     auto_submit: true,
@@ -65,7 +65,7 @@ export function ExamCreator() {
       duration_minutes: 90,
       total_marks: 100,
       passing_marks: 40,
-      negative_marking: 0.25,
+      negative_marking: 0,
       schedule_date: '',
       schedule_time: '',
       auto_submit: true,
@@ -120,7 +120,7 @@ export function ExamCreator() {
       duration_minutes: exam.duration_minutes,
       total_marks: exam.total_marks,
       passing_marks: exam.passing_marks || 40,
-      negative_marking: exam.negative_marking || 0.25,
+      negative_marking: exam.negative_marking || 0,
       schedule_date: exam.schedule_date || '',
       schedule_time: exam.schedule_time || '',
       auto_submit: exam.auto_submit ?? true,
@@ -272,7 +272,7 @@ export function ExamCreator() {
                 <label className="block">
                   <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Negative marking</span>
                   <select value={formData.negative_marking} onChange={(e) => setFormData((prev) => ({ ...prev, negative_marking: Number(e.target.value) }))} className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}>
-                    <option value={0}>No negative</option>
+                    <option value={0}>No negative marking</option>
                     <option value={0.25}>-0.25</option>
                     <option value={0.33}>-0.33</option>
                     <option value={0.5}>-0.5</option>

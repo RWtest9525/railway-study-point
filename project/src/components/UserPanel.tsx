@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { ChevronRight, Crown, LogOut, Shield, Trophy, User, X } from 'lucide-react';
+import { Bell, ChevronRight, Crown, LogOut, Shield, Trophy, User, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { BrandLogo } from './BrandLogo';
@@ -8,9 +8,10 @@ import { trialWholeDaysLeft } from '../lib/authUtils';
 interface UserPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  notificationCount?: number;
 }
 
-export function UserPanel({ isOpen, onClose }: UserPanelProps) {
+export function UserPanel({ isOpen, onClose, notificationCount = 0 }: UserPanelProps) {
   const { profile, signOut, isPremium, effectiveRole, trialExpiredNeedsPremium } = useAuth();
   const { navigate } = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -49,6 +50,7 @@ export function UserPanel({ isOpen, onClose }: UserPanelProps) {
 
   const quickRows = [
     { title: 'Profile', subtitle: 'Manage your details', icon: User, action: () => go('/profile') },
+    { title: 'Notifications', subtitle: notificationCount > 0 ? `${notificationCount} new update(s)` : 'Check admin updates', icon: Bell, action: () => go('/notifications') },
     { title: 'Leaderboard', subtitle: 'See top performers', icon: Trophy, action: () => go('/leaderboard') },
     { title: isPremium ? 'Premium plan' : 'Upgrade plan', subtitle: isPremium ? 'Membership active' : 'Unlock premium tests', icon: Crown, action: () => go('/upgrade') },
   ];
@@ -68,7 +70,7 @@ export function UserPanel({ isOpen, onClose }: UserPanelProps) {
                 <BrandLogo variant="inline" className="ring-1 ring-slate-200" />
                 <div>
                   <div className="text-sm font-bold text-slate-900">Railway Study Point</div>
-                  <div className="text-xs text-slate-500">User Panel</div>
+                  <div className="text-xs text-slate-500">Account & Access</div>
                 </div>
               </div>
               <button onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100">
@@ -106,6 +108,22 @@ export function UserPanel({ isOpen, onClose }: UserPanelProps) {
                     {daysLeftTrial ?? 'Unavailable'} day(s) left
                   </span>
                 )}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <button onClick={() => go('/notifications')} className="relative rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left">
+                  <div className="text-xs uppercase tracking-wide text-slate-400">Alerts</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Notifications</div>
+                  {notificationCount > 0 && (
+                    <span className="absolute right-3 top-3 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white animate-pulse">
+                      {notificationCount}
+                    </span>
+                  )}
+                </button>
+                <button onClick={() => go('/upgrade')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left">
+                  <div className="text-xs uppercase tracking-wide text-slate-400">Access</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{isPremium ? 'Premium Active' : 'Manage Plan'}</div>
+                </button>
               </div>
             </div>
           </div>

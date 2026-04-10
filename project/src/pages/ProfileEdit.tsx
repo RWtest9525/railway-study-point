@@ -12,14 +12,14 @@ export function ProfileEdit() {
   const isDark = theme === 'dark';
   const { profile, user, refreshProfile } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(profile?.phone ?? '');
   const [loading, setLoading] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
-    setPhone(''); // Phone is not in Firestore profile yet
-  }, [profile?.full_name, profile?.id]);
+    setPhone(profile?.phone ?? '');
+  }, [profile?.full_name, profile?.phone, profile?.id]);
   
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');

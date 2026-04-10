@@ -261,7 +261,7 @@ export function Leaderboard() {
                     More Rankings
                   </h3>
                 </div>
-                <div className="divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}">
+                <div className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
                   {rows.slice(3).map((r, i) => {
                     const actualRank = i + 4;
                     return (

@@ -17,6 +17,7 @@ interface Profile {
   id: string;
   email: string;
   full_name: string;
+  phone?: string;
   role: 'admin' | 'student';
   is_premium: boolean;
   premium_until?: string;

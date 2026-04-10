@@ -49,10 +49,10 @@ export function Membership() {
 
           {effectiveRole === 'admin' && (
             <div className={`${isDark ? 'bg-red-900/20 border-red-500/30 text-red-200' : 'bg-red-50 border-red-200 text-red-700'} rounded-xl p-4 mb-4 border`}>
-              <p className="text-xs sm:text-sm flex items-center gap-2">
+              <div className="text-xs sm:text-sm flex items-center gap-2">
                 <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${isDark ? 'bg-red-400 text-white' : 'bg-red-600 text-white'}`}>A</div>
                 Admin accounts have full access. No membership plan applies.
-              </p>
+              </div>
             </div>
           )}
 

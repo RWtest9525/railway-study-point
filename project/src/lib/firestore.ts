@@ -75,7 +75,8 @@ export interface Exam {
 // Enhanced Question type with difficulty, tags, images, LaTeX
 export interface Question {
   id: string;
-  exam_id: string;
+  exam_id?: string;
+  category_node_id?: string;
   subject: string;
   topic?: string; // "Maths > Profit & Loss"
   subtopic?: string;
@@ -222,13 +223,31 @@ export interface AuditLog {
 
 export interface Notification {
   id: string;
-  user_id?: string; // optional for broadcast
+  user_id?: string;
+  notification_group_id?: string;
+  audience?: 'global' | 'selected';
+  recipient_name?: string;
+  sent_by?: string;
   title: string;
   message: string;
   type: 'test_live' | 'result_declared' | 'payment' | 'system';
   is_read: boolean;
+  is_push?: boolean;
   action_url?: string;
   created_at: string;
+  updated_at?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  phone?: string;
+  role?: 'admin' | 'student';
+  is_premium?: boolean;
+  premium_until?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ProctoringLog {
@@ -241,6 +260,30 @@ export interface ProctoringLog {
   tab_switch_count: number;
   violation_count: number;
   created_at: string;
+}
+
+export interface CategoryNode {
+  id: string;
+  category_id: string;
+  parent_id?: string | null;
+  name: string;
+  level: number;
+  order?: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CategoryLink {
+  id: string;
+  category_id: string;
+  category_node_id?: string | null;
+  type: 'whatsapp_channel';
+  title: string;
+  url: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // Categories
@@ -288,6 +331,81 @@ export const updateCategory = async (categoryId: string, data: Partial<Category>
 
 export const deleteCategory = async (categoryId: string) => {
   await deleteDoc(doc(db, 'categories', categoryId));
+};
+
+// Category tree nodes
+export const categoryNodesRef = collection(db, 'category_nodes');
+
+export const getCategoryNodes = async (categoryId: string, parentId?: string | null) => {
+  const constraints = [
+    where('category_id', '==', categoryId),
+    where('parent_id', '==', parentId ?? null),
+    where('is_active', '==', true),
+    orderBy('order', 'asc'),
+  ];
+  const snapshot = await getDocs(query(categoryNodesRef, ...constraints));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CategoryNode));
+};
+
+export const createCategoryNode = async (data: Omit<CategoryNode, 'id' | 'created_at' | 'updated_at'>) => {
+  const docRef = await addDoc(categoryNodesRef, {
+    ...data,
+    parent_id: data.parent_id ?? null,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const updateCategoryNode = async (nodeId: string, data: Partial<CategoryNode>) => {
+  await updateDoc(doc(db, 'category_nodes', nodeId), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+};
+
+export const deleteCategoryNode = async (nodeId: string) => {
+  await deleteDoc(doc(db, 'category_nodes', nodeId));
+};
+
+// Category Links
+export const categoryLinksRef = collection(db, 'category_links');
+
+export const getCategoryLinks = async (categoryId: string, categoryNodeId?: string | null) => {
+  const snapshot = await getDocs(
+    query(
+      categoryLinksRef,
+      where('category_id', '==', categoryId),
+      where('category_node_id', '==', categoryNodeId ?? null),
+      where('is_active', '==', true),
+      orderBy('updated_at', 'desc')
+    )
+  );
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CategoryLink));
+};
+
+export const upsertCategoryLink = async (data: Omit<CategoryLink, 'id' | 'created_at' | 'updated_at'>) => {
+  const existing = await getCategoryLinks(data.category_id, data.category_node_id ?? null);
+  if (existing[0]) {
+    await updateDoc(doc(db, 'category_links', existing[0].id), {
+      ...data,
+      category_node_id: data.category_node_id ?? null,
+      updated_at: serverTimestamp(),
+    });
+    return existing[0].id;
+  }
+
+  const docRef = await addDoc(categoryLinksRef, {
+    ...data,
+    category_node_id: data.category_node_id ?? null,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const deleteCategoryLink = async (linkId: string) => {
+  await deleteDoc(doc(db, 'category_links', linkId));
 };
 
 // Exams
@@ -476,7 +594,54 @@ export const profilesRef = collection(db, 'profiles');
 
 export const getUsers = async () => {
   const snapshot = await getDocs(profilesRef);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+};
+
+export const getUserProfile = async (userId: string) => {
+  const snapshot = await getDoc(doc(db, 'profiles', userId));
+  if (!snapshot.exists()) return null;
+  return { id: snapshot.id, ...snapshot.data() } as UserProfile;
+};
+
+export const notificationsRef = collection(db, 'notifications');
+
+export const getUserNotifications = async (userId: string) => {
+  const snapshot = await getDocs(
+    query(notificationsRef, where('user_id', '==', userId), orderBy('created_at', 'desc'))
+  );
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Notification));
+};
+
+export const createNotifications = async (
+  notifications: Omit<Notification, 'id' | 'created_at' | 'updated_at'>[]
+) => {
+  await Promise.all(
+    notifications.map((notification) =>
+      addDoc(notificationsRef, {
+        ...notification,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      })
+    )
+  );
+};
+
+export const markNotificationRead = async (notificationId: string) => {
+  await updateDoc(doc(db, 'notifications', notificationId), {
+    is_read: true,
+    updated_at: serverTimestamp(),
+  });
+};
+
+export const updateNotification = async (notificationId: string, data: Partial<Notification>) => {
+  await updateDoc(doc(db, 'notifications', notificationId), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+};
+
+export const deleteNotification = async (notificationId: string) => {
+  await deleteDoc(doc(db, 'notifications', notificationId));
 };
 
 export const getLeaderboard = async (limitCount: number = 100) => {

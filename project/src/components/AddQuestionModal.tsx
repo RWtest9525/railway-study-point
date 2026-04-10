@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Image as ImageIcon, Loader2, Save, Upload, X } from 'lucide-react';
+import { AlertCircle, Loader2, Save, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { createQuestion, createQuestionsBatch, getExams, getQuestions, Exam } from '../lib/firestore';
+import { createQuestion, createQuestionsBatch, getQuestions } from '../lib/firestore';
 import { uploadImage, validateImage } from '../lib/imageUtils';
 
 type QuestionMode = 'manual' | 'screenshot' | 'bulk';
@@ -12,6 +12,9 @@ interface AddQuestionModalProps {
   onClose: () => void;
   onSuccess: () => void;
   examId?: string;
+  examTitle?: string;
+  categoryNodeId?: string;
+  linkedLabel?: string;
   initialMode?: QuestionMode;
 }
 
@@ -19,16 +22,6 @@ interface OptionDraft {
   id: string;
   text: string;
 }
-
-const SUBJECTS = ['Maths', 'Reasoning', 'GK', 'Science', 'English', 'Quantitative'];
-const TOPIC_MAP: Record<string, string[]> = {
-  Maths: ['Arithmetic', 'Algebra', 'Geometry', 'Trigonometry'],
-  Reasoning: ['Verbal', 'Non-Verbal', 'Logical'],
-  GK: ['Current Affairs', 'History', 'Geography', 'Polity'],
-  Science: ['Physics', 'Chemistry', 'Biology'],
-  English: ['Grammar', 'Vocabulary', 'Comprehension'],
-  Quantitative: ['Arithmetic', 'DI'],
-};
 
 const defaultOptions = (): OptionDraft[] => [
   { id: '1', text: '' },
@@ -47,72 +40,58 @@ export function AddQuestionModal({
   onClose,
   onSuccess,
   examId,
+  examTitle,
+  categoryNodeId,
+  linkedLabel,
   initialMode = 'manual',
 }: AddQuestionModalProps) {
   const { profile } = useAuth();
   const [mode, setMode] = useState<QuestionMode>(initialMode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
-  const [uploadingBulkImages, setUploadingBulkImages] = useState(false);
-  const [availableExams, setAvailableExams] = useState<Exam[]>([]);
   const [correctIndex, setCorrectIndex] = useState(0);
   const [options, setOptions] = useState<OptionDraft[]>(defaultOptions());
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
+  const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
+  const [uploadingBulkImages, setUploadingBulkImages] = useState(false);
   const [formData, setFormData] = useState({
-    exam_id: examId || '',
     question_text: '',
-    subject: 'Maths',
-    topic: '',
-    subtopic: '',
+    explanation: '',
+    video_explanation_url: '',
     difficulty: 'medium' as 'easy' | 'medium' | 'hard',
     marks: 1,
     negative_marks: 0,
-    explanation: '',
-    tags: '',
     is_draft: false,
     image_url: '',
-    video_explanation_url: '',
     option_label_style: 'alphabet' as 'alphabet' | 'numeric',
   });
+
+  const isLinkedQuestionBank = Boolean(categoryNodeId);
+  const previewOptions = useMemo(
+    () => (mode === 'manual' ? buildFinalOptions(options, formData.option_label_style) : buildFallbackOptions(formData.option_label_style)),
+    [mode, options, formData.option_label_style]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
     setMode(initialMode);
-    void loadExams();
   }, [isOpen, initialMode]);
-
-  const loadExams = async () => {
-    const exams = await getExams(undefined, true);
-    setAvailableExams(exams);
-    setFormData((prev) => ({
-      ...prev,
-      exam_id: examId || prev.exam_id || exams[0]?.id || '',
-    }));
-  };
-
-  const topics = useMemo(() => TOPIC_MAP[formData.subject] || [], [formData.subject]);
 
   const resetForm = () => {
     setError('');
+    setMode(initialMode);
     setCorrectIndex(0);
     setOptions(defaultOptions());
     setBulkFiles([]);
-    setMode(initialMode);
     setFormData({
-      exam_id: examId || availableExams[0]?.id || '',
       question_text: '',
-      subject: 'Maths',
-      topic: '',
-      subtopic: '',
+      explanation: '',
+      video_explanation_url: '',
       difficulty: 'medium',
       marks: 1,
       negative_marks: 0,
-      explanation: '',
-      tags: '',
       is_draft: false,
       image_url: '',
-      video_explanation_url: '',
       option_label_style: 'alphabet',
     });
   };
@@ -141,7 +120,7 @@ export function AddQuestionModal({
       setFormData((prev) => ({ ...prev, image_url: uploaded.url }));
       toast.success('Question screenshot uploaded');
     } catch (uploadError: any) {
-      const message = uploadError?.message || 'Failed to upload question screenshot';
+      const message = uploadError?.message || 'Failed to upload screenshot';
       setError(message);
       toast.error(message);
     } finally {
@@ -149,43 +128,33 @@ export function AddQuestionModal({
     }
   };
 
-  const buildFinalOptions = () => {
-    const typedOptions = options.map((option) => option.text.trim());
-    return typedOptions.some(Boolean)
-      ? typedOptions.map((option, index) => option || buildFallbackOptions(formData.option_label_style)[index])
-      : buildFallbackOptions(formData.option_label_style);
-  };
-
   const saveSingleQuestion = async () => {
     if (!profile?.id) throw new Error('Please sign in again.');
-    if (!formData.exam_id) throw new Error('Please select an exam.');
-    if (!formData.topic) throw new Error('Please select a topic.');
+    if (!categoryNodeId) throw new Error('Please choose the folder first.');
 
-    const existingQuestions = await getQuestions(formData.exam_id);
-    const finalOptions = buildFinalOptions();
+    const existingQuestions = examId ? await getQuestions(examId) : [];
+    const finalOptions = buildFinalOptions(options, formData.option_label_style);
 
     if (mode === 'manual') {
       if (!formData.question_text.trim()) throw new Error('Please enter the question text.');
-      if (!options.some((option) => option.text.trim())) throw new Error('Please enter the option text.');
+      if (!options.some((option) => option.text.trim())) throw new Error('Please enter all option text.');
     }
 
     if (mode === 'screenshot' && !formData.image_url.trim()) {
-      throw new Error('Please upload the screenshot of the full question.');
+      throw new Error('Please upload the screenshot.');
     }
 
     await createQuestion({
-      exam_id: formData.exam_id,
-      subject: formData.subject,
-      topic: formData.topic,
-      subtopic: formData.subtopic || undefined,
-      question_text: formData.question_text.trim() || (mode === 'screenshot' ? 'Screenshot question' : ''),
+      exam_id: examId || undefined,
+      category_node_id: categoryNodeId,
+      subject: linkedLabel || 'General',
+      question_text: formData.question_text.trim() || 'Screenshot question',
       options: finalOptions,
       option_label_style: formData.option_label_style,
       correct_index: correctIndex,
       explanation: formData.explanation.trim() || undefined,
       video_explanation_url: formData.video_explanation_url.trim() || undefined,
       difficulty: formData.difficulty,
-      tags: formData.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
       image_url: formData.image_url.trim() || undefined,
       marks: Number(formData.marks) || 1,
       negative_marks: Number(formData.negative_marks) || 0,
@@ -199,14 +168,12 @@ export function AddQuestionModal({
 
   const saveBulkQuestions = async () => {
     if (!profile?.id) throw new Error('Please sign in again.');
-    if (!formData.exam_id) throw new Error('Please select an exam.');
-    if (!formData.topic) throw new Error('Please select a topic.');
+    if (!categoryNodeId) throw new Error('Please choose the folder first.');
     if (bulkFiles.length === 0) throw new Error('Please choose one or more screenshots.');
 
     setUploadingBulkImages(true);
     try {
-      const existingQuestions = await getQuestions(formData.exam_id);
-      const finalOptions = buildFallbackOptions(formData.option_label_style);
+      const existingQuestions = examId ? await getQuestions(examId) : [];
       const uploadedUrls: string[] = [];
 
       for (const file of bulkFiles) {
@@ -220,18 +187,16 @@ export function AddQuestionModal({
 
       await createQuestionsBatch(
         uploadedUrls.map((url, index) => ({
-          exam_id: formData.exam_id,
-          subject: formData.subject,
-          topic: formData.topic,
-          subtopic: formData.subtopic || undefined,
-          question_text: `${formData.question_text.trim() || 'Screenshot question'} ${existingQuestions.length + index + 1}`,
-          options: finalOptions,
+          exam_id: examId || undefined,
+          category_node_id: categoryNodeId,
+          subject: linkedLabel || 'General',
+          question_text: `Screenshot question ${existingQuestions.length + index + 1}`,
+          options: buildFallbackOptions(formData.option_label_style),
           option_label_style: formData.option_label_style,
           correct_index: correctIndex,
           explanation: formData.explanation.trim() || undefined,
           video_explanation_url: formData.video_explanation_url.trim() || undefined,
           difficulty: formData.difficulty,
-          tags: formData.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
           image_url: url,
           marks: Number(formData.marks) || 1,
           negative_marks: Number(formData.negative_marks) || 0,
@@ -273,25 +238,25 @@ export function AddQuestionModal({
 
   if (!isOpen) return null;
 
-  const previewOptions = mode === 'manual' ? buildFinalOptions() : buildFallbackOptions(formData.option_label_style);
-
   return (
-    <div className="fixed inset-0 z-[200] bg-black/80 p-3 sm:p-6">
-      <div className="mx-auto max-h-[92vh] max-w-5xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-700 px-4 py-4 sm:px-6">
+    <div className="fixed inset-0 z-[200] bg-slate-950/85 p-3 sm:p-6">
+      <div className="mx-auto max-h-[92vh] max-w-6xl overflow-y-auto rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-5 sm:px-6">
           <div>
-            <h2 className="text-xl font-semibold text-white">Add Questions</h2>
-            <p className="text-sm text-slate-400">Use manual entry, one screenshot, or bulk screenshot upload from the same screen.</p>
+            <h2 className="text-xl font-semibold text-slate-900">Add Questions</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Save questions directly into the selected folder.
+            </p>
           </div>
-          <button onClick={handleClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+          <button onClick={handleClose} className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-6 p-4 sm:grid-cols-[1.35fr_0.9fr] sm:p-6">
+        <form onSubmit={handleSubmit} className="grid gap-6 p-5 lg:grid-cols-[1.3fr_0.8fr] lg:p-6">
           <div className="space-y-5">
             {error && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{error}</span>
@@ -299,84 +264,37 @@ export function AddQuestionModal({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               {[
                 { id: 'manual' as QuestionMode, title: 'Manual', subtitle: 'Type question and options' },
-                { id: 'screenshot' as QuestionMode, title: 'Single Screenshot', subtitle: 'Upload one full screenshot' },
-                { id: 'bulk' as QuestionMode, title: 'Bulk Screenshots', subtitle: 'Upload many and auto-sequence' },
+                { id: 'screenshot' as QuestionMode, title: 'Single Screenshot', subtitle: 'Upload one screenshot' },
+                { id: 'bulk' as QuestionMode, title: 'Bulk Screenshot', subtitle: 'Upload many screenshots' },
               ].map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setMode(item.id)}
                   className={`rounded-2xl border px-4 py-4 text-left transition ${
-                    mode === item.id ? 'border-blue-400 bg-blue-500/10 text-white' : 'border-slate-700 bg-slate-950/70 text-slate-300'
+                    mode === item.id
+                      ? 'border-blue-300 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300'
                   }`}
                 >
                   <div className="text-sm font-semibold">{item.title}</div>
-                  <div className="mt-1 text-xs text-slate-400">{item.subtitle}</div>
+                  <div className="mt-1 text-xs text-slate-500">{item.subtitle}</div>
                 </button>
               ))}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Exam</span>
-                <select
-                  value={formData.exam_id}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, exam_id: e.target.value }))}
-                  disabled={!!examId}
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                >
-                  <option value="">Select exam</option>
-                  {availableExams.map((exam) => (
-                    <option key={exam.id} value={exam.id}>{exam.title}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Subject</span>
-                <select
-                  value={formData.subject}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, subject: e.target.value, topic: '' }))}
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                >
-                  {SUBJECTS.map((subject) => (
-                    <option key={subject} value={subject}>{subject}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
             <div className="grid gap-4 sm:grid-cols-3">
+              <InfoCard label="Folder" value={linkedLabel || 'Selected folder'} />
+              <InfoCard label="Exam" value={examTitle || 'Question bank only'} />
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Topic</span>
-                <select
-                  value={formData.topic}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, topic: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                >
-                  <option value="">Select topic</option>
-                  {topics.map((topic) => (
-                    <option key={topic} value={topic}>{topic}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Subtopic</span>
-                <input
-                  value={formData.subtopic}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, subtopic: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                  placeholder="Optional"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Option style</span>
+                <span className="mb-2 block text-sm font-medium text-slate-700">Option style</span>
                 <select
                   value={formData.option_label_style}
                   onChange={(e) => setFormData((prev) => ({ ...prev, option_label_style: e.target.value as 'alphabet' | 'numeric' }))}
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 >
                   <option value="alphabet">A B C D</option>
                   <option value="numeric">1 2 3 4</option>
@@ -386,11 +304,11 @@ export function AddQuestionModal({
 
             <div className="grid gap-4 sm:grid-cols-4">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Difficulty</span>
+                <span className="mb-2 block text-sm font-medium text-slate-700">Difficulty</span>
                 <select
                   value={formData.difficulty}
                   onChange={(e) => setFormData((prev) => ({ ...prev, difficulty: e.target.value as 'easy' | 'medium' | 'hard' }))}
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 >
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
@@ -398,19 +316,32 @@ export function AddQuestionModal({
                 </select>
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Marks</span>
-                <input type="number" min="1" value={formData.marks} onChange={(e) => setFormData((prev) => ({ ...prev, marks: Number(e.target.value) }))} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" />
+                <span className="mb-2 block text-sm font-medium text-slate-700">Marks</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.marks}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, marks: Number(e.target.value) }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+                />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Negative</span>
-                <input type="number" min="0" step="0.25" value={formData.negative_marks} onChange={(e) => setFormData((prev) => ({ ...prev, negative_marks: Number(e.target.value) }))} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" />
+                <span className="mb-2 block text-sm font-medium text-slate-700">Negative</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={formData.negative_marks}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, negative_marks: Number(e.target.value) }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+                />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Correct answer</span>
+                <span className="mb-2 block text-sm font-medium text-slate-700">Correct answer</span>
                 <select
                   value={correctIndex}
                   onChange={(e) => setCorrectIndex(Number(e.target.value))}
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 >
                   {buildFallbackOptions(formData.option_label_style).map((_, index) => (
                     <option key={index} value={index}>
@@ -421,50 +352,45 @@ export function AddQuestionModal({
               </label>
             </div>
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-200">{mode === 'manual' ? 'Question text' : 'Title / note'}</span>
-              <textarea
-                value={formData.question_text}
-                onChange={(e) => setFormData((prev) => ({ ...prev, question_text: e.target.value }))}
-                rows={mode === 'manual' ? 4 : 2}
-                className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                placeholder={
-                  mode === 'manual'
-                    ? 'Type the full question here'
-                    : mode === 'screenshot'
-                    ? 'Optional note. The screenshot can already contain the full question and options.'
-                    : 'Optional prefix for all bulk screenshot questions'
-                }
-              />
-            </label>
-
             {mode === 'manual' && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-white">Manual options</h3>
-                {options.map((option, index) => (
-                  <div key={option.id} className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
-                    <div className="mb-2 text-xs font-semibold text-slate-400">
-                      Option {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
-                    </div>
-                    <textarea
-                      value={option.text}
-                      onChange={(e) => updateOption(option.id, e.target.value)}
-                      rows={2}
-                      className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                      placeholder="Enter option text"
-                    />
-                  </div>
-                ))}
-              </div>
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Question</span>
+                  <textarea
+                    value={formData.question_text}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, question_text: e.target.value }))}
+                    rows={4}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+                    placeholder="Type the full question here"
+                  />
+                </label>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {options.map((option, index) => (
+                    <label key={option.id} className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">
+                        Option {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
+                      </span>
+                      <textarea
+                        value={option.text}
+                        onChange={(e) => updateOption(option.id, e.target.value)}
+                        rows={2}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+                        placeholder="Enter option text"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </>
             )}
 
             {mode === 'screenshot' && (
-              <div className="rounded-3xl border border-slate-700 bg-slate-950/70 p-4">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-200">Question screenshot</span>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-100">
+                  <span className="text-sm font-medium text-slate-700">Upload screenshot</span>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700">
                     {uploadingQuestionImage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                    Upload
+                    Choose file
                     <input
                       type="file"
                       accept="image/*"
@@ -477,25 +403,21 @@ export function AddQuestionModal({
                     />
                   </label>
                 </div>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, image_url: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white"
-                  placeholder="https://question-screenshot-url"
-                />
-                <p className="mt-3 text-xs leading-5 text-slate-400">
-                  Upload one screenshot containing the full question and all options. Students will still get clean answer boxes to choose from.
-                </p>
-                {formData.image_url && <img src={formData.image_url} alt="Question" className="mt-4 max-h-64 w-full rounded-2xl object-contain" />}
+                {formData.image_url ? (
+                  <img src={formData.image_url} alt="Question" className="max-h-72 w-full rounded-2xl border border-slate-200 bg-white object-contain" />
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center text-sm text-slate-400">
+                    Upload the full question screenshot here
+                  </div>
+                )}
               </div>
             )}
 
             {mode === 'bulk' && (
-              <div className="rounded-3xl border border-slate-700 bg-slate-950/70 p-4">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-200">Bulk screenshots</span>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-100">
+                  <span className="text-sm font-medium text-slate-700">Bulk screenshots</span>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700">
                     {uploadingBulkImages ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                     Choose files
                     <input
@@ -507,19 +429,16 @@ export function AddQuestionModal({
                     />
                   </label>
                 </div>
-                <p className="text-xs leading-5 text-slate-400">
-                  Upload many screenshots together. They will be saved in sequence under the selected exam and category context.
-                </p>
-                <div className="mt-4 space-y-2">
+                <div className="space-y-2">
                   {bulkFiles.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-500">
-                      No screenshots selected yet
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center text-sm text-slate-400">
+                      Select screenshots to auto-save in sequence
                     </div>
                   ) : (
                     bulkFiles.map((file, index) => (
-                      <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-200">
+                      <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                         <span className="truncate">{index + 1}. {file.name}</span>
-                        <span className="ml-4 shrink-0 text-xs text-slate-500">{Math.round(file.size / 1024)} KB</span>
+                        <span className="ml-4 shrink-0 text-xs text-slate-400">{Math.round(file.size / 1024)} KB</span>
                       </div>
                     ))
                   )}
@@ -527,22 +446,32 @@ export function AddQuestionModal({
               </div>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-200">Explanation</span>
-                <textarea value={formData.explanation} onChange={(e) => setFormData((prev) => ({ ...prev, explanation: e.target.value }))} rows={4} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" />
+                <span className="mb-2 block text-sm font-medium text-slate-700">Explanation</span>
+                <textarea
+                  value={formData.explanation}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, explanation: e.target.value }))}
+                  rows={4}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+                />
               </label>
               <div className="space-y-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-200">Video explanation URL</span>
-                  <input type="url" value={formData.video_explanation_url} onChange={(e) => setFormData((prev) => ({ ...prev, video_explanation_url: e.target.value }))} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" />
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Video explanation URL</span>
+                  <input
+                    type="url"
+                    value={formData.video_explanation_url}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, video_explanation_url: e.target.value }))}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+                  />
                 </label>
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-200">Tags</span>
-                  <input type="text" value={formData.tags} onChange={(e) => setFormData((prev) => ({ ...prev, tags: e.target.value }))} className="w-full rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white" placeholder="rrb, image, mock" />
-                </label>
-                <label className="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-200">
-                  <input type="checkbox" checked={formData.is_draft} onChange={(e) => setFormData((prev) => ({ ...prev, is_draft: e.target.checked }))} />
+                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_draft}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, is_draft: e.target.checked }))}
+                  />
                   Save as draft
                 </label>
               </div>
@@ -550,22 +479,33 @@ export function AddQuestionModal({
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-3xl border border-slate-700 bg-slate-950/70 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-white">Student preview</h3>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Student preview</h3>
               <div className="space-y-3">
-                <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
-                  <div className="mb-2 text-xs text-slate-400">{formData.subject} • {formData.marks} mark(s)</div>
-                  <div className="text-sm text-white">{formData.question_text || (mode === 'manual' ? 'Question preview' : 'Screenshot question preview')}</div>
-                  {formData.image_url && <img src={formData.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl object-contain" />}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-2 text-xs text-slate-400">
+                    {linkedLabel || 'Selected folder'} • {formData.marks} mark(s)
+                  </div>
+                  <div className="text-sm text-slate-900">
+                    {mode === 'manual' ? formData.question_text || 'Question preview' : 'Screenshot question preview'}
+                  </div>
+                  {formData.image_url && (
+                    <img src={formData.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl border border-slate-200 object-contain" />
+                  )}
                 </div>
                 {previewOptions.map((option, index) => (
-                  <div key={index} className={`rounded-2xl border p-3 ${index === correctIndex ? 'border-emerald-400/40 bg-emerald-500/10' : 'border-slate-700 bg-slate-900'}`}>
+                  <div
+                    key={index}
+                    className={`rounded-2xl border p-3 ${
+                      index === correctIndex ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
+                    }`}
+                  >
                     <div className="flex items-start gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600 text-xs font-semibold text-slate-200">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-700">
                         {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm text-slate-100">{option || `Choose option ${index + 1}`}</div>
+                      <div className="min-w-0 flex-1 text-sm text-slate-700">
+                        {option || `Choose option ${index + 1}`}
                       </div>
                     </div>
                   </div>
@@ -573,19 +513,20 @@ export function AddQuestionModal({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-300">
-              <div className="mb-3 font-semibold text-white">Checklist</div>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <div className="mb-3 font-semibold text-slate-900">Ready check</div>
               <div className="space-y-2">
-                <div>{formData.exam_id ? '✓' : '•'} Exam selected</div>
-                <div>{formData.topic ? '✓' : '•'} Topic chosen</div>
-                <div>{mode !== 'screenshot' || formData.image_url ? '✓' : '•'} Single screenshot ready</div>
-                <div>{mode !== 'bulk' || bulkFiles.length > 0 ? '✓' : '•'} Bulk screenshots ready</div>
+                <div>{isLinkedQuestionBank ? '✓' : '•'} Folder selected</div>
+                <div>{examTitle ? '✓' : '•'} Exam link optional</div>
+                <div>{mode !== 'manual' || formData.question_text.trim() ? '✓' : '•'} Manual question ready</div>
+                <div>{mode !== 'screenshot' || formData.image_url ? '✓' : '•'} Screenshot uploaded</div>
+                <div>{mode !== 'bulk' || bulkFiles.length > 0 ? '✓' : '•'} Bulk screenshots selected</div>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-slate-700 pt-2 sm:col-span-2">
-            <button type="button" onClick={handleClose} className="rounded-2xl border border-slate-600 px-5 py-3 text-sm font-medium text-slate-200">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-2 lg:col-span-2">
+            <button type="button" onClick={handleClose} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700">
               Cancel
             </button>
             <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-70">
@@ -597,4 +538,20 @@ export function AddQuestionModal({
       </div>
     </div>
   );
+}
+
+function InfoCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+    </div>
+  );
+}
+
+function buildFinalOptions(options: OptionDraft[], style: 'alphabet' | 'numeric') {
+  const typedOptions = options.map((option) => option.text.trim());
+  return typedOptions.some(Boolean)
+    ? typedOptions.map((option, index) => option || buildFallbackOptions(style)[index])
+    : buildFallbackOptions(style);
 }

@@ -1,561 +1,444 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Download,
-  Eye,
-  FolderPlus,
-  ImagePlus,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  Upload,
-} from 'lucide-react';
+import { ChevronRight, Download, FolderPlus, Import, Pencil, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
   Category,
+  CategoryNode,
   Exam,
-  Question,
   createCategory,
+  createCategoryNode,
   deleteCategory,
-  getAllQuestions,
-  getExams,
-  getQuestions,
-  subscribeToCategories,
+  deleteCategoryNode,
+  getCategories,
+  getCategoryNodes,
+  getExam,
   updateCategory,
-  updateQuestion,
-  deleteQuestion,
+  updateCategoryNode,
 } from '../../lib/firestore';
 import { AddQuestionModal } from '../../components/AddQuestionModal';
 
-type ModalMode = 'manual' | 'screenshot' | 'bulk';
-
-interface EnhancedQuestion extends Question {
-  examTitle?: string;
-  categoryName?: string;
-}
+type LevelEntity = 'category' | 'node';
+type QuestionMode = 'manual' | 'screenshot' | 'bulk';
 
 export function QuestionHub() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const [questions, setQuestions] = useState<EnhancedQuestion[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [exams, setExams] = useState<Exam[]>([]);
+  const [path, setPath] = useState<Array<{ entity: LevelEntity; id: string; name: string; categoryId: string }>>([]);
+  const [currentItems, setCurrentItems] = useState<CategoryNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [selectedExamId, setSelectedExamId] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState('');
-  const [selectedSubtopic, setSelectedSubtopic] = useState('');
-  const [difficultyFilter, setDifficultyFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [modalMode, setModalMode] = useState<ModalMode>('manual');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [categoryFormOpen, setCategoryFormOpen] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [categoryForm, setCategoryForm] = useState({
-    name: '',
-    description: '',
-    color: '#2563eb',
-    iconUrl: '',
-    is_active: true,
-  });
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [nodeModalOpen, setNodeModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingNode, setEditingNode] = useState<CategoryNode | null>(null);
+  const [questionModalOpen, setQuestionModalOpen] = useState(false);
+  const [questionMode, setQuestionMode] = useState<QuestionMode>('manual');
+  const [linkedExam, setLinkedExam] = useState<Exam | null>(null);
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#2563eb', iconUrl: '', is_active: true });
+  const [nodeName, setNodeName] = useState('');
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const examIdFromQuery = urlParams.get('examId') || '';
+  const selectedCategoryId = path.find((item) => item.entity === 'category')?.id || '';
+  const selectedNode = path.length > 0 ? path[path.length - 1] : null;
+  const currentLevel = Math.max(0, path.length - 1);
+  const canAddQuestions = path.length >= 2;
 
   useEffect(() => {
-    const unsubscribe = subscribeToCategories((cats) => setCategories(cats));
-    return () => unsubscribe();
+    void loadCategories();
   }, []);
 
   useEffect(() => {
-    setSelectedExamId(examIdFromQuery);
-    void loadData(examIdFromQuery);
-  }, [examIdFromQuery]);
+    void loadExamContext();
+  }, []);
 
-  const loadData = async (examId?: string) => {
+  useEffect(() => {
+    void loadCurrentItems();
+  }, [path.length, selectedCategoryId, selectedNode?.id]);
+
+  useEffect(() => {
+    if (!linkedExam || categories.length === 0 || path.length > 0) return;
+
+    const examCategory = categories.find((category) => category.id === linkedExam.category_id);
+    if (!examCategory) return;
+
+    setPath([{ entity: 'category', id: examCategory.id, name: examCategory.name, categoryId: examCategory.id }]);
+  }, [linkedExam, categories, path.length]);
+
+  const loadCategories = async () => {
     setLoading(true);
     try {
-      const [allExams, allQuestions] = await Promise.all([
-        getExams(undefined, true),
-        examId ? getQuestions(examId) : getAllQuestions(),
-      ]);
-
-      const examMap = new Map(allExams.map((exam) => [exam.id, exam]));
-      const categoryMap = new Map(categories.map((category) => [category.id, category]));
-
-      setExams(allExams);
-      setQuestions(
-        (allQuestions as EnhancedQuestion[]).map((question) => {
-          const exam = examMap.get(question.exam_id);
-          return {
-            ...question,
-            examTitle: exam?.title,
-            categoryName: categoryMap.get(exam?.category_id || '')?.name || exam?.category_id,
-          };
-        })
-      );
+      const data = await getCategories();
+      setCategories(data);
     } catch (error) {
-      console.error('Error loading question hub:', error);
-      toast.error('Failed to load question hub data');
+      console.error(error);
+      toast.error('Failed to load categories');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (exams.length === 0) return;
-    setQuestions((prev) =>
-      prev.map((question) => {
-        const exam = exams.find((item) => item.id === question.exam_id);
-        return {
-          ...question,
-          examTitle: exam?.title,
-          categoryName: categories.find((category) => category.id === exam?.category_id)?.name || exam?.category_id,
-        };
-      })
-    );
-  }, [categories, exams]);
+  const loadCurrentItems = async () => {
+    if (!selectedCategoryId || path.length === 0) {
+      setCurrentItems([]);
+      return;
+    }
 
-  const visibleExams = useMemo(
-    () => (selectedCategoryId ? exams.filter((exam) => exam.category_id === selectedCategoryId) : exams),
-    [exams, selectedCategoryId]
-  );
-
-  const subjects = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          questions
-            .filter((question) => !selectedExamId || question.exam_id === selectedExamId)
-            .map((question) => question.subject)
-            .filter(Boolean)
-        )
-      ),
-    [questions, selectedExamId]
-  );
-
-  const topics = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          questions
-            .filter((question) => (!selectedExamId || question.exam_id === selectedExamId) && (!selectedSubject || question.subject === selectedSubject))
-            .map((question) => question.topic)
-            .filter(Boolean)
-        )
-      ) as string[],
-    [questions, selectedExamId, selectedSubject]
-  );
-
-  const subtopics = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          questions
-            .filter(
-              (question) =>
-                (!selectedExamId || question.exam_id === selectedExamId) &&
-                (!selectedSubject || question.subject === selectedSubject) &&
-                (!selectedTopic || question.topic === selectedTopic)
-            )
-            .map((question) => question.subtopic)
-            .filter(Boolean)
-        )
-      ) as string[],
-    [questions, selectedExamId, selectedSubject, selectedTopic]
-  );
-
-  const filteredQuestions = useMemo(() => {
-    return questions.filter((question) => {
-      const exam = exams.find((item) => item.id === question.exam_id);
-      if (selectedCategoryId && exam?.category_id !== selectedCategoryId) return false;
-      if (selectedExamId && question.exam_id !== selectedExamId) return false;
-      if (selectedSubject && question.subject !== selectedSubject) return false;
-      if (selectedTopic && question.topic !== selectedTopic) return false;
-      if (selectedSubtopic && question.subtopic !== selectedSubtopic) return false;
-      if (difficultyFilter && question.difficulty !== difficultyFilter) return false;
-      if (statusFilter === 'live' && question.is_draft) return false;
-      if (statusFilter === 'draft' && !question.is_draft) return false;
-      if (
-        searchQuery &&
-        !`${question.question_text} ${question.examTitle || ''} ${question.topic || ''} ${question.subtopic || ''}`
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [
-    questions,
-    exams,
-    selectedCategoryId,
-    selectedExamId,
-    selectedSubject,
-    selectedTopic,
-    selectedSubtopic,
-    difficultyFilter,
-    statusFilter,
-    searchQuery,
-  ]);
-
-  const openCreateCategory = () => {
-    setEditingCategoryId(null);
-    setCategoryForm({
-      name: '',
-      description: '',
-      color: '#2563eb',
-      iconUrl: '',
-      is_active: true,
-    });
-    setCategoryFormOpen(true);
+    const parentNode = path[path.length - 1].entity === 'node' ? path[path.length - 1].id : null;
+    const nodes = await getCategoryNodes(selectedCategoryId, parentNode);
+    setCurrentItems(nodes);
   };
 
-  const openEditCategory = (category: Category) => {
-    setEditingCategoryId(category.id);
-    setCategoryForm({
-      name: category.name,
-      description: category.description || '',
-      color: category.color || '#2563eb',
-      iconUrl: category.iconUrl || '',
-      is_active: category.is_active,
-    });
-    setCategoryFormOpen(true);
+  const loadExamContext = async () => {
+    const examId = new URLSearchParams(window.location.search).get('examId');
+    if (!examId) return;
+
+    try {
+      const exam = await getExam(examId);
+      setLinkedExam(exam);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load exam link');
+    }
   };
 
-  const handleCategorySubmit = async (e: React.FormEvent) => {
+  const sectionTitle = useMemo(() => {
+    if (path.length === 0) return 'Choose category';
+    if (path.length === 1) return 'Choose subcategory';
+    if (path.length === 2) return 'Choose next folder';
+    if (path.length === 3) return 'Choose test paper';
+    return 'Choose next folder';
+  }, [path.length]);
+
+  const openAddCategory = (category?: Category) => {
+    setEditingCategory(category || null);
+    setCategoryForm({
+      name: category?.name || '',
+      description: category?.description || '',
+      color: category?.color || '#2563eb',
+      iconUrl: category?.iconUrl || '',
+      is_active: category?.is_active ?? true,
+    });
+    setCategoryModalOpen(true);
+  };
+
+  const openAddNode = (node?: CategoryNode) => {
+    setEditingNode(node || null);
+    setNodeName(node?.name || '');
+    setNodeModalOpen(true);
+  };
+
+  const saveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (editingCategoryId) {
-        await updateCategory(editingCategoryId, categoryForm);
+      if (!categoryForm.name.trim()) {
+        toast.error('Enter category name');
+        return;
+      }
+
+      const duplicateCategory = categories.find(
+        (category) =>
+          category.id !== editingCategory?.id &&
+          category.name.trim().toLowerCase() === categoryForm.name.trim().toLowerCase()
+      );
+      if (duplicateCategory) {
+        toast.error('Category name already exists');
+        return;
+      }
+
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, categoryForm);
         toast.success('Category updated');
       } else {
         await createCategory({ ...categoryForm, order: categories.length + 1 });
         toast.success('Category created');
       }
-      setCategoryFormOpen(false);
+      setCategoryModalOpen(false);
+      await loadCategories();
     } catch (error) {
       console.error(error);
       toast.error('Failed to save category');
     }
   };
 
-  const handleDeleteCategory = async (categoryId: string) => {
-    if (!confirm('Delete this category? Exams already linked to it may need reassignment.')) return;
-    await deleteCategory(categoryId);
-    if (selectedCategoryId === categoryId) setSelectedCategoryId('');
-    toast.success('Category deleted');
+  const saveNode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCategoryId) {
+      toast.error('Choose category first');
+      return;
+    }
+    try {
+      if (!nodeName.trim()) {
+        toast.error('Enter folder name');
+        return;
+      }
+
+      const duplicateNode = currentItems.find(
+        (node) =>
+          node.id !== editingNode?.id &&
+          node.name.trim().toLowerCase() === nodeName.trim().toLowerCase()
+      );
+
+      if (duplicateNode) {
+        toast.error('This name already exists in the selected level');
+        return;
+      }
+
+      if (editingNode) {
+        await updateCategoryNode(editingNode.id, { name: nodeName });
+        toast.success('Folder updated');
+      } else {
+        await createCategoryNode({
+          category_id: selectedCategoryId,
+          parent_id: selectedNode?.entity === 'node' ? selectedNode.id : null,
+          name: nodeName,
+          level: currentLevel + 1,
+          order: currentItems.length + 1,
+          is_active: true,
+        });
+        toast.success('Folder created');
+      }
+      setNodeModalOpen(false);
+      setNodeName('');
+      await loadCurrentItems();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save folder');
+    }
   };
 
-  const handleDeleteQuestion = async (questionId: string) => {
-    if (!confirm('Delete this question from the question bank?')) return;
-    await deleteQuestion(questionId);
-    await loadData(selectedExamId || undefined);
-    toast.success('Question deleted');
+  const removeCategory = async (category: Category) => {
+    if (!confirm(`Delete category "${category.name}"?`)) return;
+    await deleteCategory(category.id);
+    if (selectedCategoryId === category.id) setPath([]);
+    await loadCategories();
   };
 
-  const toggleDraftState = async (question: EnhancedQuestion) => {
-    await updateQuestion(question.id, {
-      is_draft: !question.is_draft,
-      updated_at: new Date().toISOString(),
-    });
-    await loadData(selectedExamId || undefined);
-    toast.success(question.is_draft ? 'Question published' : 'Question moved to draft');
+  const removeNode = async (node: CategoryNode) => {
+    if (!confirm(`Delete "${node.name}"?`)) return;
+    await deleteCategoryNode(node.id);
+    await loadCurrentItems();
   };
 
-  const exportCsv = () => {
-    const headers = ['Exam', 'Category', 'Subject', 'Topic', 'Subtopic', 'Difficulty', 'Status', 'Question'];
-    const rows = filteredQuestions.map((question) => [
-      question.examTitle || '',
-      question.categoryName || '',
-      question.subject || '',
-      question.topic || '',
-      question.subtopic || '',
-      question.difficulty || '',
-      question.is_draft ? 'Draft' : 'Live',
-      `"${(question.question_text || '').replace(/"/g, '""')}"`,
-    ]);
-    const blob = new Blob([[headers.join(','), ...rows.map((row) => row.join(','))].join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `question-hub-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const exportPlaceholder = () => toast('Export hook is ready here.');
+  const importPlaceholder = () => toast('Import hook is ready here.');
 
   return (
-    <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen`}>
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-          <aside className="space-y-6">
-            <section className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border p-5 shadow-sm`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Categories</h2>
-                  <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Add and manage exam categories here.</p>
-                </div>
-                <button onClick={openCreateCategory} className="rounded-2xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white">
-                  Add
-                </button>
-              </div>
+    <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Question Categories</h1>
+          <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Simple flow: category, subcategory, next folder, test paper. Question actions appear only after a real folder is selected.</p>
+        </div>
+        <button onClick={() => openAddCategory()} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white">
+          <Plus className="h-4 w-4" />
+          Add category
+        </button>
+      </div>
 
-              <div className="mt-4 space-y-3">
-                <button
-                  onClick={() => setSelectedCategoryId('')}
-                  className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-medium ${
-                    !selectedCategoryId
-                      ? 'bg-blue-600 text-white'
-                      : isDark
-                      ? 'bg-gray-900 text-gray-300'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  All categories
-                </button>
-                {categories.map((category) => (
+      {linkedExam && (
+        <div className={`${isDark ? 'border-blue-500/30 bg-blue-500/10 text-blue-100' : 'border-blue-200 bg-blue-50 text-blue-700'} mb-5 rounded-3xl border px-5 py-4`}>
+          <div className="text-sm font-semibold">Questions will link to exam: {linkedExam.title}</div>
+          <div className={`mt-1 text-xs ${isDark ? 'text-blue-200/80' : 'text-blue-600'}`}>
+            Choose the correct category path first, then add questions into the selected folder for this exam.
+          </div>
+        </div>
+      )}
+
+      <div className="mb-5 flex flex-wrap items-center gap-2 text-sm">
+        <button onClick={() => setPath([])} className={`rounded-xl px-3 py-2 font-semibold ${path.length === 0 ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-700'}`}>
+          Categories
+        </button>
+        {path.map((item, index) => (
+          <div key={item.id} className="flex items-center gap-2">
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <button
+              onClick={() => setPath(path.slice(0, index + 1))}
+              className={`rounded-xl px-3 py-2 font-semibold ${index === path.length - 1 ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-700'}`}
+            >
+              {item.name}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
+        <aside className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} rounded-3xl border p-5 shadow-sm`}>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{sectionTitle}</h2>
+              <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Only one clean tree flow, no extra clutter.</p>
+            </div>
+            {path.length > 0 && (
+              <button onClick={() => openAddNode()} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white">
+                Add {path.length === 1 ? 'subcategory' : 'folder'}
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {path.length === 0
+              ? categories.map((category) => (
                   <div key={category.id} className={`rounded-2xl border p-3 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
                     <button
-                      onClick={() => {
-                        setSelectedCategoryId(category.id);
-                        setSelectedExamId('');
-                      }}
-                      className={`w-full text-left text-sm font-semibold ${selectedCategoryId === category.id ? 'text-blue-500' : isDark ? 'text-white' : 'text-gray-900'}`}
+                      onClick={() => setPath([{ entity: 'category', id: category.id, name: category.name, categoryId: category.id }])}
+                      className={`w-full text-left text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}
                     >
                       {category.name}
                     </button>
                     <div className="mt-2 flex gap-2">
-                      <button onClick={() => openEditCategory(category)} className="rounded-xl border border-slate-500/30 px-3 py-1 text-xs text-slate-300">Edit</button>
-                      <button onClick={() => void handleDeleteCategory(category.id)} className="rounded-xl border border-red-500/30 px-3 py-1 text-xs text-red-300">Delete</button>
+                      <button onClick={() => openAddCategory(category)} className="rounded-xl border border-slate-300 px-3 py-1 text-xs text-slate-600">Edit</button>
+                      <button onClick={() => void removeCategory(category)} className="rounded-xl border border-red-300 px-3 py-1 text-xs text-red-600">Delete</button>
+                    </div>
+                  </div>
+                ))
+              : currentItems.map((node) => (
+                  <div key={node.id} className={`rounded-2xl border p-3 ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
+                    <button
+                      onClick={() =>
+                        setPath([
+                          ...path,
+                          {
+                            entity: 'node',
+                            id: node.id,
+                            name: node.name,
+                            categoryId: selectedCategoryId,
+                          },
+                        ])
+                      }
+                      className={`w-full text-left text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}
+                    >
+                      {node.name}
+                    </button>
+                    <div className="mt-2 flex gap-2">
+                      <button onClick={() => openAddNode(node)} className="rounded-xl border border-slate-300 px-3 py-1 text-xs text-slate-600">Edit</button>
+                      <button onClick={() => void removeNode(node)} className="rounded-xl border border-red-300 px-3 py-1 text-xs text-red-600">Delete</button>
                     </div>
                   </div>
                 ))}
+
+            {path.length > 0 && currentItems.length === 0 && (
+              <div className={`rounded-2xl border p-5 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
+                No folder here yet. Use the add button above.
               </div>
-            </section>
+            )}
+          </div>
+        </aside>
 
-            <section className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border p-5 shadow-sm`}>
-              <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Link questions fast</h3>
-              <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Create the exam first, then choose it here to add questions directly into that exam card flow.</p>
+        <main className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} rounded-3xl border p-6 shadow-sm`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {canAddQuestions ? `${selectedNode?.name} actions` : 'Question actions'}
+              </h2>
+              <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                {canAddQuestions
+                  ? 'You are inside the selected folder. Add, import, or export questions from here.'
+                  : 'Choose category and folder first. Question actions should not appear before a real final selection.'}
+              </p>
+            </div>
 
-              <div className="mt-4 space-y-3">
-                <label className="block">
-                  <span className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Exam</span>
-                  <select
-                    value={selectedExamId}
-                    onChange={(e) => setSelectedExamId(e.target.value)}
-                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
-                  >
-                    <option value="">All exams</option>
-                    {visibleExams.map((exam) => (
-                      <option key={exam.id} value={exam.id}>{exam.title}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Subject</span>
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => {
-                      setSelectedSubject(e.target.value);
-                      setSelectedTopic('');
-                      setSelectedSubtopic('');
-                    }}
-                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
-                  >
-                    <option value="">All subjects</option>
-                    {subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Topic</span>
-                  <select
-                    value={selectedTopic}
-                    onChange={(e) => {
-                      setSelectedTopic(e.target.value);
-                      setSelectedSubtopic('');
-                    }}
-                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
-                  >
-                    <option value="">All topics</option>
-                    {topics.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Subtopic</span>
-                  <select
-                    value={selectedSubtopic}
-                    onChange={(e) => setSelectedSubtopic(e.target.value)}
-                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
-                  >
-                    <option value="">All subtopics</option>
-                    {subtopics.map((subtopic) => <option key={subtopic} value={subtopic}>{subtopic}</option>)}
-                  </select>
-                </label>
+            {canAddQuestions && (
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => {
+                    if (confirm(`Are you sure you want to add question in "${selectedNode?.name}"?`)) {
+                      setQuestionMode('manual');
+                      setQuestionModalOpen(true);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add question
+                </button>
+                <button onClick={importPlaceholder} className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                  <Import className="h-4 w-4" />
+                  Import
+                </button>
+                <button onClick={exportPlaceholder} className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                  <Download className="h-4 w-4" />
+                  Export
+                </button>
               </div>
-            </section>
-          </aside>
+            )}
+          </div>
 
-          <main className="space-y-6">
-            <section className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border p-5 shadow-sm`}>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Question Hub</h1>
-                  <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Add questions manually or from single/bulk screenshots, then manage draft/live status from one place.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <button onClick={() => { setModalMode('manual'); setIsAddModalOpen(true); }} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">
-                    <Plus className="h-4 w-4" />
-                    Manual
-                  </button>
-                  <button onClick={() => { setModalMode('screenshot'); setIsAddModalOpen(true); }} className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
-                    <ImagePlus className="h-4 w-4" />
-                    Upload SS
-                  </button>
-                  <button onClick={() => { setModalMode('bulk'); setIsAddModalOpen(true); }} className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
-                    <Upload className="h-4 w-4" />
-                    Bulk SS
-                  </button>
-                  <button onClick={exportCsv} className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
-                    <Download className="h-4 w-4" />
-                    Export
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_repeat(3,minmax(0,1fr))]">
-                <label className="relative block">
-                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search question, exam, topic"
-                    className={`w-full rounded-2xl border py-3 pl-11 pr-4 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
-                  />
-                </label>
-                <select value={difficultyFilter} onChange={(e) => setDifficultyFilter(e.target.value)} className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}>
-                  <option value="">All difficulty</option>
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}>
-                  <option value="">All status</option>
-                  <option value="live">Live</option>
-                  <option value="draft">Draft</option>
-                </select>
-                <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}>
-                  {filteredQuestions.length} question(s)
-                </div>
-              </div>
-            </section>
-
-            <section className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border shadow-sm overflow-hidden`}>
-              {loading ? (
-                <div className={`p-10 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Loading questions...</div>
-              ) : filteredQuestions.length === 0 ? (
-                <div className={`p-10 text-center text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No questions found for the current filters.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead className={isDark ? 'bg-gray-900/70' : 'bg-gray-50'}>
-                      <tr>
-                        {['Question', 'Exam', 'Category', 'Subject', 'Topic', 'Status', 'Actions'].map((head) => (
-                          <th key={head} className={`px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{head}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                      {filteredQuestions.map((question) => (
-                        <tr key={question.id} className={isDark ? 'hover:bg-gray-900/50' : 'hover:bg-gray-50'}>
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              {question.image_url ? (
-                                <img src={question.image_url} alt="Question" className="h-12 w-12 rounded-xl object-cover" />
-                              ) : (
-                                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${isDark ? 'bg-gray-900 text-gray-500' : 'bg-gray-100 text-gray-400'}`}>
-                                  <Eye className="h-4 w-4" />
-                                </div>
-                              )}
-                              <div className="min-w-0">
-                                <div className={`max-w-sm truncate text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{question.question_text || 'Screenshot question'}</div>
-                                <div className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                                  {question.difficulty || 'medium'} • {question.marks || 1} mark(s)
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className={`px-5 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{question.examTitle || '-'}</td>
-                          <td className={`px-5 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{question.categoryName || '-'}</td>
-                          <td className={`px-5 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{question.subject || '-'}</td>
-                          <td className={`px-5 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{[question.topic, question.subtopic].filter(Boolean).join(' / ') || '-'}</td>
-                          <td className="px-5 py-4">
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${question.is_draft ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                              {question.is_draft ? 'Draft' : 'Live'}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => void toggleDraftState(question)} className="rounded-xl border border-slate-300 p-2 text-slate-600">
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              <button onClick={() => void handleDeleteQuestion(question.id)} className="rounded-xl border border-red-300 p-2 text-red-500">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          </main>
-        </div>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {[
+              { title: 'Manual', desc: 'Write question and options manually' },
+              { title: 'Single Screenshot', desc: 'Upload one image question' },
+              { title: 'Bulk Screenshot', desc: 'Upload many screenshots together' },
+            ].map((item, index) => (
+              <button
+                key={item.title}
+                disabled={!canAddQuestions}
+                onClick={() => {
+                  if (!canAddQuestions) return;
+                  if (confirm(`Are you sure you want to add question in "${selectedNode?.name}"?`)) {
+                    setQuestionMode(index === 0 ? 'manual' : index === 1 ? 'screenshot' : 'bulk');
+                    setQuestionModalOpen(true);
+                  }
+                }}
+                className={`rounded-3xl border p-5 text-left transition ${
+                  !canAddQuestions
+                    ? isDark
+                      ? 'cursor-not-allowed border-gray-700 bg-gray-900 text-gray-500'
+                      : 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                    : isDark
+                    ? 'border-gray-700 bg-gray-900 text-white hover:border-blue-500'
+                    : 'border-gray-200 bg-gray-50 text-gray-900 hover:border-blue-400'
+                }`}
+              >
+                <div className="text-base font-bold">{item.title}</div>
+                <div className="mt-2 text-sm opacity-80">{item.desc}</div>
+              </button>
+            ))}
+          </div>
+        </main>
       </div>
 
       <AddQuestionModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSuccess={() => void loadData(selectedExamId || undefined)}
-        examId={selectedExamId || examIdFromQuery || undefined}
-        initialMode={modalMode}
+        isOpen={questionModalOpen}
+        onClose={() => setQuestionModalOpen(false)}
+        onSuccess={() => toast.success('Question saved')}
+        examId={linkedExam?.id}
+        examTitle={linkedExam?.title}
+        categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
+        linkedLabel={selectedNode ? `${selectedNode.name} selected` : undefined}
+        initialMode={questionMode}
       />
 
-      {categoryFormOpen && (
+      {categoryModalOpen && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70 p-4">
           <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} w-full max-w-lg rounded-3xl border p-6 shadow-2xl`}>
             <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{editingCategoryId ? 'Edit category' : 'Add category'}</h3>
-                <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Keep category management directly inside the question workflow.</p>
-              </div>
-              <button onClick={() => setCategoryFormOpen(false)} className="rounded-xl border border-slate-300 p-2 text-slate-500">
-                <FolderPlus className="h-4 w-4" />
-              </button>
+              <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{editingCategory ? 'Edit category' : 'Add category'}</h3>
+              <button onClick={() => setCategoryModalOpen(false)} className="rounded-xl p-2 text-slate-500"><Trash2 className="h-4 w-4" /></button>
             </div>
-            <form onSubmit={handleCategorySubmit} className="space-y-4">
+            <form onSubmit={saveCategory} className="space-y-4">
               <input value={categoryForm.name} onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Category name" className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
               <textarea value={categoryForm.description} onChange={(e) => setCategoryForm((prev) => ({ ...prev, description: e.target.value }))} placeholder="Description" rows={3} className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
-              <div className="grid grid-cols-2 gap-4">
-                <input value={categoryForm.iconUrl} onChange={(e) => setCategoryForm((prev) => ({ ...prev, iconUrl: e.target.value }))} placeholder="Icon URL" className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
-                <input type="color" value={categoryForm.color} onChange={(e) => setCategoryForm((prev) => ({ ...prev, color: e.target.value }))} className="h-12 w-full rounded-2xl" />
-              </div>
-              <label className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-gray-50 text-gray-700'}`}>
-                <input type="checkbox" checked={categoryForm.is_active} onChange={(e) => setCategoryForm((prev) => ({ ...prev, is_active: e.target.checked }))} />
-                Active category
-              </label>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setCategoryFormOpen(false)} className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancel</button>
-                <button type="submit" className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">Save category</button>
+                <button type="button" onClick={() => setCategoryModalOpen(false)} className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancel</button>
+                <button type="submit" className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {nodeModalOpen && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70 p-4">
+          <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} w-full max-w-lg rounded-3xl border p-6 shadow-2xl`}>
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{editingNode ? 'Edit folder' : path.length === 1 ? 'Add subcategory' : 'Add folder'}</h3>
+              <button onClick={() => setNodeModalOpen(false)} className="rounded-xl p-2 text-slate-500"><Pencil className="h-4 w-4" /></button>
+            </div>
+            <form onSubmit={saveNode} className="space-y-4">
+              <input value={nodeName} onChange={(e) => setNodeName(e.target.value)} placeholder="Folder name" className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setNodeModalOpen(false)} className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancel</button>
+                <button type="submit" className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">Save</button>
               </div>
             </form>
           </div>
