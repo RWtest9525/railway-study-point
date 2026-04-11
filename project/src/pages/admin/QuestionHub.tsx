@@ -34,8 +34,6 @@ export function QuestionHub() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [defaultSettings, setDefaultSettings] = useState<{marks: number, negative_marks: number, difficulty: 'easy'|'medium'|'hard'}>({ marks: 1, negative_marks: 0, difficulty: 'medium' });
   const [questionMode, setQuestionMode] = useState<QuestionMode>('manual');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingNode, setEditingNode] = useState<CategoryNode | null>(null);
@@ -348,6 +346,17 @@ export function QuestionHub() {
                 }
                 onEdit={() => openAddNode(node)}
                 onDelete={() => void removeNode(node)}
+                onResult={() => {
+                  toast('Results functionality not implemented yet');
+                }}
+                onAddQuestion={() => {
+                  setPath((prev) => [
+                    ...prev,
+                    { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId },
+                  ]);
+                  setQuestionMode('manual');
+                  setQuestionModalOpen(true);
+                }}
               />
             ))}
           </div>
@@ -375,6 +384,11 @@ export function QuestionHub() {
                 </button>
               </div>
             ))}
+            {questions.length === 0 && (
+              <div className={`rounded-xl border border-dashed p-6 text-center text-sm ${isDark ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
+                No questions here yet. Add a question to get started.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -409,13 +423,6 @@ export function QuestionHub() {
             <div className="flex flex-wrap gap-3">
               {canAddQuestionHere && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -456,12 +463,6 @@ export function QuestionHub() {
                 renderCards()
               )}
             </div>
-
-            {path.length > 0 && items.length === 0 && !loading && !stepLoading && (
-              <div className={`rounded-3xl border px-5 py-10 text-center text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
-                No child folders here yet. You can add a new one from the top button.
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -480,7 +481,6 @@ export function QuestionHub() {
         categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
         linkedLabel={selectedNode?.name}
         initialMode={questionMode}
-        defaultSettings={defaultSettings}
       />
 
       <ConfirmModal
@@ -519,58 +519,6 @@ export function QuestionHub() {
           </form>
         </ModalShell>
       )}
-
-      {settingsModalOpen && (
-        <ModalShell isDark={isDark} title="Folder Default Settings" onClose={() => setSettingsModalOpen(false)}>
-          <div className="space-y-4">
-            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Set default values for all new questions added to this folder.
-            </p>
-            <label className="block">
-              <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Difficulty</span>
-              <select
-                value={defaultSettings.difficulty}
-                onChange={(e) => setDefaultSettings(prev => ({ ...prev, difficulty: e.target.value as 'easy'|'medium'|'hard' }))}
-                className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
-              >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Marks</span>
-              <input
-                type="number"
-                min="1"
-                value={defaultSettings.marks}
-                onChange={(e) => setDefaultSettings(prev => ({ ...prev, marks: Number(e.target.value) }))}
-                className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
-              />
-            </label>
-            <label className="block">
-              <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Negative Marks</span>
-              <input
-                type="number"
-                min="0"
-                step="0.25"
-                value={defaultSettings.negative_marks}
-                onChange={(e) => setDefaultSettings(prev => ({ ...prev, negative_marks: Number(e.target.value) }))}
-                className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
-              />
-            </label>
-            <button
-              onClick={() => {
-                toast.success('Settings saved');
-                setSettingsModalOpen(false);
-              }}
-              className="mt-4 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700"
-            >
-              Save Settings
-            </button>
-          </div>
-        </ModalShell>
-      )}
     </div>
   );
 }
@@ -582,6 +530,8 @@ function ItemCard({
   onOpen,
   onEdit,
   onDelete,
+  onAddQuestion,
+  onResult,
 }: {
   title: string;
   subtitle: string;
@@ -589,27 +539,29 @@ function ItemCard({
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onAddQuestion?: () => void;
+  onResult?: () => void;
 }) {
   return (
-    <div className={`rounded-[28px] border p-4 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+    <div className={`rounded-[28px] border p-4 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'} flex flex-col justify-between`}>
       <button
         type="button"
         onClick={onOpen}
         className={`w-full rounded-[24px] border-2 px-5 py-6 text-left transition ${
           isDark
-            ? 'border-slate-700 bg-slate-900 hover:border-teal-500'
-            : 'border-slate-300 bg-white hover:border-teal-500'
+            ? 'border-slate-700 bg-slate-900 hover:border-blue-500'
+            : 'border-slate-300 bg-white hover:border-blue-500'
         }`}
       >
-        <div className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</div>
+        <div className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</div>
         <div className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{subtitle}</div>
       </button>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-4 flex flex-wrap gap-2 justify-center">
         <button
           type="button"
           onClick={onEdit}
-          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs ${
-            isDark ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-700'
+          className={`flex-1 min-w-[70px] inline-flex justify-center items-center gap-1 rounded-xl border px-2 py-2 text-xs font-medium ${
+            isDark ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
           }`}
         >
           <Pencil className="h-3.5 w-3.5" />
@@ -618,14 +570,33 @@ function ItemCard({
         <button
           type="button"
           onClick={onDelete}
-          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs ${
-            isDark ? 'border-red-500/40 text-red-300' : 'border-red-300 text-red-600'
+          className={`flex-1 min-w-[70px] inline-flex justify-center items-center gap-1 rounded-xl border px-2 py-2 text-xs font-medium ${
+            isDark ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
           }`}
         >
           <Trash2 className="h-3.5 w-3.5" />
           Delete
         </button>
+        <button
+          type="button"
+          onClick={onResult}
+          className={`flex-1 min-w-[70px] inline-flex justify-center items-center gap-1 rounded-xl border px-2 py-2 text-xs font-medium ${
+            isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
+          }`}
+        >
+          Result
+        </button>
       </div>
+      {onAddQuestion && (
+        <button
+          type="button"
+          onClick={onAddQuestion}
+          className="mt-2 w-full inline-flex justify-center items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          <Plus className="h-4 w-4" />
+          Add Question
+        </button>
+      )}
     </div>
   );
 }
