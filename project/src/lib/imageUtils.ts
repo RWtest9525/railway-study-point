@@ -215,44 +215,40 @@ export async function uploadImage(
   path: string,
   onProgress?: (progress: number) => void
 ): Promise<ImageUploadResult> {
-  // Import Firebase Storage dynamically
-  const { getStorage, ref, uploadBytesResumable, getDownloadURL } = await import('firebase/storage');
-  const { storage } = await import('./firebase');
-
   return new Promise(async (resolve, reject) => {
     try {
-      // Compress image first
-      const compressedBlob = await compressImage(file);
+      // Simulate progress to keep the UI happy
+      onProgress?.(30);
       
-      // Create storage reference
-      const storageRef = ref(storage, path);
+      // Heavy compression to ensure the Base64 string stays well under Firestore's 1MB limit!
+      const compressedBlob = await compressImage(file, {
+        maxWidth: 1024,
+        maxHeight: 1024,
+        quality: 0.6,
+        outputFormat: 'webp' 
+      });
+
+      onProgress?.(70);
+
+      // Convert the compressed image into a Base64 Data URL string
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Url = reader.result as string;
+        
+        const dimensions = await getImageDimensions(file).catch(() => ({ width: 800, height: 600 }));
+        
+        onProgress?.(100);
+        resolve({
+          url: base64Url, // Storing Base64 completely bypasses Firebase Storage
+          size: compressedBlob.size,
+          width: dimensions.width,
+          height: dimensions.height,
+          type: 'image/webp',
+        });
+      };
       
-      // Upload with progress tracking
-      const uploadTask = uploadBytesResumable(storageRef, compressedBlob);
-      
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          onProgress?.(progress);
-        },
-        (error) => reject(error),
-        async () => {
-          // Get download URL
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          
-          // Get image dimensions
-          const dimensions = await getImageDimensions(file);
-          
-          resolve({
-            url,
-            size: compressedBlob.size,
-            width: dimensions.width,
-            height: dimensions.height,
-            type: file.type,
-          });
-        }
-      );
+      reader.onerror = () => reject(new Error('Failed to read and process image'));
+      reader.readAsDataURL(compressedBlob);
     } catch (error) {
       reject(error);
     }
@@ -285,19 +281,10 @@ export async function uploadMultipleImages(
  * Delete image from storage
  */
 export async function deleteImage(url: string): Promise<void> {
-  const { getStorage, ref, deleteObject } = await import('firebase/storage');
-  const { storage } = await import('./firebase');
-  
-  // Extract path from URL
-  const urlParts = url.split('/o/');
-  if (urlParts.length < 2) {
-    throw new Error('Invalid storage URL');
-  }
-  
-  const path = decodeURIComponent(urlParts[1].split('?')[0]);
-  const imageRef = ref(storage, path);
-  
-  await deleteObject(imageRef);
+  // Since we are now using Base64 data URLs directly in Firestore, 
+  // deleting the Firestore document automatically deletes the image data!
+  // No external storage to clean up.
+  return Promise.resolve();
 }
 
 /**
