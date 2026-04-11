@@ -9,7 +9,6 @@ import {
   deleteCategoryLink,
   getCategories,
   getCategoryLinks,
-  getCategoryNodes,
   upsertCategoryLink,
 } from '../../lib/firestore';
 
@@ -18,8 +17,6 @@ export function ManageLinks() {
   const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [path, setPath] = useState<CategoryNode[]>([]);
-  const [currentNodes, setCurrentNodes] = useState<CategoryNode[]>([]);
   const [links, setLinks] = useState<CategoryLink[]>([]);
   const [formData, setFormData] = useState({
     title: 'WhatsApp Channel',
@@ -32,16 +29,13 @@ export function ManageLinks() {
 
   useEffect(() => {
     if (!selectedCategoryId) return;
-    void loadNodes();
     void loadLinks();
-  }, [selectedCategoryId, path.length]);
+  }, [selectedCategoryId]);
 
-  const currentNodeId = path.length > 0 ? path[path.length - 1].id : null;
   const levelLabel = useMemo(() => {
     if (!selectedCategoryId) return 'Choose category';
-    if (path.length === 0) return 'Category level';
-    return path[path.length - 1].name;
-  }, [selectedCategoryId, path]);
+    return categories.find(c => c.id === selectedCategoryId)?.name || 'Category';
+  }, [selectedCategoryId, categories]);
 
   const loadCategories = async () => {
     const data = await getCategories();
@@ -49,13 +43,9 @@ export function ManageLinks() {
     if (data[0]) setSelectedCategoryId(data[0].id);
   };
 
-  const loadNodes = async () => {
-    const nodes = await getCategoryNodes(selectedCategoryId, currentNodeId);
-    setCurrentNodes(nodes);
-  };
 
   const loadLinks = async () => {
-    const data = await getCategoryLinks(selectedCategoryId, currentNodeId);
+    const data = await getCategoryLinks(selectedCategoryId, null);
     setLinks(data);
     setFormData((prev) => ({
       ...prev,
@@ -72,7 +62,7 @@ export function ManageLinks() {
 
     await upsertCategoryLink({
       category_id: selectedCategoryId,
-      category_node_id: currentNodeId,
+      category_node_id: null,
       type: 'whatsapp_channel',
       title: formData.title.trim() || 'WhatsApp Channel',
       url: formData.url.trim(),
@@ -105,54 +95,12 @@ export function ManageLinks() {
             <label className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Category</label>
             <select
               value={selectedCategoryId}
-              onChange={(e) => {
-                setSelectedCategoryId(e.target.value);
-                setPath([]);
-              }}
               className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
             >
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{category.name}</option>
               ))}
             </select>
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-            {selectedCategoryId && (
-              <button
-                onClick={() => setPath([])}
-                className={`rounded-full px-3 py-1 font-semibold ${path.length === 0 ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-900 text-gray-300' : 'bg-slate-100 text-slate-700'}`}
-              >
-                {categories.find((item) => item.id === selectedCategoryId)?.name || 'Category'}
-              </button>
-            )}
-            {path.map((node, index) => (
-              <button
-                key={node.id}
-                onClick={() => setPath(path.slice(0, index + 1))}
-                className={`rounded-full px-3 py-1 font-semibold ${index === path.length - 1 ? 'bg-blue-600 text-white' : isDark ? 'bg-gray-900 text-gray-300' : 'bg-slate-100 text-slate-700'}`}
-              >
-                {node.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="space-y-3">
-            {currentNodes.map((node) => (
-              <button
-                key={node.id}
-                onClick={() => setPath((prev) => [...prev, node])}
-                className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-              >
-                <span className="font-semibold">{node.name}</span>
-                <Plus className="h-4 w-4" />
-              </button>
-            ))}
-            {selectedCategoryId && currentNodes.length === 0 && (
-              <div className={`rounded-2xl border px-4 py-6 text-center text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
-                No deeper folder here. Save the link for this selected level.
-              </div>
-            )}
           </div>
         </aside>
 

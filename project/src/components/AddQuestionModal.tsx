@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Plus, Save, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { createQuestionsBatch, getQuestions } from '../lib/firestore';
+import { createQuestionsBatch, getQuestions, getQuestionsByCategoryNode, deleteQuestion, updateQuestion, Question } from '../lib/firestore';
 import { uploadImage, validateImage } from '../lib/imageUtils';
 
 type QuestionMode = 'manual' | 'screenshot' | 'bulk';
@@ -49,6 +49,7 @@ interface QuestionDraft {
   option_label_style: 'alphabet' | 'numeric';
   options: OptionDraft[];
   correct_index: number;
+  id?: string;
 }
 
 interface DefaultSettings {
@@ -92,6 +93,10 @@ export function AddQuestionModal({
   const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [uploadingBulkImages, setUploadingBulkImages] = useState(false);
 
+  const [existingQuestions, setExistingQuestions] = useState<Question[]>([]);
+  const [viewMode, setViewMode] = useState<'draft' | 'existing'>('draft');
+  const [existingIndex, setExistingIndex] = useState(0);
+
   const isLinkedQuestionBank = Boolean(categoryNodeId);
   const currentDraft = draftQuestions[currentIndex];
   const isBulkMode = currentDraft.mode === 'bulk';
@@ -106,7 +111,57 @@ export function AddQuestionModal({
     setDraftQuestions([defaultDraft(initialMode, defaultSettings)]);
     setCurrentIndex(0);
     setBulkFiles([]);
-  }, [isOpen, initialMode, defaultSettings]);
+    setViewMode('draft');
+    if (categoryNodeId) {
+      void loadExistingQuestions();
+    }
+  }, [isOpen, initialMode, defaultSettings, categoryNodeId, examId]);
+
+  const loadExistingQuestions = async () => {
+    try {
+      let qs: Question[] = [];
+      if (examId) qs = await getQuestions(examId);
+      else if (categoryNodeId) qs = await getQuestionsByCategoryNode(categoryNodeId);
+      setExistingQuestions(qs);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditExisting = () => {
+    const q = existingQuestions[existingIndex];
+    if (!q) return;
+    updateCurrentDraft({
+        id: q.id,
+        mode: q.image_url && !q.question_text?.includes('Screenshot question') ? 'screenshot' : (q.image_url ? 'screenshot' : 'manual'),
+        question_text: q.question_text || '',
+        explanation: q.explanation || '',
+        video_explanation_url: q.video_explanation_url || '',
+        difficulty: (q.difficulty as any) || 'medium',
+        marks: q.marks || 1,
+        negative_marks: q.negative_marks || 0,
+        is_draft: q.is_draft || false,
+        image_url: q.image_url || '',
+        option_label_style: (q.option_label_style as any) || 'alphabet',
+        options: [...defaultOptions()].map((opt, i) => ({ ...opt, text: q.options?.[i] || '' })),
+        correct_index: q.correct_index || 0,
+    });
+    setViewMode('draft');
+  };
+
+  const handleDeleteExisting = async () => {
+    const q = existingQuestions[existingIndex];
+    if (!q) return;
+    if (!window.confirm('Delete this question permanently?')) return;
+    try {
+        await deleteQuestion(q.id);
+        toast.success('Question deleted');
+        setExistingIndex(Math.max(0, existingIndex - 1));
+        await loadExistingQuestions();
+    } catch (e) {
+        toast.error('Failed to delete question');
+    }
+  };
 
   const updateCurrentDraft = (updates: Partial<QuestionDraft>) => {
     setDraftQuestions((prev) => prev.map((q, i) => (i === currentIndex ? { ...q, ...updates } : q)));
@@ -166,28 +221,41 @@ export function AddQuestionModal({
 
     if (validDrafts.length === 0) throw new Error('No valid questions entered to save.');
 
-    const formattedQuestions = validDrafts.map((draft, idx) => ({
-      exam_id: examId || null,
-      category_node_id: categoryNodeId,
-      subject: linkedLabel || 'General',
-      question_text: draft.question_text.trim() || 'Screenshot question',
-      options: buildFinalOptions(draft.options, draft.option_label_style),
-      option_label_style: draft.option_label_style,
-      correct_index: draft.correct_index,
-      explanation: draft.explanation.trim() || null,
-      video_explanation_url: draft.video_explanation_url.trim() || null,
-      difficulty: draft.difficulty,
-      image_url: draft.image_url.trim() || null,
-      marks: Number(draft.marks) || 1,
-      negative_marks: Number(draft.negative_marks) || 0,
-      order: existingQuestions.length + idx + 1,
-      is_draft: draft.is_draft,
-      version: 1,
-      created_by: profile.id,
-      updated_at: new Date().toISOString(),
-    }));
+    const newQuestions = [];
+    
+    for (let idx = 0; idx < validDrafts.length; idx++) {
+      const draft = validDrafts[idx];
+      const payload: any = {
+        exam_id: examId || null,
+        category_node_id: categoryNodeId,
+        subject: linkedLabel || 'General',
+        question_text: draft.question_text.trim() || 'Screenshot question',
+        options: buildFinalOptions(draft.options, draft.option_label_style),
+        option_label_style: draft.option_label_style,
+        correct_index: draft.correct_index,
+        explanation: draft.explanation.trim() || null,
+        video_explanation_url: draft.video_explanation_url.trim() || null,
+        difficulty: draft.difficulty,
+        image_url: draft.image_url.trim() || null,
+        marks: Number(draft.marks) || 1,
+        negative_marks: Number(draft.negative_marks) || 0,
+        is_draft: draft.is_draft,
+        version: 1,
+        updated_at: new Date().toISOString(),
+      };
 
-    await createQuestionsBatch(formattedQuestions as any);
+      if (draft.id) {
+        await updateQuestion(draft.id, payload);
+      } else {
+        payload.order = existingQuestions.length + newQuestions.length + 1;
+        payload.created_by = profile.id;
+        newQuestions.push(payload);
+      }
+    }
+
+    if (newQuestions.length > 0) {
+      await createQuestionsBatch(newQuestions as any);
+    }
   };
 
   const saveBulkQuestions = async () => {
@@ -314,6 +382,7 @@ export function AddQuestionModal({
                   <div className="mt-1 text-xs text-slate-500">{item.subtitle}</div>
                 </button>
               ))}
+              {existingQuestions.length > 0 && <InfoCard label="Existing" value={String(existingQuestions.length)} />}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
@@ -460,64 +529,158 @@ export function AddQuestionModal({
 
           <div className="space-y-5">
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Student preview</h3>
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="mb-2 text-xs text-slate-400">
-                    {linkedLabel || 'Selected folder'} • {currentDraft.marks} mark(s)
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  {viewMode === 'draft' ? 'Student preview' : 'Existing Questions'}
+                </h3>
+                {existingQuestions.length > 0 && (
+                  <div className="flex rounded-lg bg-slate-200 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('draft')}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                        viewMode === 'draft' ? 'bg-white text-slate-900 shadow' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Draft
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('existing')}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                        viewMode === 'existing' ? 'bg-white text-slate-900 shadow' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Existing ({existingQuestions.length})
+                    </button>
                   </div>
-                  <div className="text-sm text-slate-900">
-                    {currentDraft.mode === 'manual' ? currentDraft.question_text || 'Question preview' : 'Screenshot question preview'}
+                )}
+              </div>
+
+              {viewMode === 'draft' ? (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="mb-2 text-xs text-slate-400">
+                      {linkedLabel || 'Selected folder'} • {currentDraft.marks} mark(s)
+                    </div>
+                    <div className="text-sm text-slate-900">
+                      {currentDraft.mode === 'manual' ? currentDraft.question_text || 'Question preview' : 'Screenshot question preview'}
+                    </div>
+                    {currentDraft.image_url && (
+                      <img src={currentDraft.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl border border-slate-200 object-contain" />
+                    )}
                   </div>
-                  {currentDraft.image_url && (
-                    <img src={currentDraft.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl border border-slate-200 object-contain" />
-                  )}
-                </div>
-                {previewOptions.map((option, index) => (
-                  <div
-                    key={index}
-                    className={`rounded-2xl border p-3 ${
-                      index === currentDraft.correct_index ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-700">
-                        {currentDraft.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
-                      </span>
-                      <div className="min-w-0 flex-1 text-sm text-slate-700">
-                        {option || `Choose option ${index + 1}`}
+                  {previewOptions.map((option, index) => (
+                    <div
+                      key={index}
+                      className={`rounded-2xl border p-3 ${
+                        index === currentDraft.correct_index ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-700">
+                          {currentDraft.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
+                        </span>
+                        <div className="min-w-0 flex-1 text-sm text-slate-700">
+                          {option || `Choose option ${index + 1}`}
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+              ) : existingQuestions.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="mb-2 text-xs text-slate-400">
+                      {linkedLabel || 'Selected folder'} • {existingQuestions[existingIndex]?.marks} mark(s)
+                    </div>
+                    <div className="text-sm text-slate-900">
+                      {existingQuestions[existingIndex]?.question_text}
+                    </div>
+                    {existingQuestions[existingIndex]?.image_url && (
+                      <img src={existingQuestions[existingIndex].image_url!} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl border border-slate-200 object-contain" />
+                    )}
                   </div>
-                ))}
-              </div>
+                  {existingQuestions[existingIndex]?.options?.map((option, index) => (
+                    <div
+                      key={index}
+                      className={`rounded-2xl border p-3 ${
+                        index === existingQuestions[existingIndex].correct_index ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-700">
+                          {existingQuestions[existingIndex].option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
+                        </span>
+                        <div className="min-w-0 flex-1 text-sm text-slate-700">
+                          {option}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-200 pt-3">
+                    <button type="button" onClick={handleEditExisting} className="rounded-lg bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200">
+                      Edit Question
+                    </button>
+                    <button type="button" onClick={() => void handleDeleteExisting()} className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200">
+                      Delete Question
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-sm text-slate-500 py-4">No remaining questions.</div>
+              )}
             </div>
 
-
             
-            {!isBulkMode && (
+            {viewMode === 'draft' ? (
+              !isBulkMode && (
+                <div className="mt-4 flex items-center justify-between rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentIndex((c) => Math.max(0, c - 1))}
+                    disabled={currentIndex === 0}
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition disabled:opacity-30 hover:bg-slate-200"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <div className="font-bold text-slate-900 text-sm">
+                    {currentIndex + 1} / {draftQuestions.length}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const isLast = currentIndex === draftQuestions.length - 1;
+                      if (isLast) setDraftQuestions((prev) => [...prev, defaultDraft(currentDraft.mode, defaultSettings)]);
+                      setCurrentIndex((c) => c + 1);
+                    }}
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 transition hover:bg-blue-200"
+                  >
+                    {currentIndex === draftQuestions.length - 1 ? <Plus className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                  </button>
+                </div>
+              )
+            ) : (
               <div className="mt-4 flex items-center justify-between rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
                 <button
                   type="button"
-                  onClick={() => setCurrentIndex((c) => Math.max(0, c - 1))}
-                  disabled={currentIndex === 0}
+                  onClick={() => setExistingIndex((c) => Math.max(0, c - 1))}
+                  disabled={existingIndex === 0}
                   className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition disabled:opacity-30 hover:bg-slate-200"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
                 <div className="font-bold text-slate-900 text-sm">
-                  {currentIndex + 1} / {draftQuestions.length}
+                  {existingQuestions.length > 0 ? existingIndex + 1 : 0} / {existingQuestions.length}
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    const isLast = currentIndex === draftQuestions.length - 1;
-                    if (isLast) setDraftQuestions((prev) => [...prev, defaultDraft(currentDraft.mode, defaultSettings)]);
-                    setCurrentIndex((c) => c + 1);
-                  }}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 transition hover:bg-blue-200"
+                  onClick={() => setExistingIndex((c) => Math.min(existingQuestions.length - 1, c + 1))}
+                  disabled={existingIndex >= existingQuestions.length - 1}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 transition disabled:opacity-30 hover:bg-blue-200"
                 >
-                  {currentIndex === draftQuestions.length - 1 ? <Plus className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                  <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
             )}
