@@ -478,6 +478,12 @@ export const getAllQuestions = async () => {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
 };
 
+export const getQuestionsByCategoryNode = async (categoryNodeId: string) => {
+  const q = query(questionsRef, where('category_node_id', '==', categoryNodeId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question));
+};
+
 export const getQuestionsBySubject = async (examId: string, subject: string) => {
   const q = query(
     questionsRef, 

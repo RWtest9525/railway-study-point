@@ -23,6 +23,7 @@ export function SupportInbox() {
   const [loading, setLoading] = useState(true);
   const [selectedQuery, setSelectedQuery] = useState<SupportQuery | null>(null);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'closed'>('all');
 
   useEffect(() => {
     void loadQueries();
@@ -31,13 +32,17 @@ export function SupportInbox() {
   const profileById = useMemo(() => new Map(profiles.map((profile) => [profile.id, profile])), [profiles]);
 
   const filteredQueries = useMemo(() => {
+    let result = queries;
+    if (statusFilter !== 'all') {
+      result = result.filter(q => q.status === statusFilter);
+    }
     const value = search.toLowerCase().trim();
-    if (!value) return queries;
-    return queries.filter((query) => {
+    if (!value) return result;
+    return result.filter((query) => {
       const user = profileById.get(query.user_id);
       return `${query.subject} ${query.message} ${user?.full_name || ''} ${user?.email || ''}`.toLowerCase().includes(value);
     });
-  }, [queries, search, profileById]);
+  }, [queries, search, profileById, statusFilter]);
 
   const loadQueries = async () => {
     try {
@@ -92,19 +97,24 @@ export function SupportInbox() {
         <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Manage user support queries with faster search and cleaner ticket handling.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 mb-8 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 mb-8 md:grid-cols-4">
         {([
-          { label: 'Pending', value: queries.filter((q) => q.status === 'pending').length, icon: Clock, tone: 'text-yellow-500' },
-          { label: 'Resolved', value: queries.filter((q) => q.status === 'resolved').length, icon: Check, tone: 'text-green-500' },
-          { label: 'Closed', value: queries.filter((q) => q.status === 'closed').length, icon: X, tone: 'text-slate-500' },
-        ] as Array<{ label: string; value: number; icon: LucideIcon; tone: string }>).map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border p-6 shadow-sm`}>
+          { label: 'All', value: queries.length, icon: MessageSquare, tone: 'text-blue-500', id: 'all' },
+          { label: 'Pending', value: queries.filter((q) => q.status === 'pending').length, icon: Clock, tone: 'text-yellow-500', id: 'pending' },
+          { label: 'Resolved', value: queries.filter((q) => q.status === 'resolved').length, icon: Check, tone: 'text-green-500', id: 'resolved' },
+          { label: 'Closed', value: queries.filter((q) => q.status === 'closed').length, icon: X, tone: 'text-slate-500', id: 'closed' },
+        ] as Array<{ label: string; value: number; icon: LucideIcon; tone: string; id: any }>).map(({ label, value, icon: Icon, tone, id }) => (
+          <button 
+            key={label} 
+            onClick={() => setStatusFilter(id)}
+            className={`text-left text-inherit transition-all ${isDark ? 'bg-gray-800' : 'bg-white'} ${statusFilter === id ? `border-2 ${isDark ? 'border-teal-500' : 'border-teal-600'} shadow-md` : `border ${isDark ? 'border-gray-700 hover:border-gray-600' : 'border-gray-200 hover:border-gray-300'}`} rounded-3xl p-6`}
+          >
             <div className="mb-2 flex items-center gap-3">
               <Icon className={`h-6 w-6 ${tone}`} />
               <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{label}</span>
             </div>
             <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{value}</p>
-          </div>
+          </button>
         ))}
       </div>
 

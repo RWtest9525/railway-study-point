@@ -5,6 +5,7 @@ import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from '../../lib/firebase';
 import { useTheme } from '../../contexts/ThemeContext';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 interface UserProfile {
   id: string;
@@ -23,6 +24,13 @@ export function UserManagement() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void, isDestructive?: boolean}>({
+    isOpen: false, title: '', message: '', onConfirm: () => {}
+  });
+
+  const [passwordModal, setPasswordModal] = useState<{isOpen: boolean, user: UserProfile | null}>({ isOpen: false, user: null });
+  const [manualPassword, setManualPassword] = useState('');
 
   useEffect(() => {
     void loadUsers();
@@ -44,32 +52,49 @@ export function UserManagement() {
   const filteredUsers = useMemo(
     () =>
       users.filter((user) =>
+        user.role !== 'admin' && // Hide all admins here as requested
         `${user.full_name} ${user.email}`.toLowerCase().includes(search.toLowerCase())
       ),
     [users, search]
   );
 
   const updateRole = async (user: UserProfile, role: 'admin' | 'student' | 'banned') => {
-    const actionLabel =
-      role === 'admin' ? 'make admin' : role === 'banned' ? 'ban' : 'restore';
-    if (!confirm(`Confirm ${actionLabel} for ${user.full_name || user.email}?`)) return;
-    await updateDoc(doc(db, 'profiles', user.id), {
-      role,
-      updated_at: new Date().toISOString(),
+    const actionLabel = role === 'admin' ? 'make admin' : role === 'banned' ? 'ban' : 'restore';
+    setConfirmModal({
+      isOpen: true,
+      title: `${actionLabel} User`,
+      message: `Are you sure you want to ${actionLabel} ${user.full_name || user.email}?`,
+      isDestructive: role === 'banned',
+      onConfirm: async () => {
+        try {
+          await updateDoc(doc(db, 'profiles', user.id), {
+            role,
+            updated_at: new Date().toISOString(),
+          });
+          await loadUsers();
+          toast.success(`User updated: ${actionLabel}`);
+        } catch (e) {
+            toast.error('Failed to update role');
+        }
+      }
     });
-    await loadUsers();
-    toast.success(`User updated: ${actionLabel}`);
   };
 
   const sendResetLink = async (user: UserProfile) => {
-    if (!confirm(`Send a password reset email to ${user.email}?`)) return;
     try {
       await sendPasswordResetEmail(auth, user.email);
       toast.success('Password reset email sent');
+      setPasswordModal({ isOpen: false, user: null });
     } catch (error) {
       console.error(error);
       toast.error('Could not send reset email');
     }
+  };
+
+  const setPasswordDirectly = () => {
+    // Note: Setting password directly requires Backend Firebase Admin SDK
+    // which is not part of standard client-side Firebase operations.
+    toast.error('Direct password overwrite requires Cloud Functions (Blaze Plan) to execute securely.');
   };
 
   if (loading) {
@@ -117,7 +142,7 @@ export function UserManagement() {
                       ? 'bg-red-100 text-red-700'
                       : 'bg-blue-100 text-blue-700'
                   }`}>
-                    {user.role}
+                    {user.role || 'student'}
                   </span>
                 </td>
                 <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -128,9 +153,9 @@ export function UserManagement() {
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-wrap justify-end gap-2">
-                    <button onClick={() => void sendResetLink(user)} className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                    <button onClick={() => { setPasswordModal({ isOpen: true, user }); setManualPassword(''); }} className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
                       <KeyRound className="h-3.5 w-3.5" />
-                      Reset password
+                      Manage Password
                     </button>
                     {user.role !== 'admin' && (
                       <button onClick={() => void updateRole(user, 'admin')} className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700">
@@ -157,6 +182,69 @@ export function UserManagement() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmModal.isDestructive}
+      />
+
+      {passwordModal.isOpen && passwordModal.user && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity">
+          <div className={`w-full max-w-md overflow-hidden rounded-[24px] border ${isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'} shadow-2xl`}>
+            <div className="p-6">
+              <h3 className={`mb-2 text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Manage Password</h3>
+              <p className={`mb-6 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                Managing password for <strong>{passwordModal.user.email}</strong>.
+              </p>
+
+              <div className="space-y-4">
+                <button
+                  onClick={() => void sendResetLink(passwordModal.user!)}
+                  className="w-full rounded-2xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-700"
+                >
+                  Send Reset Link Email
+                </button>
+
+                <div className="relative flex items-center py-2">
+                  <div className={`flex-grow border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}></div>
+                  <span className={`mx-4 flex-shrink-0 text-xs text-slate-400`}>OR MANUAL ENFORCEMENT</span>
+                  <div className={`flex-grow border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}></div>
+                </div>
+
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Type new password"
+                    value={manualPassword}
+                    onChange={(e) => setManualPassword(e.target.value)}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-white text-slate-900'}`}
+                  />
+                  <button
+                    onClick={setPasswordDirectly}
+                    className={`w-full rounded-2xl border px-5 py-3 text-sm font-semibold ${isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-500' : 'border-amber-200 bg-amber-50 text-amber-700'}`}
+                  >
+                    Force Change Password
+                  </button>
+                  <p className="text-center text-xs text-slate-500">
+                    *Requires Cloud Functions to directly change passwords of other users.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setPasswordModal({ isOpen: false, user: null })}
+                className={`mt-6 w-full rounded-2xl border px-5 py-3 text-sm font-semibold ${isDark ? 'border-slate-700 hover:bg-slate-800 text-slate-300' : 'border-slate-300 hover:bg-slate-50 text-slate-700'}`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

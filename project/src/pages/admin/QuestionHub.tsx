@@ -13,8 +13,12 @@ import {
   getCategoryNodes,
   updateCategory,
   updateCategoryNode,
+  Question,
+  getQuestionsByCategoryNode,
+  deleteQuestion,
 } from '../../lib/firestore';
 import { AddQuestionModal } from '../../components/AddQuestionModal';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 type QuestionMode = 'manual' | 'screenshot' | 'bulk';
 type StepItem = { entity: 'category' | 'node'; id: string; name: string; categoryId: string };
@@ -35,6 +39,10 @@ export function QuestionHub() {
   const [editingNode, setEditingNode] = useState<CategoryNode | null>(null);
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '', color: '#0f766e', iconUrl: '', is_active: true });
   const [nodeName, setNodeName] = useState('');
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void, isDestructive?: boolean}>({
+    isOpen: false, title: '', message: '', onConfirm: () => {}
+  });
 
   const selectedCategoryId = path.find((item) => item.entity === 'category')?.id || '';
   const selectedNode = path.length > 0 ? path[path.length - 1] : null;
@@ -47,7 +55,22 @@ export function QuestionHub() {
 
   useEffect(() => {
     void loadStepItems();
+    if (selectedNode?.entity === 'node') {
+      void loadQuestions();
+    } else {
+      setQuestions([]);
+    }
   }, [selectedCategoryId, currentNodeParent, path.length]);
+
+  const loadQuestions = async () => {
+    if (selectedNode?.entity !== 'node') return;
+    try {
+      const qs = await getQuestionsByCategoryNode(selectedNode.id);
+      setQuestions(qs);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const pageTitle = useMemo(() => {
     if (path.length === 0) return 'Category';
@@ -226,30 +249,63 @@ export function QuestionHub() {
   };
 
   const removeCategory = async (category: Category) => {
-    if (!confirm(`Delete "${category.name}"?`)) return;
-    try {
-      await deleteCategory(category.id);
-      setPath([]);
-      setItems([]);
-      await loadCategories();
-      toast.success('Category deleted');
-    } catch (error) {
-      console.error(error);
-      toast.error('Could not delete category');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Category',
+      message: `Delete "${category.name}"? This action cannot be undone.`,
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteCategory(category.id);
+          setPath([]);
+          setItems([]);
+          await loadCategories();
+          toast.success('Category deleted');
+        } catch (error) {
+          console.error(error);
+          toast.error('Could not delete category');
+        }
+      }
+    });
   };
 
   const removeNode = async (node: CategoryNode) => {
-    if (!confirm(`Delete "${node.name}"?`)) return;
-    try {
-      await deleteCategoryNode(node.id);
-      setItems((prev) => prev.filter((item) => item.id !== node.id));
-      await loadStepItems();
-      toast.success('Item deleted');
-    } catch (error) {
-      console.error(error);
-      toast.error('Could not delete item');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Folder',
+      message: `Delete "${node.name}"? This action cannot be undone.`,
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteCategoryNode(node.id);
+          setItems((prev) => prev.filter((item) => item.id !== node.id));
+          await loadStepItems();
+          toast.success('Folder deleted');
+        } catch (error) {
+          console.error(error);
+          toast.error('Could not delete folder');
+        }
+      }
+    });
+  };
+
+  const executeRemoveQuestion = async (q: Question) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Question',
+      message: 'Are you sure you want to delete this question forever?',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteQuestion(q.id);
+          setQuestions((prev) => prev.filter((item) => item.id !== q.id));
+          toast.success('Question deleted');
+        } catch (error) {
+          console.error(error);
+          toast.error('Could not delete question');
+        }
+      }
+    });
   };
 
   const renderCards = () => {
@@ -270,22 +326,57 @@ export function QuestionHub() {
       ));
     }
 
-    return items.map((node) => (
-      <ItemCard
-        key={node.id}
-        title={node.name}
-        subtitle="Open next page"
-        isDark={isDark}
-        onOpen={() =>
-          setPath((prev) => [
-            ...prev,
-            { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId },
-          ])
-        }
-        onEdit={() => openAddNode(node)}
-        onDelete={() => void removeNode(node)}
-      />
-    ));
+    return (
+      <div className="grid gap-4">
+        {/* Child Folders */}
+        <div className="mb-2">
+          {items.length > 0 && <h3 className={`mb-3 text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Folders</h3>}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((node) => (
+              <ItemCard
+                key={node.id}
+                title={node.name}
+                subtitle="Open next page"
+                isDark={isDark}
+                onOpen={() =>
+                  setPath((prev) => [
+                    ...prev,
+                    { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId },
+                  ])
+                }
+                onEdit={() => openAddNode(node)}
+                onDelete={() => void removeNode(node)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Questions in Folder */}
+        <div className="mt-4">
+          <h3 className={`mb-3 text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Questions ({questions.length})</h3>
+          <div className="grid gap-4">
+            {questions.map((q, idx) => (
+              <div key={q.id} className={`flex items-center justify-between rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-white'}`}>
+                <div className="flex flex-1 items-center gap-3">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-xl font-bold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                    Q{idx + 1}
+                  </div>
+                  <div className={`line-clamp-1 flex-1 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {q.question_text === 'Screenshot question' && q.image_url ? '📷 Screenshot attached' : q.question_text}
+                  </div>
+                </div>
+                <button
+                  onClick={() => executeRemoveQuestion(q)}
+                  className={`ml-4 rounded-xl p-2 transition ${isDark ? 'text-red-400 hover:bg-red-400/10' : 'text-red-500 hover:bg-red-50'}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -318,10 +409,8 @@ export function QuestionHub() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm(`Add question inside "${selectedNode?.name}"?`)) {
-                      setQuestionMode('manual');
-                      setQuestionModalOpen(true);
-                    }
+                    setQuestionMode('manual');
+                    setQuestionModalOpen(true);
                   }}
                   className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white"
                 >
@@ -368,11 +457,26 @@ export function QuestionHub() {
 
       <AddQuestionModal
         isOpen={questionModalOpen}
-        onClose={() => setQuestionModalOpen(false)}
-        onSuccess={() => toast.success('Question saved')}
+        onClose={() => {
+          setQuestionModalOpen(false);
+          if (selectedNode?.entity === 'node') loadQuestions(); // reload questions when closing
+        }}
+        onSuccess={() => {
+          toast.success('Question saved');
+          if (selectedNode?.entity === 'node') loadQuestions();
+        }}
         categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
         linkedLabel={selectedNode?.name}
         initialMode={questionMode}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmModal.isDestructive}
       />
 
       {categoryModalOpen && (

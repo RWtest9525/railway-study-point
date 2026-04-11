@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Loader2, Save, Upload, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Plus, Save, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { createQuestion, createQuestionsBatch, getQuestions } from '../lib/firestore';
+import { createQuestionsBatch, getQuestions } from '../lib/firestore';
 import { uploadImage, validateImage } from '../lib/imageUtils';
 
 type QuestionMode = 'manual' | 'screenshot' | 'bulk';
@@ -35,6 +35,36 @@ const buildFallbackOptions = (style: 'alphabet' | 'numeric') =>
     style === 'numeric' ? `Option ${index + 1}` : `Option ${String.fromCharCode(65 + index)}`
   );
 
+interface QuestionDraft {
+  mode: QuestionMode;
+  question_text: string;
+  explanation: string;
+  video_explanation_url: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  marks: number;
+  negative_marks: number;
+  is_draft: boolean;
+  image_url: string;
+  option_label_style: 'alphabet' | 'numeric';
+  options: OptionDraft[];
+  correct_index: number;
+}
+
+const defaultDraft = (initialMode: QuestionMode = 'manual'): QuestionDraft => ({
+  mode: initialMode,
+  question_text: '',
+  explanation: '',
+  video_explanation_url: '',
+  difficulty: 'medium',
+  marks: 1,
+  negative_marks: 0,
+  is_draft: false,
+  image_url: '',
+  option_label_style: 'alphabet',
+  options: defaultOptions(),
+  correct_index: 0,
+});
+
 export function AddQuestionModal({
   isOpen,
   onClose,
@@ -46,63 +76,49 @@ export function AddQuestionModal({
   initialMode = 'manual',
 }: AddQuestionModalProps) {
   const { profile } = useAuth();
-  const [mode, setMode] = useState<QuestionMode>(initialMode);
+  const [draftQuestions, setDraftQuestions] = useState<QuestionDraft[]>([defaultDraft(initialMode)]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [correctIndex, setCorrectIndex] = useState(0);
-  const [options, setOptions] = useState<OptionDraft[]>(defaultOptions());
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [uploadingBulkImages, setUploadingBulkImages] = useState(false);
-  const [formData, setFormData] = useState({
-    question_text: '',
-    explanation: '',
-    video_explanation_url: '',
-    difficulty: 'medium' as 'easy' | 'medium' | 'hard',
-    marks: 1,
-    negative_marks: 0,
-    is_draft: false,
-    image_url: '',
-    option_label_style: 'alphabet' as 'alphabet' | 'numeric',
-  });
 
   const isLinkedQuestionBank = Boolean(categoryNodeId);
+  const currentDraft = draftQuestions[currentIndex];
+  const isBulkMode = currentDraft.mode === 'bulk';
+
   const previewOptions = useMemo(
-    () => (mode === 'manual' ? buildFinalOptions(options, formData.option_label_style) : buildFallbackOptions(formData.option_label_style)),
-    [mode, options, formData.option_label_style]
+    () => (currentDraft.mode === 'manual' ? buildFinalOptions(currentDraft.options, currentDraft.option_label_style) : buildFallbackOptions(currentDraft.option_label_style)),
+    [currentDraft.mode, currentDraft.options, currentDraft.option_label_style]
   );
 
   useEffect(() => {
     if (!isOpen) return;
-    setMode(initialMode);
+    setDraftQuestions([defaultDraft(initialMode)]);
+    setCurrentIndex(0);
+    setBulkFiles([]);
   }, [isOpen, initialMode]);
+
+  const updateCurrentDraft = (updates: Partial<QuestionDraft>) => {
+    setDraftQuestions((prev) => prev.map((q, i) => (i === currentIndex ? { ...q, ...updates } : q)));
+  };
+
+  const updateDraftOption = (id: string, text: string) => {
+    const updatedOptions = currentDraft.options.map((option) => (option.id === id ? { ...option, text } : option));
+    updateCurrentDraft({ options: updatedOptions });
+  };
 
   const resetForm = () => {
     setError('');
-    setMode(initialMode);
-    setCorrectIndex(0);
-    setOptions(defaultOptions());
+    setDraftQuestions([defaultDraft(initialMode)]);
+    setCurrentIndex(0);
     setBulkFiles([]);
-    setFormData({
-      question_text: '',
-      explanation: '',
-      video_explanation_url: '',
-      difficulty: 'medium',
-      marks: 1,
-      negative_marks: 0,
-      is_draft: false,
-      image_url: '',
-      option_label_style: 'alphabet',
-    });
   };
 
   const handleClose = () => {
     resetForm();
     onClose();
-  };
-
-  const updateOption = (id: string, text: string) => {
-    setOptions((prev) => prev.map((option) => (option.id === id ? { ...option, text } : option)));
   };
 
   const uploadQuestionImage = async (file: File) => {
@@ -117,7 +133,7 @@ export function AddQuestionModal({
     setUploadingQuestionImage(true);
     try {
       const uploaded = await uploadImage(file, `questions/${Date.now()}-${file.name}`);
-      setFormData((prev) => ({ ...prev, image_url: uploaded.url }));
+      updateCurrentDraft({ image_url: uploaded.url });
       toast.success('Question screenshot uploaded');
     } catch (uploadError: any) {
       const message = uploadError?.message || 'Failed to upload screenshot';
@@ -128,42 +144,42 @@ export function AddQuestionModal({
     }
   };
 
-  const saveSingleQuestion = async () => {
+  const saveQuestions = async () => {
     if (!profile?.id) throw new Error('Please sign in again.');
     if (!categoryNodeId) throw new Error('Please choose the folder first.');
 
     const existingQuestions = examId ? await getQuestions(examId) : [];
-    const finalOptions = buildFinalOptions(options, formData.option_label_style);
+    
+    // Filter out completely empty drafts
+    const validDrafts = draftQuestions.filter(d => 
+      (d.mode === 'manual' && d.question_text.trim()) || 
+      (d.mode === 'screenshot' && d.image_url.trim())
+    );
 
-    if (mode === 'manual') {
-      if (!formData.question_text.trim()) throw new Error('Please enter the question text.');
-      if (!options.some((option) => option.text.trim())) throw new Error('Please enter all option text.');
-    }
+    if (validDrafts.length === 0) throw new Error('No valid questions entered to save.');
 
-    if (mode === 'screenshot' && !formData.image_url.trim()) {
-      throw new Error('Please upload the screenshot.');
-    }
-
-    await createQuestion({
+    const formattedQuestions = validDrafts.map((draft, idx) => ({
       exam_id: examId || null,
       category_node_id: categoryNodeId,
       subject: linkedLabel || 'General',
-      question_text: formData.question_text.trim() || 'Screenshot question',
-      options: finalOptions,
-      option_label_style: formData.option_label_style,
-      correct_index: correctIndex,
-      explanation: formData.explanation.trim() || null,
-      video_explanation_url: formData.video_explanation_url.trim() || null,
-      difficulty: formData.difficulty,
-      image_url: formData.image_url.trim() || null,
-      marks: Number(formData.marks) || 1,
-      negative_marks: Number(formData.negative_marks) || 0,
-      order: existingQuestions.length + 1,
-      is_draft: formData.is_draft,
+      question_text: draft.question_text.trim() || 'Screenshot question',
+      options: buildFinalOptions(draft.options, draft.option_label_style),
+      option_label_style: draft.option_label_style,
+      correct_index: draft.correct_index,
+      explanation: draft.explanation.trim() || null,
+      video_explanation_url: draft.video_explanation_url.trim() || null,
+      difficulty: draft.difficulty,
+      image_url: draft.image_url.trim() || null,
+      marks: Number(draft.marks) || 1,
+      negative_marks: Number(draft.negative_marks) || 0,
+      order: existingQuestions.length + idx + 1,
+      is_draft: draft.is_draft,
       version: 1,
       created_by: profile.id,
       updated_at: new Date().toISOString(),
-    } as any);
+    }));
+
+    await createQuestionsBatch(formattedQuestions as any);
   };
 
   const saveBulkQuestions = async () => {
@@ -191,17 +207,17 @@ export function AddQuestionModal({
           category_node_id: categoryNodeId,
           subject: linkedLabel || 'General',
           question_text: `Screenshot question ${existingQuestions.length + index + 1}`,
-          options: buildFallbackOptions(formData.option_label_style),
-          option_label_style: formData.option_label_style,
-          correct_index: correctIndex,
-          explanation: formData.explanation.trim() || null,
-          video_explanation_url: formData.video_explanation_url.trim() || null,
-          difficulty: formData.difficulty,
+          options: buildFallbackOptions(currentDraft.option_label_style),
+          option_label_style: currentDraft.option_label_style,
+          correct_index: currentDraft.correct_index,
+          explanation: currentDraft.explanation.trim() || null,
+          video_explanation_url: currentDraft.video_explanation_url.trim() || null,
+          difficulty: currentDraft.difficulty,
           image_url: url,
-          marks: Number(formData.marks) || 1,
-          negative_marks: Number(formData.negative_marks) || 0,
+          marks: Number(currentDraft.marks) || 1,
+          negative_marks: Number(currentDraft.negative_marks) || 0,
           order: existingQuestions.length + index + 1,
-          is_draft: formData.is_draft,
+          is_draft: currentDraft.is_draft,
           version: 1,
           created_by: profile.id,
           updated_at: new Date().toISOString(),
@@ -218,12 +234,12 @@ export function AddQuestionModal({
     setError('');
 
     try {
-      if (mode === 'bulk') {
+      if (isBulkMode) {
         await saveBulkQuestions();
         toast.success(`${bulkFiles.length} screenshot question(s) created`);
       } else {
-        await saveSingleQuestion();
-        toast.success('Question created successfully');
+        await saveQuestions();
+        toast.success(`${draftQuestions.filter(d => Boolean(d.question_text || d.image_url)).length} questions created successfully`);
       }
       onSuccess();
       handleClose();
@@ -273,9 +289,15 @@ export function AddQuestionModal({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setMode(item.id)}
+                  onClick={() => {
+                    if (draftQuestions.length > 1 && item.id === 'bulk') {
+                      toast.error('Bulk upload cannot be combined with existing drafts. Save drafts first.');
+                      return;
+                    }
+                    updateCurrentDraft({ mode: item.id });
+                  }}
                   className={`rounded-2xl border px-4 py-4 text-left transition ${
-                    mode === item.id
+                    currentDraft.mode === item.id
                       ? 'border-blue-300 bg-blue-50 text-blue-700'
                       : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300'
                   }`}
@@ -292,8 +314,8 @@ export function AddQuestionModal({
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Option style</span>
                 <select
-                  value={formData.option_label_style}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, option_label_style: e.target.value as 'alphabet' | 'numeric' }))}
+                  value={currentDraft.option_label_style}
+                  onChange={(e) => updateCurrentDraft({ option_label_style: e.target.value as 'alphabet' | 'numeric' })}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 >
                   <option value="alphabet">A B C D</option>
@@ -306,8 +328,8 @@ export function AddQuestionModal({
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Difficulty</span>
                 <select
-                  value={formData.difficulty}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, difficulty: e.target.value as 'easy' | 'medium' | 'hard' }))}
+                  value={currentDraft.difficulty}
+                  onChange={(e) => updateCurrentDraft({ difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 >
                   <option value="easy">Easy</option>
@@ -320,8 +342,8 @@ export function AddQuestionModal({
                 <input
                   type="number"
                   min="1"
-                  value={formData.marks}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, marks: Number(e.target.value) }))}
+                  value={currentDraft.marks}
+                  onChange={(e) => updateCurrentDraft({ marks: Number(e.target.value) })}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 />
               </label>
@@ -331,34 +353,34 @@ export function AddQuestionModal({
                   type="number"
                   min="0"
                   step="0.25"
-                  value={formData.negative_marks}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, negative_marks: Number(e.target.value) }))}
+                  value={currentDraft.negative_marks}
+                  onChange={(e) => updateCurrentDraft({ negative_marks: Number(e.target.value) })}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 />
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Correct answer</span>
                 <select
-                  value={correctIndex}
-                  onChange={(e) => setCorrectIndex(Number(e.target.value))}
+                  value={currentDraft.correct_index}
+                  onChange={(e) => updateCurrentDraft({ correct_index: Number(e.target.value) })}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 >
-                  {buildFallbackOptions(formData.option_label_style).map((_, index) => (
+                  {buildFallbackOptions(currentDraft.option_label_style).map((_, index) => (
                     <option key={index} value={index}>
-                      {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
+                      {currentDraft.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
 
-            {mode === 'manual' && (
+            {currentDraft.mode === 'manual' && (
               <>
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Question</span>
                   <textarea
-                    value={formData.question_text}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, question_text: e.target.value }))}
+                    value={currentDraft.question_text}
+                    onChange={(e) => updateCurrentDraft({ question_text: e.target.value })}
                     rows={4}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                     placeholder="Type the full question here"
@@ -366,14 +388,14 @@ export function AddQuestionModal({
                 </label>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {options.map((option, index) => (
+                  {currentDraft.options.map((option, index) => (
                     <label key={option.id} className="block">
                       <span className="mb-2 block text-sm font-medium text-slate-700">
-                        Option {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
+                        Option {currentDraft.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
                       </span>
                       <textarea
                         value={option.text}
-                        onChange={(e) => updateOption(option.id, e.target.value)}
+                        onChange={(e) => updateDraftOption(option.id, e.target.value)}
                         rows={2}
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                         placeholder="Enter option text"
@@ -384,7 +406,7 @@ export function AddQuestionModal({
               </>
             )}
 
-            {mode === 'screenshot' && (
+            {currentDraft.mode === 'screenshot' && (
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-700">Upload screenshot</span>
@@ -403,8 +425,8 @@ export function AddQuestionModal({
                     />
                   </label>
                 </div>
-                {formData.image_url ? (
-                  <img src={formData.image_url} alt="Question" className="max-h-72 w-full rounded-2xl border border-slate-200 bg-white object-contain" />
+                {currentDraft.image_url ? (
+                  <img src={currentDraft.image_url} alt="Question" className="max-h-72 w-full rounded-2xl border border-slate-200 bg-white object-contain" />
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center text-sm text-slate-400">
                     Upload the full question screenshot here
@@ -413,7 +435,7 @@ export function AddQuestionModal({
               </div>
             )}
 
-            {mode === 'bulk' && (
+            {currentDraft.mode === 'bulk' && (
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-700">Bulk screenshots</span>
@@ -450,8 +472,8 @@ export function AddQuestionModal({
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Explanation</span>
                 <textarea
-                  value={formData.explanation}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, explanation: e.target.value }))}
+                  value={currentDraft.explanation}
+                  onChange={(e) => updateCurrentDraft({ explanation: e.target.value })}
                   rows={4}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                 />
@@ -461,16 +483,16 @@ export function AddQuestionModal({
                   <span className="mb-2 block text-sm font-medium text-slate-700">Video explanation URL</span>
                   <input
                     type="url"
-                    value={formData.video_explanation_url}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, video_explanation_url: e.target.value }))}
+                    value={currentDraft.video_explanation_url}
+                    onChange={(e) => updateCurrentDraft({ video_explanation_url: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
                   />
                 </label>
                 <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                   <input
                     type="checkbox"
-                    checked={formData.is_draft}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, is_draft: e.target.checked }))}
+                    checked={currentDraft.is_draft}
+                    onChange={(e) => updateCurrentDraft({ is_draft: e.target.checked })}
                   />
                   Save as draft
                 </label>
@@ -484,25 +506,25 @@ export function AddQuestionModal({
               <div className="space-y-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="mb-2 text-xs text-slate-400">
-                    {linkedLabel || 'Selected folder'} • {formData.marks} mark(s)
+                    {linkedLabel || 'Selected folder'} • {currentDraft.marks} mark(s)
                   </div>
                   <div className="text-sm text-slate-900">
-                    {mode === 'manual' ? formData.question_text || 'Question preview' : 'Screenshot question preview'}
+                    {currentDraft.mode === 'manual' ? currentDraft.question_text || 'Question preview' : 'Screenshot question preview'}
                   </div>
-                  {formData.image_url && (
-                    <img src={formData.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl border border-slate-200 object-contain" />
+                  {currentDraft.image_url && (
+                    <img src={currentDraft.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl border border-slate-200 object-contain" />
                   )}
                 </div>
                 {previewOptions.map((option, index) => (
                   <div
                     key={index}
                     className={`rounded-2xl border p-3 ${
-                      index === correctIndex ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
+                      index === currentDraft.correct_index ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-700">
-                        {formData.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
+                        {currentDraft.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
                       </span>
                       <div className="min-w-0 flex-1 text-sm text-slate-700">
                         {option || `Choose option ${index + 1}`}
@@ -514,24 +536,73 @@ export function AddQuestionModal({
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <div className="mb-3 font-semibold text-slate-900">Ready check</div>
-              <div className="space-y-2">
-                <div>{isLinkedQuestionBank ? '✓' : '•'} Folder selected</div>
-                <div>{examTitle ? '✓' : '•'} Exam link optional</div>
-                <div>{mode !== 'manual' || formData.question_text.trim() ? '✓' : '•'} Manual question ready</div>
-                <div>{mode !== 'screenshot' || formData.image_url ? '✓' : '•'} Screenshot uploaded</div>
-                <div>{mode !== 'bulk' || bulkFiles.length > 0 ? '✓' : '•'} Bulk screenshots selected</div>
+              <div className="mb-4 font-semibold text-slate-900">Ready check</div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  {isLinkedQuestionBank ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
+                  <span className={isLinkedQuestionBank ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Folder selected</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {examTitle ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
+                  <span className={examTitle ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Exam link optional</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {currentDraft.mode !== 'manual' || currentDraft.question_text.trim() ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
+                  <span className={currentDraft.mode !== 'manual' || currentDraft.question_text.trim() ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Manual question ready</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {currentDraft.mode !== 'screenshot' || currentDraft.image_url ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
+                  <span className={currentDraft.mode !== 'screenshot' || currentDraft.image_url ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Screenshot uploaded</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {currentDraft.mode !== 'bulk' || bulkFiles.length > 0 ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
+                  <span className={currentDraft.mode !== 'bulk' || bulkFiles.length > 0 ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Bulk screenshots selected</span>
+                </div>
               </div>
             </div>
+            
+            {!isBulkMode && (
+              <div className="mt-4 flex items-center justify-between rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setCurrentIndex((c) => Math.max(0, c - 1))}
+                  disabled={currentIndex === 0}
+                  className="inline-flex h-12 items-center gap-2 rounded-2xl px-4 text-sm font-semibold text-slate-700 transition disabled:opacity-30 hover:bg-slate-50"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back Question No.
+                </button>
+                <div className="font-bold text-slate-900">
+                  Question {currentIndex + 1} of {draftQuestions.length}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isLast = currentIndex === draftQuestions.length - 1;
+                    if (isLast) {
+                      setDraftQuestions((prev) => [...prev, defaultDraft(currentDraft.mode)]);
+                    }
+                    setCurrentIndex((c) => c + 1);
+                  }}
+                  className="inline-flex h-12 items-center gap-2 rounded-2xl bg-slate-50 px-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                >
+                  {currentIndex === draftQuestions.length - 1 ? (
+                    <>Add Next Page <Plus className="h-4 w-4" /></>
+                  ) : (
+                    <>Question {currentIndex + 2} <ChevronRight className="h-4 w-4" /></>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-2 lg:col-span-2">
             <button type="button" onClick={handleClose} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700">
               Cancel
             </button>
-            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-70">
+            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-blue-700 disabled:opacity-70">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {loading ? 'Saving...' : mode === 'bulk' ? 'Save screenshots' : 'Save question'}
+              {loading ? 'Saving...' : isBulkMode ? 'Save bulk screenshots' : `Save ${draftQuestions.length} question(s)`}
             </button>
           </div>
         </form>
