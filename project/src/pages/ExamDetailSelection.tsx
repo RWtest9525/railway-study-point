@@ -5,6 +5,7 @@ import { getCategory, getCategoryLinks, getCategoryNodes, getExams, Exam, Catego
 import { ArrowLeft, ChevronRight, Clock, Crown, ExternalLink, Layers3, Lock, PlayCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { BottomNav } from '../components/BottomNav';
+import { ConfirmModal } from '../components/ConfirmModal';
 import toast from 'react-hot-toast';
 
 interface ExamDetailSelectionProps {
@@ -37,6 +38,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
   const [currentNodes, setCurrentNodes] = useState<CategoryNode[]>([]);
   const [currentLink, setCurrentLink] = useState<CategoryLink | null>(null);
   const currentNodeId = path.length > 0 ? path[path.length - 1].id : null;
+  const [examToStart, setExamToStart] = useState<Exam | null>(null);
 
   useEffect(() => {
     void loadCategoryAndExams();
@@ -96,8 +98,13 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
       return;
     }
 
-    const ok = confirm(`Start "${exam.title}" now?`);
-    if (ok) navigate(`/exam/${exam.id}`);
+    setExamToStart(exam);
+  };
+
+  const handleConfirmStart = () => {
+    if (examToStart) {
+      navigate(`/exam/${examToStart.id}`);
+    }
   };
 
   const canShowExams = currentNodes.length === 0 || path.length > 0;
@@ -135,14 +142,9 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
           >
             <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
           </button>
-          <div className="min-w-0">
-            <h1 className={`truncate font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h1 className={`truncate font-extrabold text-xl ${isDark ? 'text-white' : 'text-gray-900'}`}>
               {path.length > 0 ? path[path.length - 1].name : category?.name || 'Available Tests'}
             </h1>
-            <p className={`truncate text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              {path.length === 0 ? 'Open subcategory or test folder' : 'Use back to move one level up'}
-            </p>
-          </div>
         </div>
       </header>
 
@@ -179,14 +181,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
 
         {currentNodes.length > 0 && (
           <section className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {path.length === 0 ? 'Subcategories' : 'Folders'}
-              </h2>
-              <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                Choose the correct folder to continue
-              </span>
-            </div>
+
 
             <div className="grid gap-3 sm:grid-cols-2">
               {currentNodes.map((node) => (
@@ -205,14 +200,19 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
                   }`}
                 >
                   {isLocked && <div className="absolute inset-0 rounded-[24px] bg-slate-950/20" />}
-                  <div className="relative flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-base font-bold">{node.name}</div>
-                      <div className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Open next folder or test paper
+                  <div className="relative flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                        {node.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{node.name}</div>
+                        <div className={`mt-0.5 text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          Open Folder
+                        </div>
                       </div>
                     </div>
-                    {isLocked ? <Lock className="h-5 w-5 text-red-400" /> : <ChevronRight className={`h-5 w-5 ${isDark ? 'text-gray-500' : 'text-slate-400'}`} />}
+                    {isLocked ? <Lock className="h-5 w-5 text-red-500" /> : <ChevronRight className={`h-6 w-6 ${isDark ? 'text-gray-500' : 'text-slate-400'}`} />}
                   </div>
                 </button>
               ))}
@@ -222,12 +222,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
 
         {canShowExams && (
           <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Tests</h2>
-              <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                {path.length > 0 ? `${path[path.length - 1].name} level` : 'Category level tests'}
-              </span>
-            </div>
+
 
             {visibleExams.length === 0 ? (
               <div className={`${isDark ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-white border-gray-200 text-gray-500'} rounded-[24px] border p-8 text-center`}>
@@ -308,6 +303,17 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
           </section>
         )}
       </main>
+      
+      <ConfirmModal
+        isOpen={!!examToStart}
+        onClose={() => setExamToStart(null)}
+        onConfirm={handleConfirmStart}
+        title="Start Exam"
+        message={examToStart ? `Are you sure you want to start "${examToStart.title}" now? The timer will begin immediately.` : ''}
+        confirmText="Start Exam"
+        cancelText="Cancel"
+      />
+      
       <BottomNav />
     </div>
   );

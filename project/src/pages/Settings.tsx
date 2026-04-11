@@ -8,6 +8,7 @@ import {
   Trophy, 
   HelpCircle, 
   Crown,
+  History as HistoryIcon,
   ChevronRight,
   LogOut,
   Moon,
@@ -66,6 +67,14 @@ export function Settings() {
       action: () => navigate('/leaderboard')
     },
     {
+      icon: HistoryIcon,
+      title: 'Exam History',
+      description: 'View previous test analytics and logs',
+      color: 'text-indigo-500',
+      bgColor: 'bg-indigo-500/10',
+      action: () => navigate('/history')
+    },
+    {
       icon: HelpCircle,
       title: 'Help & Support',
       description: 'Get help and contact support',
@@ -73,16 +82,6 @@ export function Settings() {
       bgColor: 'bg-green-500/10',
       action: () => navigate('/support')
     },
-    {
-      icon: Crown,
-      title: 'Membership Details',
-      description: isPremium 
-        ? `Premium until ${profile?.premium_until ? formatDate(profile.premium_until) : 'N/A'}`
-        : 'See free trial and premium status',
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10',
-      action: () => navigate('/membership')
-    }
   ];
 
   return (
@@ -144,32 +143,6 @@ export function Settings() {
             </div>
           </div>
 
-          <div className={`mt-5 grid gap-3 md:grid-cols-2`}>
-            <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'border-gray-700 bg-gray-900/60' : 'border-slate-200 bg-white/80'}`}>
-              <div className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${theme === 'dark' ? 'text-gray-500' : 'text-slate-500'}`}>
-                Membership
-              </div>
-              <div className={`mt-2 text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {isPremium ? 'Premium Active' : 'Free Trial / Free User'}
-              </div>
-              <div className={`mt-1 text-xs leading-6 ${theme === 'dark' ? 'text-gray-400' : 'text-slate-500'}`}>
-                {isPremium
-                  ? `Ends on ${formatDateTime((profile as any)?.premium_until)}`
-                  : `Trial based on joined date ${profile?.created_at ? formatDate(profile.created_at) : 'Unavailable'}`}
-              </div>
-            </div>
-            <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'border-gray-700 bg-gray-900/60' : 'border-slate-200 bg-white/80'}`}>
-              <div className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${theme === 'dark' ? 'text-gray-500' : 'text-slate-500'}`}>
-                Premium Start
-              </div>
-              <div className={`mt-2 text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {(profile as any)?.premium_started_at ? formatDateTime((profile as any).premium_started_at) : 'Unavailable'}
-              </div>
-              <div className={`mt-1 text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-slate-500'}`}>
-                Shown only when premium has been activated successfully.
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Theme Toggle */}
@@ -244,13 +217,40 @@ export function Settings() {
           ))}
         </div>
 
+        {/* Membership Details Button */}
+        <button
+          onClick={() => navigate('/membership')}
+          className={`w-full mt-6 flex items-center justify-between gap-4 p-4 rounded-xl border transition-all ${
+            theme === 'dark'
+              ? 'bg-gradient-to-r from-purple-500/10 to-transparent hover:from-purple-500/20 border-purple-500/30'
+              : 'bg-gradient-to-r from-purple-50 to-white hover:from-purple-100 border-purple-200 shadow-sm'
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-purple-500/20' : 'bg-purple-100'}`}>
+              <Crown className="w-6 h-6 text-purple-500" />
+            </div>
+            <div className="text-left">
+              <h3 className={`text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Membership Details
+              </h3>
+              <p className={`text-sm mt-0.5 ${theme === 'dark' ? 'text-purple-300' : 'text-purple-600'}`}>
+                {isPremium 
+                  ? `Premium ends ${profile?.premium_until ? formatDate(profile.premium_until) : 'N/A'}`
+                  : `Free Trial / Manage Plan`}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className={`w-5 h-5 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-500'} transition`} />
+        </button>
+
         {/* Sign Out Button */}
         <button
           onClick={handleSignOut}
-          className={`w-full mt-6 flex items-center justify-center gap-2 p-4 rounded-xl border font-medium transition-all ${
+          className={`w-full mt-3 flex items-center justify-center gap-2 p-4 rounded-xl border font-bold uppercase tracking-wider text-sm transition-all ${
             theme === 'dark'
-              ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400'
-              : 'bg-red-50 hover:bg-red-100 border-red-200 text-red-600'
+              ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-500'
+              : 'bg-red-50 hover:bg-red-100 border-red-200 text-red-600 shadow-sm'
           }`}
         >
           <LogOut className="w-5 h-5" />

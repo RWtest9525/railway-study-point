@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { collection, doc, getDocs, orderBy, query, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useTheme } from '../../contexts/ThemeContext';
+import { formatDate } from '../../lib/dateUtils';
 
 interface Transaction {
   id: string;
@@ -137,6 +138,13 @@ export function SubscriptionManagement() {
             <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {filteredProfiles.map((profile) => {
                 const isActive = profile.is_premium && (!profile.premium_until || new Date(profile.premium_until) > new Date());
+                
+                const FREE_TRIAL_DAYS = 7;
+                const createdAt = profile.created_at ? new Date(profile.created_at) : new Date();
+                const trialEnd = new Date(createdAt);
+                trialEnd.setDate(trialEnd.getDate() + FREE_TRIAL_DAYS);
+                const isTrialActive = !isActive && new Date() < trialEnd;
+                
                 return (
                   <tr key={profile.id} className={isDark ? 'hover:bg-gray-900/40' : 'hover:bg-gray-50'}>
                     <td className="px-4 py-4">
@@ -144,12 +152,12 @@ export function SubscriptionManagement() {
                       <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{profile.email}</div>
                     </td>
                     <td className="px-4 py-4">
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}`}>
-                        {isActive ? 'Premium active' : 'Free user'}
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isActive ? 'bg-green-100 text-green-700' : isTrialActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>
+                        {isActive ? 'Premium active' : isTrialActive ? 'Free trial' : 'Free user'}
                       </span>
                     </td>
                     <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                      {profile.premium_until ? new Date(profile.premium_until).toLocaleDateString() : 'Not set'}
+                      {profile.premium_until ? formatDate(profile.premium_until) : `Trial until ${formatDate(trialEnd)}`}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">

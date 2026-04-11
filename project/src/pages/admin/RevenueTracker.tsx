@@ -127,10 +127,26 @@ export function RevenueTracker() {
             Latest transactions first. Pending is only for stuck payments, cancelled is for closed or failed attempts.
           </p>
         </div>
-        <button onClick={handleExportCSV} className="inline-flex items-center gap-2 rounded-2xl bg-green-600 px-5 py-3 text-sm font-semibold text-white">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={async () => {
+            if (window.confirm('Are you absolute sure you want to DELETE ALL revenue transactions? This is meant for clearing test data. Cannot be undone.')) {
+              if (window.confirm('Final confirmation: Delete all transaction logs?')) {
+                toast.error('Deleting all transactions...');
+                for (const t of transactions) {
+                  await import('firebase/firestore').then(({ deleteDoc, doc }) => deleteDoc(doc(db, 'transactions', t.id)));
+                }
+                toast.success('All transactions cleared.');
+                loadRevenueData();
+              }
+            }
+          }} className="inline-flex items-center gap-2 rounded-2xl bg-red-100 px-5 py-3 text-sm font-semibold text-red-700 hover:bg-red-200">
+            Clear Testing Data
+          </button>
+          <button onClick={handleExportCSV} className="inline-flex items-center gap-2 rounded-2xl bg-green-600 px-5 py-3 text-sm font-semibold text-white">
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

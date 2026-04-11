@@ -7,7 +7,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { getUserNotifications, getExams, subscribeToCategories, Category, Exam, Notification, timestampToString } from '../lib/firestore';
 import { BrandLogo } from '../components/BrandLogo';
 import { BottomNav } from '../components/BottomNav';
-import { UserPanel } from '../components/UserPanel';
 
 function getExamState(exam: Exam) {
   if (!exam.schedule_date || !exam.schedule_time) {
@@ -34,7 +33,6 @@ export function ExamSelection() {
   const [featuredExams, setFeaturedExams] = useState<Exam[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userPanelOpen, setUserPanelOpen] = useState(false);
   const unreadCount = useMemo(() => notifications.filter((item) => !item.is_read).length, [notifications]);
   const hasLockedAccess = !canAccessTests || trialExpiredNeedsPremium;
 
@@ -112,15 +110,12 @@ export function ExamSelection() {
 
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-[#f4f7fb]'}`}>
-      <UserPanel isOpen={userPanelOpen} onClose={() => setUserPanelOpen(false)} notificationCount={unreadCount} />
-
       <header className={`${isDark ? 'border-gray-800 bg-gray-900/95' : 'border-slate-200 bg-white/95'} sticky top-0 z-50 border-b backdrop-blur-md`}>
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <BrandLogo variant="nav" className={`${isDark ? 'ring-white/10' : 'ring-slate-200'} ring-1`} />
             <div className="min-w-0">
               <div className={`truncate text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Railway Study Point</div>
-              <div className={`truncate text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Choose category</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -134,12 +129,6 @@ export function ExamSelection() {
                   {unreadCount}
                 </span>
               )}
-            </button>
-            <button
-              onClick={() => setUserPanelOpen(true)}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${isDark ? 'bg-gray-800 text-white' : 'bg-slate-900 text-white'}`}
-            >
-              <User className="h-4 w-4" />
             </button>
           </div>
         </div>

@@ -22,6 +22,7 @@ import { Settings } from './pages/Settings';
 import { MockTests } from './pages/MockTests';
 import { SubjectQuizzes } from './pages/SubjectQuizzes';
 import { PreviousYearPapers } from './pages/PreviousYearPapers';
+import { History } from './pages/History';
 import { AdminPortal } from './pages/admin/AdminPortal';
 import { StudentAnalytics } from './pages/admin/StudentAnalytics';
 
@@ -212,6 +213,14 @@ function AppContent() {
     return (
       <ProtectedRoute>
         <ContactSupport />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/history') {
+    return (
+      <ProtectedRoute>
+        <History />
       </ProtectedRoute>
     );
   }

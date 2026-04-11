@@ -433,7 +433,11 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                 </button>
               ) : (
                 <button
-                  onClick={handleSubmit}
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to submit your exam now? You will not be able to change your answers.')) {
+                      void handleSubmit();
+                    }
+                  }}
                   className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold transition shadow-lg shadow-green-900/20"
                 >
                   <CheckCircle className="w-5 h-5" />

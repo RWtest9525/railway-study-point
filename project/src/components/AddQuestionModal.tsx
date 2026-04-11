@@ -16,6 +16,7 @@ interface AddQuestionModalProps {
   categoryNodeId?: string;
   linkedLabel?: string;
   initialMode?: QuestionMode;
+  defaultSettings?: DefaultSettings;
 }
 
 interface OptionDraft {
@@ -50,14 +51,20 @@ interface QuestionDraft {
   correct_index: number;
 }
 
-const defaultDraft = (initialMode: QuestionMode = 'manual'): QuestionDraft => ({
+interface DefaultSettings {
+  marks: number;
+  negative_marks: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+}
+
+const defaultDraft = (initialMode: QuestionMode = 'manual', settings?: DefaultSettings): QuestionDraft => ({
   mode: initialMode,
   question_text: '',
   explanation: '',
   video_explanation_url: '',
-  difficulty: 'medium',
-  marks: 1,
-  negative_marks: 0,
+  difficulty: settings?.difficulty || 'medium',
+  marks: settings?.marks ?? 1,
+  negative_marks: settings?.negative_marks ?? 0,
   is_draft: false,
   image_url: '',
   option_label_style: 'alphabet',
@@ -74,9 +81,10 @@ export function AddQuestionModal({
   categoryNodeId,
   linkedLabel,
   initialMode = 'manual',
+  defaultSettings,
 }: AddQuestionModalProps) {
   const { profile } = useAuth();
-  const [draftQuestions, setDraftQuestions] = useState<QuestionDraft[]>([defaultDraft(initialMode)]);
+  const [draftQuestions, setDraftQuestions] = useState<QuestionDraft[]>([defaultDraft(initialMode, defaultSettings)]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -95,10 +103,10 @@ export function AddQuestionModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setDraftQuestions([defaultDraft(initialMode)]);
+    setDraftQuestions([defaultDraft(initialMode, defaultSettings)]);
     setCurrentIndex(0);
     setBulkFiles([]);
-  }, [isOpen, initialMode]);
+  }, [isOpen, initialMode, defaultSettings]);
 
   const updateCurrentDraft = (updates: Partial<QuestionDraft>) => {
     setDraftQuestions((prev) => prev.map((q, i) => (i === currentIndex ? { ...q, ...updates } : q)));
@@ -111,7 +119,7 @@ export function AddQuestionModal({
 
   const resetForm = () => {
     setError('');
-    setDraftQuestions([defaultDraft(initialMode)]);
+    setDraftQuestions([defaultDraft(initialMode, defaultSettings)]);
     setCurrentIndex(0);
     setBulkFiles([]);
   };
@@ -309,8 +317,6 @@ export function AddQuestionModal({
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
-              <InfoCard label="Folder" value={linkedLabel || 'Selected folder'} />
-              <InfoCard label="Exam" value={examTitle || 'Question bank only'} />
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Option style</span>
                 <select
@@ -324,55 +330,7 @@ export function AddQuestionModal({
               </label>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Difficulty</span>
-                <select
-                  value={currentDraft.difficulty}
-                  onChange={(e) => updateCurrentDraft({ difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
-                >
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Marks</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={currentDraft.marks}
-                  onChange={(e) => updateCurrentDraft({ marks: Number(e.target.value) })}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Negative</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  value={currentDraft.negative_marks}
-                  onChange={(e) => updateCurrentDraft({ negative_marks: Number(e.target.value) })}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Correct answer</span>
-                <select
-                  value={currentDraft.correct_index}
-                  onChange={(e) => updateCurrentDraft({ correct_index: Number(e.target.value) })}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
-                >
-                  {buildFallbackOptions(currentDraft.option_label_style).map((_, index) => (
-                    <option key={index} value={index}>
-                      {currentDraft.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+
 
             {currentDraft.mode === 'manual' && (
               <>
@@ -470,7 +428,7 @@ export function AddQuestionModal({
 
             <div className="grid gap-4 lg:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Explanation</span>
+                <span className="mb-2 block text-sm font-medium text-slate-700">Explanation (Optional)</span>
                 <textarea
                   value={currentDraft.explanation}
                   onChange={(e) => updateCurrentDraft({ explanation: e.target.value })}
@@ -480,7 +438,7 @@ export function AddQuestionModal({
               </label>
               <div className="space-y-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">Video explanation URL</span>
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Video explanation URL (Optional)</span>
                   <input
                     type="url"
                     value={currentDraft.video_explanation_url}
@@ -535,31 +493,7 @@ export function AddQuestionModal({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <div className="mb-4 font-semibold text-slate-900">Ready check</div>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  {isLinkedQuestionBank ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
-                  <span className={isLinkedQuestionBank ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Folder selected</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {examTitle ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
-                  <span className={examTitle ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Exam link optional</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {currentDraft.mode !== 'manual' || currentDraft.question_text.trim() ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
-                  <span className={currentDraft.mode !== 'manual' || currentDraft.question_text.trim() ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Manual question ready</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {currentDraft.mode !== 'screenshot' || currentDraft.image_url ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
-                  <span className={currentDraft.mode !== 'screenshot' || currentDraft.image_url ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Screenshot uploaded</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {currentDraft.mode !== 'bulk' || bulkFiles.length > 0 ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />} 
-                  <span className={currentDraft.mode !== 'bulk' || bulkFiles.length > 0 ? "text-slate-900 text-sm" : "text-slate-500 text-sm"}>Bulk screenshots selected</span>
-                </div>
-              </div>
-            </div>
+
             
             {!isBulkMode && (
               <div className="mt-4 flex items-center justify-between rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
@@ -567,30 +501,23 @@ export function AddQuestionModal({
                   type="button"
                   onClick={() => setCurrentIndex((c) => Math.max(0, c - 1))}
                   disabled={currentIndex === 0}
-                  className="inline-flex h-12 items-center gap-2 rounded-2xl px-4 text-sm font-semibold text-slate-700 transition disabled:opacity-30 hover:bg-slate-50"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition disabled:opacity-30 hover:bg-slate-200"
                 >
-                  <ChevronLeft className="h-4 w-4" />
-                  Back Question No.
+                  <ChevronLeft className="h-5 w-5" />
                 </button>
-                <div className="font-bold text-slate-900">
-                  Question {currentIndex + 1} of {draftQuestions.length}
+                <div className="font-bold text-slate-900 text-sm">
+                  {currentIndex + 1} / {draftQuestions.length}
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     const isLast = currentIndex === draftQuestions.length - 1;
-                    if (isLast) {
-                      setDraftQuestions((prev) => [...prev, defaultDraft(currentDraft.mode)]);
-                    }
+                    if (isLast) setDraftQuestions((prev) => [...prev, defaultDraft(currentDraft.mode, defaultSettings)]);
                     setCurrentIndex((c) => c + 1);
                   }}
-                  className="inline-flex h-12 items-center gap-2 rounded-2xl bg-slate-50 px-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 transition hover:bg-blue-200"
                 >
-                  {currentIndex === draftQuestions.length - 1 ? (
-                    <>Add Next Page <Plus className="h-4 w-4" /></>
-                  ) : (
-                    <>Question {currentIndex + 2} <ChevronRight className="h-4 w-4" /></>
-                  )}
+                  {currentIndex === draftQuestions.length - 1 ? <Plus className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                 </button>
               </div>
             )}

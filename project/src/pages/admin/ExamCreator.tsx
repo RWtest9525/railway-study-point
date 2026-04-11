@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from '../../contexts/RouterContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Category, Exam, createExam, deleteExam, getCategories, getExams, updateExam } from '../../lib/firestore';
+import { Category, Exam, createExam, deleteExam, getCategories, getExams, updateExam, getQuestions, createQuestionsBatch } from '../../lib/firestore';
 import { formatDate } from '../../lib/dateUtils';
 import { AddQuestionModal } from '../../components/AddQuestionModal';
 
@@ -56,7 +56,34 @@ export function ExamCreator() {
     try {
       const [allCategories, allExams] = await Promise.all([getCategories(), getExams(undefined, true)]);
       setCategories(allCategories);
-      setExams(allExams);
+      
+      const now = new Date();
+      const processedExams: Exam[] = [];
+      const updates: Promise<void>[] = [];
+      
+      for (const exam of allExams) {
+        let isOver = false;
+        if (exam.schedule_date && exam.schedule_time && exam.is_active) {
+          const end = new Date(`${exam.schedule_date}T${exam.schedule_time}`);
+          end.setMinutes(end.getMinutes() + (exam.duration_minutes || 0));
+          if (end < now) {
+            isOver = true;
+          }
+        }
+        
+        if (isOver && exam.is_active) {
+          updates.push(updateExam(exam.id, { is_active: false }));
+          processedExams.push({ ...exam, is_active: false });
+        } else {
+          processedExams.push(exam);
+        }
+      }
+      
+      if (updates.length > 0) {
+        await Promise.all(updates);
+      }
+      
+      setExams(processedExams);
       setFormData((prev) => ({ ...prev, category_id: prev.category_id || allCategories[0]?.id || '' }));
     } catch (error) {
       console.error(error);
@@ -105,8 +132,27 @@ export function ExamCreator() {
       } as any;
 
       if (editingId) {
-        await updateExam(editingId, payload);
-        toast.success('Exam updated');
+        const oldExam = exams.find(e => e.id === editingId);
+        const scheduleChanged = oldExam && (
+          oldExam.schedule_date !== formData.schedule_date || 
+          oldExam.schedule_time !== formData.schedule_time
+        );
+
+        if (scheduleChanged) {
+          const newExamId = await createExam(payload);
+          const oldQuestions = await getQuestions(editingId);
+          if (oldQuestions.length > 0) {
+            const newQuestions = oldQuestions.map(q => {
+              const { id, created_at, updated_at, ...rest } = q as any;
+              return { ...rest, exam_id: newExamId };
+            });
+            await createQuestionsBatch(newQuestions);
+          }
+          toast.success('New exam scheduled with duplicated questions');
+        } else {
+          await updateExam(editingId, payload);
+          toast.success('Exam updated');
+        }
       } else {
         await createExam(payload);
         toast.success('Exam created');
@@ -200,7 +246,7 @@ export function ExamCreator() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {exam.is_premium && <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-700">Premium</span>}
-                  {!exam.is_active && <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">Paused</span>}
+                  {!exam.is_active && <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">Inactive</span>}
                 </div>
               </div>
 

@@ -14,23 +14,29 @@ export function formatDate(
   if (!date) return '-';
   
   try {
-    const dateObj = typeof date === 'string' || typeof date === 'number' 
-      ? new Date(date) 
-      : date;
+    let dateObj: Date;
     
-    if (isNaN(dateObj.getTime())) {
+    if (date && typeof (date as any).toDate === 'function') {
+      dateObj = (date as any).toDate();
+    } else {
+      dateObj = typeof date === 'string' || typeof date === 'number' 
+        ? new Date(date) 
+        : (date as Date);
+    }
+    
+    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
       console.warn('Invalid date provided:', date);
       return '-';
     }
     
     const defaultOptions: Intl.DateTimeFormatOptions = {
       year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       ...options
     };
     
-    return new Intl.DateTimeFormat('en-IN', defaultOptions).format(dateObj);
+    return new Intl.DateTimeFormat('en-GB', defaultOptions).format(dateObj);
   } catch (error) {
     console.error('Error formatting date:', error);
     return '-';
@@ -60,11 +66,17 @@ export function formatRelativeTime(
   if (!date) return '-';
   
   try {
-    const dateObj = typeof date === 'string' || typeof date === 'number'
-      ? new Date(date)
-      : date;
+    let dateObj: Date;
     
-    if (isNaN(dateObj.getTime())) return '-';
+    if (date && typeof (date as any).toDate === 'function') {
+      dateObj = (date as any).toDate();
+    } else {
+      dateObj = typeof date === 'string' || typeof date === 'number' 
+        ? new Date(date) 
+        : (date as Date);
+    }
+    
+    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '-';
     
     const now = new Date();
     const diffMs = dateObj.getTime() - now.getTime();

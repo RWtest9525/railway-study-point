@@ -6,6 +6,7 @@ import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from '../../lib/firebase';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { formatDate } from '../../lib/dateUtils';
 
 interface UserProfile {
   id: string;
@@ -122,7 +123,7 @@ export function UserManagement() {
         <table className="min-w-full">
           <thead className={isDark ? 'bg-gray-900/70' : 'bg-gray-50'}>
             <tr>
-              {['User', 'Role', 'Premium', 'Joined', 'Actions'].map((head) => (
+              {['User', 'Role', 'Joined', 'Actions'].map((head) => (
                 <th key={head} className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{head}</th>
               ))}
             </tr>
@@ -146,10 +147,7 @@ export function UserManagement() {
                   </span>
                 </td>
                 <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                  {user.is_premium ? `Active until ${user.premium_until ? new Date(user.premium_until).toLocaleDateString() : 'lifetime'}` : 'Free'}
-                </td>
-                <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                  {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+                  {user.created_at ? formatDate(user.created_at) : '-'}
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-wrap justify-end gap-2">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, Settings, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
@@ -34,6 +34,8 @@ export function QuestionHub() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [defaultSettings, setDefaultSettings] = useState<{marks: number, negative_marks: number, difficulty: 'easy'|'medium'|'hard'}>({ marks: 1, negative_marks: 0, difficulty: 'medium' });
   const [questionMode, setQuestionMode] = useState<QuestionMode>('manual');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingNode, setEditingNode] = useState<CategoryNode | null>(null);
@@ -406,17 +408,26 @@ export function QuestionHub() {
 
             <div className="flex flex-wrap gap-3">
               {canAddQuestionHere && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuestionMode('manual');
-                    setQuestionModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Question
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuestionMode('manual');
+                      setQuestionModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Question
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -468,6 +479,7 @@ export function QuestionHub() {
         categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
         linkedLabel={selectedNode?.name}
         initialMode={questionMode}
+        defaultSettings={defaultSettings}
       />
 
       <ConfirmModal
@@ -504,6 +516,58 @@ export function QuestionHub() {
             />
             <button type="submit" className="w-full rounded-2xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white">Submit</button>
           </form>
+        </ModalShell>
+      )}
+
+      {settingsModalOpen && (
+        <ModalShell isDark={isDark} title="Folder Default Settings" onClose={() => setSettingsModalOpen(false)}>
+          <div className="space-y-4">
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Set default values for all new questions added to this folder.
+            </p>
+            <label className="block">
+              <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Difficulty</span>
+              <select
+                value={defaultSettings.difficulty}
+                onChange={(e) => setDefaultSettings(prev => ({ ...prev, difficulty: e.target.value as 'easy'|'medium'|'hard' }))}
+                className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
+              >
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Marks</span>
+              <input
+                type="number"
+                min="1"
+                value={defaultSettings.marks}
+                onChange={(e) => setDefaultSettings(prev => ({ ...prev, marks: Number(e.target.value) }))}
+                className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
+              />
+            </label>
+            <label className="block">
+              <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Negative Marks</span>
+              <input
+                type="number"
+                min="0"
+                step="0.25"
+                value={defaultSettings.negative_marks}
+                onChange={(e) => setDefaultSettings(prev => ({ ...prev, negative_marks: Number(e.target.value) }))}
+                className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-slate-700 bg-slate-950 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
+              />
+            </label>
+            <button
+              onClick={() => {
+                toast.success('Settings saved');
+                setSettingsModalOpen(false);
+              }}
+              className="mt-4 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Save Settings
+            </button>
+          </div>
         </ModalShell>
       )}
     </div>
