@@ -40,6 +40,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
   const currentNodeId = path.length > 0 ? path[path.length - 1].id : null;
   const [examToStart, setExamToStart] = useState<Exam | null>(null);
   const [attemptedExamIds, setAttemptedExamIds] = useState<Set<string>>(new Set());
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     void loadCategoryAndExams();
@@ -73,12 +74,15 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
   };
 
   const loadCurrentNodes = async () => {
+    setIsTransitioning(true);
     try {
       const parentId = path.length > 0 ? path[path.length - 1].id : null;
       const nodes = await getCategoryNodes(categoryId, parentId);
       setCurrentNodes(nodes);
     } catch (error) {
       console.error('Error loading nodes:', error);
+    } finally {
+      setIsTransitioning(false);
     }
   };
 
@@ -147,9 +151,149 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
     );
   }
 
+  const renderContent = () => {
+    if (isTransitioning) {
+      return (
+        <div className="py-16 flex justify-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {currentNodes.length > 0 && (
+          <section className="mb-6">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {currentNodes.map((node) => (
+                <button
+                  key={node.id}
+                  onClick={() => {
+                    if (isLocked) {
+                      toast.error('Take premium. Your free trial has ended.');
+                      navigate('/upgrade');
+                      return;
+                    }
+                    setPath((prev) => [...prev, node]);
+                  }}
+                  className={`relative rounded-[24px] border p-5 text-left transition duration-300 ${
+                    isDark ? 'border-white/10 bg-white/5 text-white hover:bg-white/10' : 'border-slate-200/60 bg-white text-gray-900 hover:shadow-md shadow-sm'
+                  }`}
+                >
+                  {isLocked && <div className="absolute inset-0 rounded-[24px] bg-slate-950/20 backdrop-blur-[1px]" />}
+                    <div className="relative flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center font-bold text-lg ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                          {node.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className={`text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>{node.name}</div>
+                          <div className={`mt-1 text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                            Open Folder
+                          </div>
+                        </div>
+                      </div>
+                    {isLocked ? <Lock className="h-5 w-5 text-red-500" /> : <ChevronRight className={`h-6 w-6 ${isDark ? 'text-gray-500' : 'text-slate-400'}`} />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {canShowExams && (
+          <section>
+            {visibleExams.length === 0 && currentNodes.length === 0 ? (
+              <div className={`${isDark ? 'bg-white/5 border-white/10 text-gray-400' : 'bg-white border-slate-200/60 text-gray-500'} rounded-[24px] border border-dashed p-8 text-center`}>
+                No tests available in this section yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {visibleExams.map((exam) => {
+                  const state = getExamState(exam);
+                  const locked = isLocked || (exam.is_premium && !isPremium);
+
+                  return (
+                    <div
+                      key={exam.id}
+                      className={`${
+                        isDark
+                          ? 'bg-white/5 border-white/10 hover:bg-white/10'
+                          : 'bg-white border-slate-200/60 hover:shadow-md'
+                      } rounded-[24px] border p-5 transition duration-300`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                              {exam.title}
+                            </h3>
+                            {exam.is_premium && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Premium</span>}
+                            {state === 'live' && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white animate-pulse">Live</span>}
+                            {isNewExam(exam) && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
+                                <Sparkles className="h-2.5 w-2.5" />
+                                New
+                              </span>
+                            )}
+                          </div>
+                          <p className={`mb-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {exam.description || 'Tap below to begin this test.'}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-3 text-sm">
+                            <span className={`flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                              <Clock className="w-4 h-4" />
+                              {exam.duration_minutes} mins
+                            </span>
+                            <span className={`flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                              <Layers3 className="w-4 h-4" />
+                              {path.length > 0 ? path[path.length - 1].name : category?.name || 'Category'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => startExam(exam)}
+                        className={`mt-6 w-full rounded-xl py-3.5 text-sm font-semibold transition ${
+                          locked
+                            ? isDark ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-amber-50 text-amber-600 border border-amber-200'
+                            : state === 'upcoming'
+                            ? isDark
+                              ? 'bg-white/10 text-white hover:bg-white/20'
+                              : 'bg-slate-100 text-slate-700'
+                            : isDark
+                            ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/20'
+                            : 'bg-slate-900 text-white shadow-md hover:bg-slate-800'
+                        }`}
+                      >
+                        {locked ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Lock className="h-4 w-4" />
+                            Take Premium
+                          </span>
+                        ) : state === 'upcoming' ? (
+                          'Notify Me'
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <PlayCircle className="h-4 w-4" />
+                            Start This Exam
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+      </>
+    );
+  };
+
   return (
-    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-[#f5f7fb]'}`}>
-      <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/95 border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-[#0B0F19]' : 'bg-[#F8FAFC]'}`}>
+      <header className={`${isDark ? 'border-white/5 bg-[#0B0F19]/80' : 'border-slate-200/60 bg-white/80'} sticky top-0 z-50 border-b backdrop-blur-xl`}>
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center gap-4">
           <button
             onClick={() => {
@@ -200,135 +344,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
           </div>
         )}
 
-        {currentNodes.length > 0 && (
-          <section className="mb-6">
-
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {currentNodes.map((node) => (
-                <button
-                  key={node.id}
-                  onClick={() => {
-                    if (isLocked) {
-                      toast.error('Take premium. Your free trial has ended.');
-                      navigate('/upgrade');
-                      return;
-                    }
-                    setPath((prev) => [...prev, node]);
-                  }}
-                  className={`relative rounded-[24px] border p-4 text-left transition ${
-                    isDark ? 'border-gray-700 bg-gray-800 text-white hover:border-blue-500' : 'border-slate-200 bg-white text-gray-900 hover:border-blue-400 shadow-sm'
-                  }`}
-                >
-                  {isLocked && <div className="absolute inset-0 rounded-[24px] bg-slate-950/20" />}
-                  <div className="relative flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
-                        {node.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{node.name}</div>
-                        <div className={`mt-0.5 text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                          Open Folder
-                        </div>
-                      </div>
-                    </div>
-                    {isLocked ? <Lock className="h-5 w-5 text-red-500" /> : <ChevronRight className={`h-6 w-6 ${isDark ? 'text-gray-500' : 'text-slate-400'}`} />}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {canShowExams && (
-          <section>
-
-
-            {visibleExams.length === 0 ? (
-              <div className={`${isDark ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-white border-gray-200 text-gray-500'} rounded-[24px] border p-8 text-center`}>
-                No tests available in this section yet.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {visibleExams.map((exam) => {
-                  const state = getExamState(exam);
-                  const locked = isLocked || (exam.is_premium && !isPremium);
-
-                  return (
-                    <div
-                      key={exam.id}
-                      className={`${
-                        isDark
-                          ? 'bg-gray-800 border-gray-700 hover:border-blue-500'
-                          : 'bg-white border-gray-200 hover:border-blue-400'
-                      } rounded-[26px] border p-5 transition`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                              {exam.title}
-                            </h3>
-                            {exam.is_premium && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Premium</span>}
-                            {state === 'live' && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white animate-pulse">Live</span>}
-                            {isNewExam(exam) && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
-                                <Sparkles className="h-2.5 w-2.5" />
-                                New
-                              </span>
-                            )}
-                          </div>
-                          <p className={`mb-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {exam.description || 'Tap below to begin this test.'}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-3 text-sm">
-                            <span className={`flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                              <Clock className="w-4 h-4" />
-                              {exam.duration_minutes} mins
-                            </span>
-                            <span className={`flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                              <Layers3 className="w-4 h-4" />
-                              {path.length > 0 ? path[path.length - 1].name : category?.name || 'Category'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => startExam(exam)}
-                        className={`mt-5 w-full rounded-2xl py-3 text-sm font-semibold ${
-                          locked
-                            ? 'bg-amber-500 text-white'
-                            : state === 'upcoming'
-                            ? isDark
-                              ? 'bg-gray-700 text-white'
-                              : 'bg-slate-100 text-slate-700'
-                            : isDark
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : 'bg-slate-900 text-white'
-                        }`}
-                      >
-                        {locked ? (
-                          <span className="inline-flex items-center gap-2">
-                            <Lock className="h-4 w-4" />
-                            Take Premium
-                          </span>
-                        ) : state === 'upcoming' ? (
-                          'Notify Me'
-                        ) : (
-                          <span className="inline-flex items-center gap-2">
-                            <PlayCircle className="h-4 w-4" />
-                            Start This Exam
-                          </span>
-                        )}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
+        {renderContent()}
       </main>
       
       <ConfirmModal

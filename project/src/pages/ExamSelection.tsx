@@ -94,8 +94,8 @@ export function ExamSelection() {
   };
 
   const upcomingNotificationsPreview = notifications.slice(0, 2);
-  const renderedCategories = categories.length > 0 ? categories : createPlaceholderCategories();
-  const renderedExams = featuredExams.length > 0 ? featuredExams : createPlaceholderExams();
+  const renderedCategories = categories;
+  const renderedExams = featuredExams;
 
   if (loading) {
     return (
@@ -109,8 +109,8 @@ export function ExamSelection() {
   }
 
   return (
-    <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-[#f4f7fb]'}`}>
-      <header className={`${isDark ? 'border-gray-800 bg-gray-900/95' : 'border-slate-200 bg-white/95'} sticky top-0 z-50 border-b backdrop-blur-md`}>
+    <div className={`min-h-screen pb-24 ${isDark ? 'bg-[#0B0F19]' : 'bg-[#F8FAFC]'}`}>
+      <header className={`${isDark ? 'border-white/5 bg-[#0B0F19]/80' : 'border-slate-200/60 bg-white/80'} sticky top-0 z-50 border-b backdrop-blur-xl`}>
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <BrandLogo variant="nav" className={`${isDark ? 'ring-white/10' : 'ring-slate-200'} ring-1`} />
@@ -182,42 +182,42 @@ export function ExamSelection() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {renderedCategories.map((category, index) => {
-              const isPlaceholder = category.id.startsWith('placeholder');
-              const isLocked = hasLockedAccess && !isPlaceholder;
-              return (
-                <button
-                  key={category.id}
-                  onClick={() => (isPlaceholder ? undefined : handleCategoryOpen(category))}
-                  className={`relative rounded-[26px] border p-4 text-left transition ${
-                    isPlaceholder
-                      ? isDark
-                        ? 'border-gray-700 bg-gray-800/60 text-gray-500'
-                        : 'border-slate-200 bg-white/70 text-slate-400'
-                      : isDark
-                      ? 'border-gray-700 bg-gray-800 text-white'
-                      : 'border-slate-200 bg-white text-slate-900 shadow-sm'
-                  }`}
-                  disabled={isPlaceholder}
-                >
-                  {isLocked && (
-                    <div className="absolute inset-0 rounded-[26px] bg-slate-950/25" />
-                  )}
-                  <div className="relative">
-                    <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${isPlaceholder ? 'bg-slate-200/50 text-slate-400' : 'bg-blue-50 text-blue-600'}`}>
-                      {isLocked ? <Lock className="h-5 w-5" /> : <span className="text-sm font-bold">{String(index + 1).padStart(2, '0')}</span>}
-                    </div>
-                    <div className="text-base font-bold">{category.name}</div>
-                    <div className={`mt-1 text-xs leading-5 ${isPlaceholder ? 'text-inherit' : isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                      {isPlaceholder ? 'Not available yet' : category.description || 'Open subcategory and tests'}
-                    </div>
+            {renderedCategories.length === 0 ? (
+               <div className={`col-span-2 rounded-[26px] border border-dashed p-6 text-center text-sm ${isDark ? 'border-gray-700 text-gray-500' : 'border-slate-300 text-slate-400'}`}>
+                 No categories found.
+               </div>
+            ) : (
+              renderedCategories.map((category, index) => {
+                const isLocked = hasLockedAccess;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => handleCategoryOpen(category)}
+                    className={`relative rounded-[24px] border p-5 text-left transition duration-300 ${
+                      isDark
+                        ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                        : 'border-slate-200/60 bg-white text-slate-900 shadow-sm hover:shadow-md'
+                    }`}
+                  >
                     {isLocked && (
-                      <div className="mt-3 text-xs font-semibold text-red-600">Locked • Take premium</div>
+                      <div className="absolute inset-0 rounded-[24px] bg-slate-950/20 backdrop-blur-[1px]" />
                     )}
-                  </div>
-                </button>
-              );
-            })}
+                    <div className="relative">
+                      <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-[16px] text-lg ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                        {isLocked ? <Lock className="h-5 w-5" /> : <span className="font-bold">{String(index + 1).padStart(2, '0')}</span>}
+                      </div>
+                      <div className="text-base font-bold tracking-tight">{category.name}</div>
+                      <div className={`mt-1.5 text-[13px] leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {category.description || 'Open subcategory and tests'}
+                      </div>
+                      {isLocked && (
+                        <div className="mt-4 text-[11px] font-bold uppercase tracking-wider text-red-500">Locked • Take premium</div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
         </section>
 
@@ -255,74 +255,70 @@ export function ExamSelection() {
           </div>
 
           <div className="scrollbar-thin flex gap-3 overflow-x-auto pb-2">
-            {renderedExams.map((exam) => {
-              const isPlaceholder = exam.id.startsWith('placeholder');
-              const state = isPlaceholder ? 'placeholder' : getExamState(exam);
-              const locked = !isPlaceholder && (hasLockedAccess || (exam.is_premium && !isPremium));
-              return (
-                <div
-                  key={exam.id}
-                  className={`min-w-[260px] max-w-[260px] rounded-[26px] border p-4 ${
-                    isPlaceholder
-                      ? isDark
-                        ? 'border-gray-700 bg-gray-800/60 text-gray-500'
-                        : 'border-slate-200 bg-white/70 text-slate-400'
-                      : isDark
-                      ? 'border-gray-700 bg-gray-800 text-white'
-                      : 'border-slate-200 bg-white text-slate-900 shadow-sm'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="line-clamp-2 text-sm font-bold">{exam.title}</div>
-                    {!isPlaceholder && state === 'live' && (
-                      <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white animate-pulse">
-                        LIVE
-                      </span>
-                    )}
-                    {!isPlaceholder && state === 'upcoming' && (
-                      <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">
-                        Soon
-                      </span>
-                    )}
-                  </div>
-
-                  <div className={`mt-3 flex items-center gap-2 text-xs ${isPlaceholder ? 'text-inherit' : isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                    <Clock3 className="h-3.5 w-3.5" />
-                    {isPlaceholder ? 'Not available yet' : `${exam.duration_minutes} min`}
-                  </div>
-
-                  <div className="mt-4 flex items-center gap-2">
-                    {!isPlaceholder && exam.is_premium && <Crown className="h-4 w-4 text-amber-500" />}
-                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${isPlaceholder ? 'bg-slate-200/70 text-slate-500' : isDark ? 'bg-gray-900 text-gray-300' : 'bg-slate-100 text-slate-600'}`}>
-                      {isPlaceholder
-                        ? 'Unavailable Yet'
-                        : state === 'upcoming'
-                        ? 'Scheduled'
-                        : state === 'live'
-                        ? 'Start Now'
-                        : 'Open'}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={() => (isPlaceholder ? undefined : handleExamAction(exam))}
-                    disabled={isPlaceholder}
-                    className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${
-                      isPlaceholder
-                        ? 'bg-slate-200 text-slate-400'
-                        : locked
-                        ? 'bg-amber-500 text-white'
-                        : state === 'upcoming'
-                        ? 'bg-slate-100 text-slate-700'
-                        : 'bg-slate-900 text-white'
+            {renderedExams.length === 0 ? (
+               <div className={`w-full rounded-[26px] border border-dashed p-6 text-center text-sm ${isDark ? 'border-gray-700 text-gray-500' : 'border-slate-300 text-slate-400'}`}>
+                 No live exams scheduled right now.
+               </div>
+            ) : (
+              renderedExams.map((exam) => {
+                const state = getExamState(exam);
+                const locked = (hasLockedAccess || (exam.is_premium && !isPremium));
+                return (
+                  <div
+                    key={exam.id}
+                    className={`min-w-[260px] max-w-[260px] rounded-[24px] border p-5 transition duration-300 ${
+                      isDark
+                        ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                        : 'border-slate-200/60 bg-white text-slate-900 shadow-sm hover:shadow-md'
                     }`}
                   >
-                    {locked ? <Lock className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
-                    {locked ? 'Take Premium' : state === 'upcoming' ? 'Notify Me' : 'Start'}
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="line-clamp-2 text-sm font-bold">{exam.title}</div>
+                      {state === 'live' && (
+                        <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white animate-pulse">
+                          LIVE
+                        </span>
+                      )}
+                      {state === 'upcoming' && (
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">
+                          Soon
+                        </span>
+                      )}
+                    </div>
+
+                    <div className={`mt-3 flex items-center gap-2 text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {exam.duration_minutes} min
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2">
+                      {exam.is_premium && <Crown className="h-4 w-4 text-amber-500" />}
+                      <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-slate-100 text-slate-600'}`}>
+                        {state === 'upcoming'
+                          ? 'Scheduled'
+                          : state === 'live'
+                          ? 'Start Now'
+                          : 'Open'}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => handleExamAction(exam)}
+                      className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold transition ${
+                        locked
+                          ? isDark ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-amber-50 text-amber-600 border border-amber-200'
+                          : state === 'upcoming'
+                          ? isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          : isDark ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/20' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-md'
+                      }`}
+                    >
+                      {locked ? <Lock className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
+                      {locked ? 'Take Premium' : state === 'upcoming' ? 'Notify Me' : 'Start'}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </section>
       </main>
@@ -332,38 +328,4 @@ export function ExamSelection() {
   );
 }
 
-function createPlaceholderCategories(): Category[] {
-  return [
-    { id: 'placeholder-ntpc', name: 'NTPC', description: 'Not available yet', is_active: false, created_at: '', updated_at: '' },
-    { id: 'placeholder-groupd', name: 'Group D', description: 'Not available yet', is_active: false, created_at: '', updated_at: '' },
-    { id: 'placeholder-je', name: 'JE', description: 'Not available yet', is_active: false, created_at: '', updated_at: '' },
-    { id: 'placeholder-alp', name: 'ALP', description: 'Not available yet', is_active: false, created_at: '', updated_at: '' },
-  ];
-}
 
-function createPlaceholderExams(): Exam[] {
-  return [
-    {
-      id: 'placeholder-1',
-      category_id: 'placeholder',
-      title: 'Mock Test 1',
-      duration_minutes: 90,
-      total_marks: 100,
-      is_premium: false,
-      is_active: false,
-      created_at: '',
-      updated_at: '',
-    },
-    {
-      id: 'placeholder-2',
-      category_id: 'placeholder',
-      title: 'Practice Set 2',
-      duration_minutes: 60,
-      total_marks: 60,
-      is_premium: false,
-      is_active: false,
-      created_at: '',
-      updated_at: '',
-    },
-  ];
-}
