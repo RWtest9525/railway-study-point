@@ -145,17 +145,17 @@ export function AddQuestionModal({
     }
 
     await createQuestion({
-      exam_id: examId || undefined,
+      exam_id: examId || null,
       category_node_id: categoryNodeId,
       subject: linkedLabel || 'General',
       question_text: formData.question_text.trim() || 'Screenshot question',
       options: finalOptions,
       option_label_style: formData.option_label_style,
       correct_index: correctIndex,
-      explanation: formData.explanation.trim() || undefined,
-      video_explanation_url: formData.video_explanation_url.trim() || undefined,
+      explanation: formData.explanation.trim() || null,
+      video_explanation_url: formData.video_explanation_url.trim() || null,
       difficulty: formData.difficulty,
-      image_url: formData.image_url.trim() || undefined,
+      image_url: formData.image_url.trim() || null,
       marks: Number(formData.marks) || 1,
       negative_marks: Number(formData.negative_marks) || 0,
       order: existingQuestions.length + 1,
@@ -163,7 +163,7 @@ export function AddQuestionModal({
       version: 1,
       created_by: profile.id,
       updated_at: new Date().toISOString(),
-    });
+    } as any);
   };
 
   const saveBulkQuestions = async () => {
@@ -187,15 +187,15 @@ export function AddQuestionModal({
 
       await createQuestionsBatch(
         uploadedUrls.map((url, index) => ({
-          exam_id: examId || undefined,
+          exam_id: examId || null,
           category_node_id: categoryNodeId,
           subject: linkedLabel || 'General',
           question_text: `Screenshot question ${existingQuestions.length + index + 1}`,
           options: buildFallbackOptions(formData.option_label_style),
           option_label_style: formData.option_label_style,
           correct_index: correctIndex,
-          explanation: formData.explanation.trim() || undefined,
-          video_explanation_url: formData.video_explanation_url.trim() || undefined,
+          explanation: formData.explanation.trim() || null,
+          video_explanation_url: formData.video_explanation_url.trim() || null,
           difficulty: formData.difficulty,
           image_url: url,
           marks: Number(formData.marks) || 1,
@@ -205,7 +205,7 @@ export function AddQuestionModal({
           version: 1,
           created_by: profile.id,
           updated_at: new Date().toISOString(),
-        }))
+        } as any))
       );
     } finally {
       setUploadingBulkImages(false);
