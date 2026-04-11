@@ -54,9 +54,8 @@ export function QuestionHub() {
   // A node is an actual Test if its parent was a test container
   const isCurrentPageTest = parentNode?.is_test_container === true;
 
-  // We can add questions if we're explicitly inside a test, OR if we're deep enough and it's NOT a test container.
-  // Actually, if it's a test container, it holds tests, not questions directly.
-  const canAddQuestionHere = path.length >= 2 && !isCurrentPageTestContainer;
+  // We can add questions only if we are inside a test.
+  const canAddQuestionHere = isCurrentPageTest;
   const canAddFolderHere = !isCurrentPageTest;
 
   useEffect(() => {
@@ -65,12 +64,12 @@ export function QuestionHub() {
 
   useEffect(() => {
     void loadStepItems();
-    if (selectedNode?.entity === 'node') {
+    if (selectedNode?.entity === 'node' && isCurrentPageTest) {
       void loadQuestions();
     } else {
       setQuestions([]);
     }
-  }, [selectedCategoryId, currentNodeParent, path.length]);
+  }, [selectedCategoryId, currentNodeParent, path.length, isCurrentPageTest]);
 
   const loadQuestions = async () => {
     if (selectedNode?.entity !== 'node') return;
@@ -339,69 +338,73 @@ export function QuestionHub() {
 
     return (
       <div className="grid gap-4">
-        {/* Child Folders */}
-        <div className="mb-2">
-          {items.length > 0 && <h3 className={`mb-3 text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Folders</h3>}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((node) => (
-              <ItemCard
-                key={node.id}
-                title={node.name}
-                subtitle="Open next page"
-                isDark={isDark}
-                onOpen={() =>
-                  setPath((prev) => [
-                    ...prev,
-                    { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId, is_test_container: node.is_test_container },
-                  ])
-                }
-                onEdit={() => openAddNode(node)}
-                onDelete={() => void removeNode(node)}
-                onResult={selectedNode?.is_test_container ? () => {
-                  toast('Results functionality not implemented yet');
-                } : undefined}
-                onAddQuestion={selectedNode?.is_test_container ? () => {
-                  setPath((prev) => [
-                    ...prev,
-                    { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId, is_test_container: node.is_test_container },
-                  ]);
-                  setQuestionMode('manual');
-                  setQuestionModalOpen(true);
-                } : undefined}
-              />
-            ))}
+        {/* Child Folders - Only show if we are NOT inside a test */}
+        {!isCurrentPageTest && (
+          <div className="mb-2">
+            {items.length > 0 && <h3 className={`mb-3 text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Folders</h3>}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map((node) => (
+                <ItemCard
+                  key={node.id}
+                  title={node.name}
+                  subtitle="Open next page"
+                  isDark={isDark}
+                  onOpen={() =>
+                    setPath((prev) => [
+                      ...prev,
+                      { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId, is_test_container: node.is_test_container },
+                    ])
+                  }
+                  onEdit={() => openAddNode(node)}
+                  onDelete={() => void removeNode(node)}
+                  onResult={selectedNode?.is_test_container ? () => {
+                    toast('Results functionality not implemented yet');
+                  } : undefined}
+                  onAddQuestion={selectedNode?.is_test_container ? () => {
+                    setPath((prev) => [
+                      ...prev,
+                      { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId, is_test_container: node.is_test_container },
+                    ]);
+                    setQuestionMode('manual');
+                    setQuestionModalOpen(true);
+                  } : undefined}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Questions in Folder */}
-        <div className="mt-4">
-          <h3 className={`mb-3 text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Questions ({questions.length})</h3>
-          <div className="grid gap-4">
-            {questions.map((q, idx) => (
-              <div key={q.id} className={`flex items-center justify-between rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-white'}`}>
-                <div className="flex flex-1 items-center gap-3">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-xl font-bold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                    Q{idx + 1}
+        {/* Questions in Folder - Only show if we ARE inside a test */}
+        {isCurrentPageTest && (
+          <div className="mt-4">
+            <h3 className={`mb-3 text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Questions ({questions.length})</h3>
+            <div className="grid gap-4">
+              {questions.map((q, idx) => (
+                <div key={q.id} className={`flex items-center justify-between rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex flex-1 items-center gap-3">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-xl font-bold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                      Q{idx + 1}
+                    </div>
+                    <div className={`line-clamp-1 flex-1 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {q.question_text === 'Screenshot question' && q.image_url ? '📷 Screenshot attached' : q.question_text}
+                    </div>
                   </div>
-                  <div className={`line-clamp-1 flex-1 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                    {q.question_text === 'Screenshot question' && q.image_url ? '📷 Screenshot attached' : q.question_text}
-                  </div>
+                  <button
+                    onClick={() => executeRemoveQuestion(q)}
+                    className={`ml-4 rounded-xl p-2 transition ${isDark ? 'text-red-400 hover:bg-red-400/10' : 'text-red-500 hover:bg-red-50'}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => executeRemoveQuestion(q)}
-                  className={`ml-4 rounded-xl p-2 transition ${isDark ? 'text-red-400 hover:bg-red-400/10' : 'text-red-500 hover:bg-red-50'}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-            {questions.length === 0 && (
-              <div className={`rounded-xl border border-dashed p-6 text-center text-sm ${isDark ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
-                No questions here yet. Add a question to get started.
-              </div>
-            )}
+              ))}
+              {questions.length === 0 && (
+                <div className={`rounded-xl border border-dashed p-6 text-center text-sm ${isDark ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
+                  No questions here yet. Add a question to get started.
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   };
