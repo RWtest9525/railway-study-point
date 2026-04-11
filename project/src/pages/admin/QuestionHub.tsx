@@ -476,6 +476,7 @@ export function QuestionHub() {
           toast.success('Question saved');
           if (selectedNode?.entity === 'node') loadQuestions();
         }}
+        categoryId={selectedCategoryId}
         categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
         linkedLabel={selectedNode?.name}
         initialMode={questionMode}

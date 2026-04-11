@@ -37,6 +37,7 @@ export interface Category {
 export interface Exam {
   id: string;
   category_id: string;
+  category_node_id?: string;
   title: string;
   description?: string;
   duration_minutes: number;

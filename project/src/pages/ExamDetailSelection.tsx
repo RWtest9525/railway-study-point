@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { getCategory, getCategoryLinks, getCategoryNodes, getExams, Exam, Category, CategoryNode, CategoryLink } from '../lib/firestore';
-import { ArrowLeft, ChevronRight, Clock, Crown, ExternalLink, Layers3, Lock, PlayCircle } from 'lucide-react';
+import { getCategory, getCategoryLinks, getCategoryNodes, getExams, getAttempts, Exam, Category, CategoryNode, CategoryLink } from '../lib/firestore';
+import { ArrowLeft, ChevronRight, Clock, Crown, ExternalLink, Layers3, Lock, PlayCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { BottomNav } from '../components/BottomNav';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -29,7 +29,7 @@ function getExamState(exam: Exam) {
 export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
   const { navigate, goBack } = useRouter();
   const { theme } = useTheme();
-  const { canAccessTests, isPremium, trialExpiredNeedsPremium } = useAuth();
+  const { canAccessTests, isPremium, trialExpiredNeedsPremium, profile } = useAuth();
   const isDark = theme === 'dark';
   const [exams, setExams] = useState<Exam[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
@@ -39,6 +39,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
   const [currentLink, setCurrentLink] = useState<CategoryLink | null>(null);
   const currentNodeId = path.length > 0 ? path[path.length - 1].id : null;
   const [examToStart, setExamToStart] = useState<Exam | null>(null);
+  const [attemptedExamIds, setAttemptedExamIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     void loadCategoryAndExams();
@@ -59,6 +60,11 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
       if (categoryData) setCategory(categoryData);
       setExams(examsData.filter((exam) => getExamState(exam) !== 'expired'));
       setPath([]);
+      // Load attempted exam IDs for the current user
+      if (profile?.id) {
+        const attempts = await getAttempts(profile.id);
+        setAttemptedExamIds(new Set(attempts.map(a => a.exam_id)));
+      }
     } catch (error) {
       console.error('Error loading exams:', error);
     } finally {
@@ -110,10 +116,25 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
   const canShowExams = currentNodes.length === 0 || path.length > 0;
   const isLocked = !canAccessTests || trialExpiredNeedsPremium;
 
+  // "New" badge: exam updated in last 7 days, OR user hasn't attempted it yet
+  const isNewExam = (exam: Exam) => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const updatedAt = exam.updated_at ? new Date(exam.updated_at).getTime() : 0;
+    const recentlyUpdated = updatedAt > sevenDaysAgo;
+    const neverAttempted = !attemptedExamIds.has(exam.id);
+    return recentlyUpdated || neverAttempted;
+  };
+
   const visibleExams = useMemo(() => {
-    if (canShowExams) return exams;
+    if (canShowExams) {
+      if (path.length > 0) {
+        return exams.filter(e => e.category_node_id === currentNodeId);
+      } else {
+        return exams.filter(e => !e.category_node_id);
+      }
+    }
     return [];
-  }, [canShowExams, exams]);
+  }, [canShowExams, exams, path.length, currentNodeId]);
 
   if (loading) {
     return (
@@ -245,12 +266,18 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                               {exam.title}
                             </h3>
                             {exam.is_premium && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Premium</span>}
                             {state === 'live' && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white animate-pulse">Live</span>}
+                            {isNewExam(exam) && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
+                                <Sparkles className="h-2.5 w-2.5" />
+                                New
+                              </span>
+                            )}
                           </div>
                           <p className={`mb-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                             {exam.description || 'Tap below to begin this test.'}
@@ -306,7 +333,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
       
       <ConfirmModal
         isOpen={!!examToStart}
-        onClose={() => setExamToStart(null)}
+        onCancel={() => setExamToStart(null)}
         onConfirm={handleConfirmStart}
         title="Start Exam"
         message={examToStart ? `Are you sure you want to start "${examToStart.title}" now? The timer will begin immediately.` : ''}

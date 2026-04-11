@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Circle, Loader2, Plus, Save, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { createQuestionsBatch, getQuestions, getQuestionsByCategoryNode, deleteQuestion, updateQuestion, Question } from '../lib/firestore';
+import { createQuestionsBatch, getQuestions, getQuestionsByCategoryNode, deleteQuestion, updateQuestion, Question, getExams, createExam, updateExam } from '../lib/firestore';
 import { uploadImage, validateImage } from '../lib/imageUtils';
 
 type QuestionMode = 'manual' | 'screenshot' | 'bulk';
@@ -13,6 +13,7 @@ interface AddQuestionModalProps {
   onSuccess: () => void;
   examId?: string;
   examTitle?: string;
+  categoryId?: string;
   categoryNodeId?: string;
   linkedLabel?: string;
   initialMode?: QuestionMode;
@@ -79,6 +80,7 @@ export function AddQuestionModal({
   onSuccess,
   examId,
   examTitle,
+  categoryId,
   categoryNodeId,
   linkedLabel,
   initialMode = 'manual',
@@ -221,12 +223,39 @@ export function AddQuestionModal({
 
     if (validDrafts.length === 0) throw new Error('No valid questions entered to save.');
 
+    let targetExamId = examId || null;
+
+    if (categoryId && categoryNodeId && !examId) {
+       const relatedExams = await getExams(categoryId);
+       const existingExam = relatedExams.find(e => e.category_node_id === categoryNodeId);
+       let sumMarks = 0;
+       validDrafts.forEach(d => sumMarks += Number(d.marks) || 1);
+       if (!existingExam) {
+         targetExamId = await createExam({
+           category_id: categoryId,
+           category_node_id: categoryNodeId,
+           title: linkedLabel || 'Folder Test',
+           description: `Questions under ${linkedLabel}`,
+           duration_minutes: existingQuestions.length + validDrafts.length * 2,
+           total_marks: sumMarks,
+           is_active: true,
+           is_premium: true,
+         });
+       } else {
+         targetExamId = existingExam.id;
+         await updateExam(existingExam.id, {
+           duration_minutes: existingQuestions.length + validDrafts.length * 2,
+           total_marks: existingExam.total_marks + sumMarks,
+         });
+       }
+    }
+
     const newQuestions = [];
     
     for (let idx = 0; idx < validDrafts.length; idx++) {
       const draft = validDrafts[idx];
       const payload: any = {
-        exam_id: examId || null,
+        exam_id: targetExamId,
         category_node_id: categoryNodeId,
         subject: linkedLabel || 'General',
         question_text: draft.question_text.trim() || 'Screenshot question',
@@ -266,6 +295,33 @@ export function AddQuestionModal({
     setUploadingBulkImages(true);
     try {
       const existingQuestions = examId ? await getQuestions(examId) : [];
+      
+      let targetExamId = examId || null;
+
+      if (categoryId && categoryNodeId && !examId) {
+         const relatedExams = await getExams(categoryId);
+         const existingExam = relatedExams.find(e => e.category_node_id === categoryNodeId);
+         let sumMarks = bulkFiles.length * (Number(currentDraft.marks) || 1);
+         if (!existingExam) {
+           targetExamId = await createExam({
+             category_id: categoryId,
+             category_node_id: categoryNodeId,
+             title: linkedLabel || 'Folder Test',
+             description: `Questions under ${linkedLabel}`,
+             duration_minutes: existingQuestions.length + bulkFiles.length * 2,
+             total_marks: sumMarks,
+             is_active: true,
+             is_premium: true,
+           });
+         } else {
+           targetExamId = existingExam.id;
+           await updateExam(existingExam.id, {
+             duration_minutes: existingQuestions.length + bulkFiles.length * 2,
+             total_marks: existingExam.total_marks + sumMarks,
+           });
+         }
+      }
+
       const uploadedUrls: string[] = [];
 
       for (const file of bulkFiles) {
@@ -279,7 +335,7 @@ export function AddQuestionModal({
 
       await createQuestionsBatch(
         uploadedUrls.map((url, index) => ({
-          exam_id: examId || null,
+          exam_id: targetExamId,
           category_node_id: categoryNodeId,
           subject: linkedLabel || 'General',
           question_text: `Screenshot question ${existingQuestions.length + index + 1}`,
@@ -692,7 +748,7 @@ export function AddQuestionModal({
             </button>
             <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-blue-700 disabled:opacity-70">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {loading ? 'Saving...' : isBulkMode ? 'Save bulk screenshots' : `Save ${draftQuestions.length} question(s)`}
+              {loading ? 'Saving...' : isBulkMode ? 'Save Screenshots' : 'Save Questions'}
             </button>
           </div>
         </form>
