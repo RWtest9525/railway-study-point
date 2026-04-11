@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, BarChart3, CheckCircle2, Clock3, Eye, Search, Target, UserRound, XCircle } from 'lucide-react';
 import { useRouter } from '../../contexts/RouterContext';
-import { getAllAttempts, getExams, getQuestions, getUsers, Exam, Question, QuizAttempt } from '../../lib/firestore';
+import { getAllAttempts, getExams, getQuestions, getQuestionsByCategoryNode, getCategoryNode, getUsers, Exam, Question, QuizAttempt } from '../../lib/firestore';
 import { formatDateTime, formatDuration } from '../../lib/dateUtils';
 
 type ProfileRow = {
@@ -44,9 +44,29 @@ export function StudentAnalytics() {
         getAllAttempts(),
       ]);
 
-      const examMap = new Map(examsData.map((exam) => [exam.id, exam]));
+      const examMap = new Map(examsData.map((exam) => [exam.id, exam.title]));
       const profileMap = new Map(
         profiles.map((profile) => [profile.id, { name: profile.full_name || 'Student', email: profile.email || 'No email' }])
+      );
+
+      // Collect all unique node IDs from attempts
+      const nodeIdsWithAttempts = new Set<string>();
+      attemptsData.forEach(attempt => {
+        if (attempt.exam_id.startsWith('node_')) {
+          nodeIdsWithAttempts.add(attempt.exam_id.replace('node_', ''));
+        }
+      });
+
+      // Fetch node titles
+      await Promise.all(
+        Array.from(nodeIdsWithAttempts).map(async (nodeId) => {
+          try {
+            const node = await getCategoryNode(nodeId);
+            if (node) examMap.set(`node_${nodeId}`, node.name);
+          } catch (e) {
+            console.error('Failed to load node', nodeId);
+          }
+        })
       );
 
       const enrichedAttempts = attemptsData.map((attempt) => {
@@ -55,7 +75,7 @@ export function StudentAnalytics() {
         const wrongAnswers = Math.max(0, attempt.total_questions - attempt.correct_answers - skippedAnswers);
         return {
           ...attempt,
-          examTitle: examMap.get(attempt.exam_id)?.title || 'Unknown exam',
+          examTitle: examMap.get(attempt.exam_id) || 'Unknown Assessment',
           userName: profile?.name || 'Student',
           userEmail: profile?.email || 'No email',
           percentage: attempt.total_questions > 0 ? (attempt.score / attempt.total_questions) * 100 : 0,
@@ -67,12 +87,30 @@ export function StudentAnalytics() {
       setExams(examsData);
       setAttempts(enrichedAttempts);
 
+      // Combine exams and test nodes into a single dropdown
+      const combinedDropdown: {id: string, title: string}[] = [
+        ...examsData.map(e => ({ id: e.id, title: e.title }))
+      ];
+      examMap.forEach((title, id) => {
+        if (id.startsWith('node_')) {
+          combinedDropdown.push({ id, title: `Test Folder: ${title}` });
+        }
+      });
+      // Deduplicate manually since test nodes might be added dynamically
+      const uniqueDropdown = Array.from(new Map(combinedDropdown.map(item => [item.id, item])).values());
+      (window as any).__examsDropdownList = uniqueDropdown; // Pass secretly without breaking state
+
       if (presetExamId) {
         const latest = enrichedAttempts.find((attempt) => attempt.exam_id === presetExamId);
         if (latest) {
           setSelectedAttempt(latest);
-          const questions = await getQuestions(latest.exam_id);
-          setAttemptQuestions(questions);
+          if (latest.exam_id.startsWith('node_')) {
+            const questions = await getQuestionsByCategoryNode(latest.exam_id.replace('node_', ''));
+            setAttemptQuestions(questions);
+          } else {
+            const questions = await getQuestions(latest.exam_id);
+            setAttemptQuestions(questions);
+          }
         }
       }
     } catch (error) {
@@ -108,8 +146,13 @@ export function StudentAnalytics() {
 
   const viewAttempt = async (attempt: AttemptRow) => {
     setSelectedAttempt(attempt);
-    const questions = await getQuestions(attempt.exam_id);
-    setAttemptQuestions(questions);
+    if (attempt.exam_id.startsWith('node_')) {
+      const questions = await getQuestionsByCategoryNode(attempt.exam_id.replace('node_', ''));
+      setAttemptQuestions(questions);
+    } else {
+      const questions = await getQuestions(attempt.exam_id);
+      setAttemptQuestions(questions);
+    }
   };
 
   const getAnswerLabel = (style: 'alphabet' | 'numeric' | undefined, index: number) =>
@@ -159,8 +202,8 @@ export function StudentAnalytics() {
               onChange={(e) => setSelectedExam(e.target.value)}
               className="rounded-2xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-white"
             >
-              <option value="">All exams</option>
-              {exams.map((exam) => (
+              <option value="">All assessments</option>
+              {((window as any).__examsDropdownList || exams).map((exam: any) => (
                 <option key={exam.id} value={exam.id}>
                   {exam.title}
                 </option>

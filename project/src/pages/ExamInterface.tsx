@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
-import { getExam, getQuestions, createAttempt, Question, Exam } from '../lib/firestore';
+import { getExam, getQuestions, getQuestionsByCategoryNode, createAttempt, Question, Exam, getCategoryNode } from '../lib/firestore';
 import { Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -92,14 +92,39 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
 
   const loadExamData = async () => {
     try {
-      const examData = await getExam(examId);
-      if (!examData) throw new Error('Exam not found');
+      if (examId.startsWith('node_')) {
+        const nodeId = examId.replace('node_', '');
+        const nodeData = await getCategoryNode(nodeId).catch(() => null);
+        const questionsData = await getQuestionsByCategoryNode(nodeId);
+        
+        let totalMarks = 0;
+        questionsData.forEach((q: any) => totalMarks += (q.marks || 1));
 
-      setExam(examData);
-      setTimeRemaining(examData.duration_minutes * 60);
+        setExam({
+          id: nodeId,
+          title: nodeData?.name || 'Practice Test',
+          description: 'Practice test for ' + (nodeData?.name || ''),
+          duration_minutes: 0, // 0 handles infinite or just fallback
+          total_marks: totalMarks || 100,
+          category_id: nodeData?.category_id || '',
+          is_premium: false,
+          is_active: true,
+          created_at: '',
+          updated_at: ''
+        });
+        
+        setTimeRemaining(0); // infinite
+        setQuestions(questionsData as QuestionWithSubject[]);
+      } else {
+        const examData = await getExam(examId);
+        if (!examData) throw new Error('Exam not found');
 
-      const questionsData = await getQuestions(examId);
-      setQuestions(questionsData as QuestionWithSubject[]);
+        setExam(examData);
+        setTimeRemaining(examData.duration_minutes * 60);
+
+        const questionsData = await getQuestions(examId);
+        setQuestions(questionsData as QuestionWithSubject[]);
+      }
     } catch (error) {
       console.error('Error loading exam:', error);
       navigate('/dashboard');
@@ -263,10 +288,10 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
               </div>
             </div>
             <div className={`flex items-center gap-2 text-lg font-bold ${
-              timeRemaining < 300 ? 'text-red-500' : isDark ? 'text-white' : 'text-gray-900'
+              timeRemaining > 0 && timeRemaining < 300 ? 'text-red-500' : isDark ? 'text-white' : 'text-gray-900'
             }`}>
               <Clock className="w-5 h-5" />
-              {formatTime(timeRemaining)}
+              {timeRemaining > 0 ? formatTime(timeRemaining) : '--:--'}
             </div>
           </div>
         </div>

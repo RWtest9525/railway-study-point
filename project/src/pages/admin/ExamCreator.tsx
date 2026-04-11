@@ -258,20 +258,20 @@ export function ExamCreator() {
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <button onClick={() => setAddingQuestionToExam(exam)} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
-                  <Plus className="h-4 w-4" />
-                  Add Questions
-                </button>
-                <button onClick={() => handleEdit(exam)} className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">Edit</button>
-                <button onClick={() => navigate(`/admin/student-analytics?examId=${exam.id}`)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700">
+                <button onClick={() => handleEdit(exam)} className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-100">Edit</button>
+                <button onClick={() => navigate(`/admin/student-analytics?examId=${exam.id}`)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700 hover:bg-purple-100">
                   <BarChart3 className="h-4 w-4" />
                   Results
                 </button>
-                <button onClick={() => generatePDF(exam)} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'}`}>
+                <button onClick={() => setAddingQuestionToExam(exam)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
+                  <Plus className="h-4 w-4" />
+                  Add Q
+                </button>
+                <button onClick={() => generatePDF(exam)} className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold hover:opacity-80 transition ${isDark ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-100 text-gray-800'}`}>
                   <Download className="h-4 w-4" />
                   PDF
                 </button>
-                <button onClick={() => void handleDelete(exam)} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                <button onClick={() => void handleDelete(exam)} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 hover:bg-red-100">
                   <Trash2 className="h-4 w-4" />
                   Delete exam
                 </button>

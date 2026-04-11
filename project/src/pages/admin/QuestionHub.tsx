@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Pencil, Plus, Settings, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useRouter } from '../../contexts/RouterContext';
 import {
   Category,
   CategoryNode,
@@ -25,6 +26,7 @@ type StepItem = { entity: 'category' | 'node'; id: string; name: string; categor
 
 export function QuestionHub() {
   const { theme } = useTheme();
+  const { navigate } = useRouter();
   const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<CategoryNode[]>([]);
@@ -358,7 +360,7 @@ export function QuestionHub() {
                   onEdit={() => openAddNode(node)}
                   onDelete={() => void removeNode(node)}
                   onResult={selectedNode?.is_test_container ? () => {
-                    toast('Results functionality not implemented yet');
+                    navigate(`/admin/student-analytics?examId=node_${node.id}`);
                   } : undefined}
                   onAddQuestion={selectedNode?.is_test_container ? () => {
                     setPath((prev) => [

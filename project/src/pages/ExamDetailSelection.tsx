@@ -165,22 +165,30 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
         {currentNodes.length > 0 && (
           <section className="mb-6">
             <div className="grid gap-3 sm:grid-cols-2">
-              {currentNodes.map((node) => (
-                <button
-                  key={node.id}
-                  onClick={() => {
-                    if (isLocked) {
-                      toast.error('Take premium. Your free trial has ended.');
-                      navigate('/upgrade');
-                      return;
-                    }
-                    setPath((prev) => [...prev, node]);
-                  }}
-                  className={`relative rounded-[24px] border p-5 text-left transition duration-300 ${
-                    isDark ? 'border-white/10 bg-white/5 text-white hover:bg-white/10' : 'border-slate-200/60 bg-white text-gray-900 hover:shadow-md shadow-sm'
-                  }`}
-                >
-                  {isLocked && <div className="absolute inset-0 rounded-[24px] bg-slate-950/20 backdrop-blur-[1px]" />}
+              {currentNodes.map((node) => {
+                const parentNode = path.length > 0 ? path[path.length - 1] : null;
+                const isTestContainerChild = parentNode?.is_test_container === true || node.is_test_container === false;
+                
+                return (
+                  <button
+                    key={node.id}
+                    onClick={() => {
+                      if (isLocked) {
+                        toast.error('Take premium. Your free trial has ended.');
+                        navigate('/upgrade');
+                        return;
+                      }
+                      if (isTestContainerChild) {
+                        navigate(`/exam/node_${node.id}`);
+                        return;
+                      }
+                      setPath((prev) => [...prev, node]);
+                    }}
+                    className={`relative rounded-[24px] border p-5 text-left transition duration-300 ${
+                      isDark ? 'border-white/10 bg-white/5 text-white hover:bg-white/10' : 'border-slate-200/60 bg-white text-gray-900 hover:shadow-md shadow-sm'
+                    }`}
+                  >
+                    {isLocked && <div className="absolute inset-0 rounded-[24px] bg-slate-950/20 backdrop-blur-[1px]" />}
                     <div className="relative flex items-center justify-between gap-3">
                       <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center font-bold text-lg ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
@@ -189,14 +197,15 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
                         <div>
                           <div className={`text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>{node.name}</div>
                           <div className={`mt-1 text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                            Open Folder
+                            {isTestContainerChild ? 'Start Test' : 'Open Folder'}
                           </div>
                         </div>
                       </div>
-                    {isLocked ? <Lock className="h-5 w-5 text-red-500" /> : <ChevronRight className={`h-6 w-6 ${isDark ? 'text-gray-500' : 'text-slate-400'}`} />}
-                  </div>
-                </button>
-              ))}
+                      {isLocked ? <Lock className="h-5 w-5 text-red-500" /> : isTestContainerChild ? <PlayCircle className={`h-5 w-5 ${isDark ? 'text-emerald-500' : 'text-emerald-600'}`} /> : <ChevronRight className={`h-5 w-5 ${isDark ? 'text-gray-500' : 'text-slate-400'}`} />}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </section>
         )}

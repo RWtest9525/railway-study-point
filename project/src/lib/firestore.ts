@@ -339,6 +339,12 @@ export const deleteCategory = async (categoryId: string) => {
 // Category tree nodes
 export const categoryNodesRef = collection(db, 'category_nodes');
 
+export const getCategoryNode = async (nodeId: string) => {
+  const snapshot = await getDoc(doc(db, 'category_nodes', nodeId));
+  if (!snapshot.exists()) return null;
+  return { id: snapshot.id, ...snapshot.data() } as CategoryNode;
+};
+
 export const getCategoryNodes = async (categoryId: string, parentId?: string | null) => {
   const constraints = [
     where('category_id', '==', categoryId),
