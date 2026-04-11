@@ -21,7 +21,7 @@ import { AddQuestionModal } from '../../components/AddQuestionModal';
 import { ConfirmModal } from '../../components/ConfirmModal';
 
 type QuestionMode = 'manual' | 'screenshot' | 'bulk';
-type StepItem = { entity: 'category' | 'node'; id: string; name: string; categoryId: string };
+type StepItem = { entity: 'category' | 'node'; id: string; name: string; categoryId: string; is_test_container?: boolean };
 
 export function QuestionHub() {
   const { theme } = useTheme();
@@ -317,7 +317,7 @@ export function QuestionHub() {
           subtitle={category.description || 'Open category'}
           isDark={isDark}
           onOpen={() => {
-            setPath([{ entity: 'category', id: category.id, name: category.name, categoryId: category.id }]);
+            setPath([{ entity: 'category', id: category.id, name: category.name, categoryId: category.id, is_test_container: category.is_test_container }]);
             setItems([]);
           }}
           onEdit={() => openAddCategory(category)}
@@ -341,22 +341,22 @@ export function QuestionHub() {
                 onOpen={() =>
                   setPath((prev) => [
                     ...prev,
-                    { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId },
+                    { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId, is_test_container: node.is_test_container },
                   ])
                 }
                 onEdit={() => openAddNode(node)}
                 onDelete={() => void removeNode(node)}
-                onResult={() => {
+                onResult={selectedNode?.is_test_container ? () => {
                   toast('Results functionality not implemented yet');
-                }}
-                onAddQuestion={() => {
+                } : undefined}
+                onAddQuestion={selectedNode?.is_test_container ? () => {
                   setPath((prev) => [
                     ...prev,
-                    { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId },
+                    { entity: 'node', id: node.id, name: node.name, categoryId: selectedCategoryId, is_test_container: node.is_test_container },
                   ]);
                   setQuestionMode('manual');
                   setQuestionModalOpen(true);
-                }}
+                } : undefined}
               />
             ))}
           </div>
@@ -417,6 +417,35 @@ export function QuestionHub() {
                 </div>
                 <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle}</h1>
                 <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{helperText}</p>
+                {path.length > 0 && (
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
+                    <input
+                      type="checkbox"
+                      checked={selectedNode?.is_test_container || false}
+                      onChange={async (e) => {
+                        const checked = e.target.checked;
+                        try {
+                           if (selectedNode?.entity === 'node') {
+                             await updateCategoryNode(selectedNode.id, { is_test_container: checked });
+                           } else if (selectedNode?.entity === 'category') {
+                             await updateCategory(selectedNode.id, { is_test_container: checked });
+                           }
+                           
+                           setPath(prev => {
+                             const newPath = [...prev];
+                             if (newPath.length > 0) {
+                               newPath[newPath.length - 1].is_test_container = checked;
+                             }
+                             return newPath;
+                           });
+                           toast.success(checked ? 'Page marked as Test Collection' : 'Page unmarked');
+                        } catch (err) { toast.error('Failed to update page settings') }
+                      }}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-600"
+                    />
+                    This page directly contains test folders
+                  </label>
+                )}
               </div>
             </div>
 

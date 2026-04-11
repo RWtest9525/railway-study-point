@@ -29,6 +29,7 @@ export interface Category {
   color?: string;
   order?: number;
   is_active: boolean;
+  is_test_container?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -271,6 +272,7 @@ export interface CategoryNode {
   level: number;
   order?: number;
   is_active: boolean;
+  is_test_container?: boolean;
   created_at: string;
   updated_at: string;
 }
