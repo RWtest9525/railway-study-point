@@ -53,22 +53,9 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       if (document.hidden) {
         setTabSwitchCount(prev => prev + 1);
         setIsFocused(false);
-        console.log('Proctoring: Tab switched away');
       } else {
         setIsFocused(true);
-        console.log('Proctoring: Tab switched back');
       }
-    };
-
-    const handleFocus = () => {
-      setIsFocused(true);
-      console.log('Proctoring: Window focused');
-    };
-
-    const handleBlur = () => {
-      setTabSwitchCount(prev => prev + 1);
-      setIsFocused(false);
-      console.log('Proctoring: Window blurred');
     };
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -77,14 +64,10 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
       // Auto Submit if they unmount without submitting
@@ -287,9 +270,10 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   }
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hrs.toString().padStart(2, '0')} : ${mins.toString().padStart(2, '0')} : ${secs.toString().padStart(2, '0')}`;
   };
 
   const subjects = Array.from(new Set(questions.map(q => q.subject)));
@@ -338,9 +322,9 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                 <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
               </button>
               <div>
-                <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} hidden sm:block`}>{exam?.title}</h1>
-                <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} flex items-center gap-2`}>
-                  <span>{questions.length} Questions</span>
+                <h1 className={`text-lg md:text-xl font-bold truncate max-w-[200px] sm:max-w-xs ${isDark ? 'text-white' : 'text-gray-900'}`}>{exam?.title}</h1>
+                <div className={`text-xs md:text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} flex items-center gap-2`}>
+                  <span>{questions.length} Qs</span>
                   <span className="opacity-50">•</span>
                   <span>{exam?.total_marks} Marks</span>
                 </div>
@@ -491,23 +475,8 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                 <ChevronLeft className="w-6 h-6" />
               </button>
 
-              <button
-                onClick={() => {
-                  const newMarked = new Set(markedForReview);
-                  if (newMarked.has(currentQuestion.id)) newMarked.delete(currentQuestion.id);
-                  else newMarked.add(currentQuestion.id);
-                  setMarkedForReview(newMarked);
-                }}
-                className={`flex items-center px-6 py-4 rounded-2xl font-semibold transition shadow-sm border ${
-                  markedForReview.has(currentQuestion.id)
-                    ? 'bg-yellow-500 border-yellow-500 text-white shadow-yellow-500/20'
-                    : isDark
-                    ? 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300'
-                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'
-                }`}
-              >
-                {markedForReview.has(currentQuestion.id) ? 'Bookmarked' : 'Bookmark'}
-              </button>
+              {/* Spacing to keep < and > ends balanced */}
+              <div className="flex-1"></div>
 
               {currentQuestionIndex < questions.length - 1 ? (
                 <button
@@ -547,8 +516,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                         ? 'bg-blue-600 text-white ring-2 ring-blue-400'
                         : answers[question.id] !== undefined
                         ? 'bg-green-600 text-white'
-                        : markedForReview.has(question.id)
-                        ? 'bg-yellow-600 text-white'
                         : isDark
                         ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                         : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -563,10 +530,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-green-600 rounded"></div>
                   <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Answered ({Object.keys(answers).length})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-yellow-600 rounded"></div>
-                  <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Marked ({markedForReview.size})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`w-4 h-4 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
