@@ -25,17 +25,11 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [startTime, setStartTime] = useState(Date.now());
+  const [startTime] = useState(Date.now());
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [isFocused, setIsFocused] = useState(true);
   const [proctoringViolations, setProctoringViolations] = useState<string[]>([]);
   const [activeSubject, setActiveSubject] = useState<string>('All');
-  
-  // New States
-  const [hasStarted, setHasStarted] = useState(false);
-  const [reportModalOpen, setReportModalOpen] = useState(false);
-  const [reportReason, setReportReason] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -46,39 +40,43 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     loadExamData();
   }, [examId, canAccessTests, authLoading, navigate]);
 
-  // Proctoring & Auto Submit
+  // Proctoring: Detect tab switching and browser focus changes
   useEffect(() => {
-    if (!hasStarted) return;
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setTabSwitchCount(prev => prev + 1);
         setIsFocused(false);
+        console.log('Proctoring: Tab switched away');
       } else {
         setIsFocused(true);
+        console.log('Proctoring: Tab switched back');
       }
     };
 
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
+    const handleFocus = () => {
+      setIsFocused(true);
+      console.log('Proctoring: Window focused');
+    };
+
+    const handleBlur = () => {
+      setTabSwitchCount(prev => prev + 1);
+      setIsFocused(false);
+      console.log('Proctoring: Window blurred');
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      
-      // Auto Submit if they unmount without submitting
-      if (timeRemaining > 0 && !isSubmitting) {
-        handleSubmit();
-      }
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
     };
-  }, [hasStarted]);
+  }, []);
 
   useEffect(() => {
-    if (hasStarted && timeRemaining > 0) {
+    if (timeRemaining > 0) {
       const timer = setInterval(() => {
         setTimeRemaining((prev) => {
           if (prev <= 1) {
@@ -90,7 +88,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [hasStarted, timeRemaining]);
+  }, [timeRemaining]);
 
   const loadExamData = async () => {
     try {
@@ -136,14 +134,17 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   };
 
   const handleSubmit = async () => {
-    if (!profile?.id || !exam || isSubmitting) return;
-    setIsSubmitting(true);
+    if (!profile?.id || !exam) return;
 
     // Check for proctoring violations
-    if (tabSwitchCount > 0 && false) { // suppress annoyances temporarily for auto submit
+    if (tabSwitchCount > 0) {
       const violationMessage = `Warning: You switched tabs ${tabSwitchCount} time(s) during the exam. This may be considered a violation of exam rules.`;
       proctoringViolations.push(violationMessage);
       setProctoringViolations([...proctoringViolations]);
+      
+      if (!confirm(violationMessage + ' Do you want to continue?')) {
+        return;
+      }
     }
     
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
@@ -214,10 +215,8 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       // Note: This would require adding 'attempts' field to Exam interface
 
       navigate(`/results/${attemptId}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error submitting exam:', error);
-      alert('Failed to submit exam: ' + error.message);
-      setIsSubmitting(false);
     }
   };
 
@@ -234,48 +233,10 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     );
   }
 
-  if (!hasStarted) {
-    return (
-      <div className={`min-h-screen ${isDark ? 'bg-gray-900 text-white' : 'bg-gray-50 text-slate-900'} flex flex-col`}>
-        <header className={`sticky top-0 z-50 ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-sm border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} px-6 py-4 flex items-center gap-4`}>
-          <button onClick={() => navigate('/dashboard')} className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-slate-600'}`}>
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-bold text-lg md:text-xl truncate">{exam?.title}</h1>
-        </header>
-
-        <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-12 flex flex-col justify-center items-center text-center">
-          <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-xl ${isDark ? 'bg-blue-500/20 ring-4 ring-blue-500/10' : 'bg-blue-50 ring-4 ring-blue-100'}`}>
-            <AlertTriangle className={`w-10 h-10 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-          </div>
-          <h2 className="text-3xl font-extrabold mb-4">Ready to Begin?</h2>
-          <div className={`mb-8 space-y-4 max-w-md ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-            <p>This assessment contains <strong className={isDark?'text-white':'text-black'}>{questions.length} questions</strong>.</p>
-            <p>You have <strong className={isDark?'text-white':'text-black'}>{exam?.duration_minutes === 0 ? "unlimited time" : `${exam?.duration_minutes} minutes`}</strong> to complete it.</p>
-            <p className={`text-sm mt-4 p-4 rounded-xl border ${isDark ? 'bg-red-500/10 border-red-500/20 text-red-200' : 'bg-red-50 border-red-200 text-red-700'}`}>
-              <strong>Note:</strong> Navigating away from this page via device back buttons will automatically submit your exam.
-            </p>
-          </div>
-
-          <button
-            onClick={() => {
-              setStartTime(Date.now());
-              setHasStarted(true);
-            }}
-            className="w-full sm:w-auto px-12 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 transition-transform active:scale-95"
-          >
-            Start Assessment
-          </button>
-        </main>
-      </div>
-    );
-  }
-
   const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
+    const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')} : ${mins.toString().padStart(2, '0')} : ${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const subjects = Array.from(new Set(questions.map(q => q.subject)));
@@ -309,43 +270,28 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       )}
 
       {/* Header */}
-      <header className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b flex-shrink-0 z-10`}>
+      <header className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-10`}>
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <button 
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to exit? Your exam will be submitted.')) {
-                    handleSubmit();
-                  }
-                }}
+                onClick={() => navigate('/dashboard')}
                 className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
               >
                 <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
               </button>
               <div>
-                <h1 className={`text-lg md:text-xl font-bold truncate max-w-[200px] sm:max-w-xs ${isDark ? 'text-white' : 'text-gray-900'}`}>{exam?.title}</h1>
-                <div className={`text-xs md:text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} flex items-center gap-2`}>
-                  <span>{questions.length} Qs</span>
-                  <span className="opacity-50">•</span>
-                  <span>{exam?.total_marks} Marks</span>
-                </div>
+                <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{exam?.title}</h1>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Question {currentQuestionIndex + 1} of {questions.length}
+                </p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setReportModalOpen(true)}
-                className={`p-2 rounded-full transition ${isDark ? 'hover:bg-red-900/30 text-red-400' : 'hover:bg-red-50 text-red-500'}`}
-                title="Report Issue"
-              >
-                <Flag className="w-5 h-5" />
-              </button>
-              
-              <div className={`flex items-center gap-2 px-4 py-2 ${isDark ? 'bg-blue-900/40 text-blue-300' : 'bg-blue-50 text-blue-700'} rounded-lg font-mono font-bold`}>
-                <Clock className="w-5 h-5" />
-                {timeRemaining > 0 ? formatTime(timeRemaining) : '--:--'}
-              </div>
+            <div className={`flex items-center gap-2 text-lg font-bold ${
+              timeRemaining > 0 && timeRemaining < 300 ? 'text-red-500' : isDark ? 'text-white' : 'text-gray-900'
+            }`}>
+              <Clock className="w-5 h-5" />
+              {timeRemaining > 0 ? formatTime(timeRemaining) : '--:--'}
             </div>
           </div>
         </div>
@@ -411,11 +357,11 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
               </h2>
 
               {currentQuestion?.image_url && (
-                <div className={`mb-6 p-2 rounded-xl flex items-center justify-center ${isDark ? 'bg-gray-950/50' : 'bg-gray-100/50'}`}>
+                <div className={`mb-6 overflow-hidden rounded-2xl border ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
                   <img
                     src={currentQuestion.image_url}
-                    alt="Question visual context"
-                    className="max-h-[30vh] w-auto max-w-full rounded shadow-sm object-contain"
+                    alt="Question"
+                    className="max-h-[28rem] w-full object-contain"
                   />
                 </div>
               )}
@@ -464,30 +410,51 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
               </div>
             </div>
 
-            <div className="flex justify-between items-center mt-6">
+            <div className="flex justify-between items-center">
               <button
                 onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
                 disabled={currentQuestionIndex === 0}
-                className={`flex items-center justify-center w-14 h-14 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   isDark
-                  ? 'bg-gray-800 hover:bg-gray-700 shadow-sm border border-gray-700 text-white'
-                  : 'bg-white hover:bg-gray-50 shadow-sm border border-gray-200 text-gray-700'
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                 }`}
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-5 h-5" />
+                Previous
               </button>
 
-              {/* Spacing to keep < and > ends balanced */}
-              <div className="flex-1"></div>
+              <button
+                onClick={() => {
+                  const newMarked = new Set(markedForReview);
+                  if (newMarked.has(currentQuestion.id)) {
+                    newMarked.delete(currentQuestion.id);
+                  } else {
+                    newMarked.add(currentQuestion.id);
+                  }
+                  setMarkedForReview(newMarked);
+                }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition ${
+                  markedForReview.has(currentQuestion.id)
+                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                    : isDark
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                <Flag className="w-5 h-5" />
+                {markedForReview.has(currentQuestion.id) ? 'Unmark' : 'Mark for Review'}
+              </button>
 
               {currentQuestionIndex < questions.length - 1 ? (
                 <button
                   onClick={() =>
                     setCurrentQuestionIndex(Math.min(questions.length - 1, currentQuestionIndex + 1))
                   }
-                  className="flex items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold transition shadow-lg shadow-blue-600/20"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition shadow-lg shadow-blue-900/20"
                 >
-                  <ChevronRight className="w-6 h-6" />
+                  Next
+                  <ChevronRight className="w-5 h-5" />
                 </button>
               ) : (
                 <button
@@ -496,19 +463,19 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                       void handleSubmit();
                     }
                   }}
-                  className="flex items-center justify-center px-6 h-14 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-extrabold tracking-wide uppercase text-sm transition shadow-lg shadow-green-600/20"
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold transition shadow-lg shadow-green-900/20"
                 >
-                  Submit
+                  <CheckCircle className="w-5 h-5" />
+                  Submit Exam
                 </button>
               )}
             </div>
           </div>
 
           <div className="lg:col-span-1">
-            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-5 border sticky top-24 shadow-lg`}>
-              <h3 className={`text-lg font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Quick Navigator</h3>
-              
-              <div className="grid grid-cols-5 gap-2 max-h-[35vh] lg:max-h-full overflow-y-auto pr-2 scrollbar-thin">
+            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-5 border sticky top-48 shadow-lg`}>
+              <h3 className={`text-lg font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Question Navigator</h3>
+              <div className="grid grid-cols-5 gap-2">
                 {filteredQuestions.map((question, index) => (
                   <button
                     key={question.id}
@@ -518,6 +485,8 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                         ? 'bg-blue-600 text-white ring-2 ring-blue-400'
                         : answers[question.id] !== undefined
                         ? 'bg-green-600 text-white'
+                        : markedForReview.has(question.id)
+                        ? 'bg-yellow-600 text-white'
                         : isDark
                         ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                         : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -534,6 +503,10 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                   <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Answered ({Object.keys(answers).length})</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-yellow-600 rounded"></div>
+                  <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Marked ({markedForReview.size})</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <div className={`w-4 h-4 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
                   <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Not Answered ({questions.length - Object.keys(answers).length})</span>
                 </div>
@@ -542,57 +515,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
           </div>
         </div>
       </div>
-      
-      {/* Report Issue Modal */}
-      {reportModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className={`${isDark ? 'bg-gray-900 border border-gray-800' : 'bg-white'} w-full max-w-sm rounded-[24px] p-6 shadow-2xl`}>
-            <h3 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Report Issue</h3>
-            <p className={`text-sm mb-6 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>We will review this question shortly.</p>
-            
-            <div className="space-y-2 mb-6">
-              {['Image not visible', 'Hard question', 'Wrong question', 'Wrong option'].map(reason => (
-                <button
-                  key={reason}
-                  onClick={() => setReportReason(reason)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-semibold transition ${
-                    reportReason === reason 
-                      ? 'border-blue-500 bg-blue-500/10 text-blue-500' 
-                      : isDark ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {reason}
-                </button>
-              ))}
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setReportModalOpen(false);
-                  setReportReason("");
-                }}
-                className={`flex-1 py-3 rounded-xl font-semibold transition ${isDark ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (reportReason) {
-                    alert('Report successfully sent to Admin for review');
-                    setReportModalOpen(false);
-                    setReportReason("");
-                  }
-                }}
-                disabled={!reportReason}
-                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition disabled:opacity-50"
-              >
-                Submit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

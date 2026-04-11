@@ -281,7 +281,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath.startsWith('/admin/student-analytics')) {
+  if (currentPath === '/admin/student-analytics') {
     return (
       <ProtectedRoute requireAdmin>
         <StudentAnalytics />

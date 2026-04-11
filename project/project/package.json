@@ -11,19 +11,20 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
-    "@types/react-router-dom": "^5.3.3",
+    "@uiw/react-md-editor": "^4.1.0",
     "firebase": "^12.11.0",
+    "katex": "^0.16.45",
     "lucide-react": "^0.344.0",
-    "razorpay": "^2.9.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.14.0"
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.14.0",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
-    "@types/node": "^25.5.2",
-    "@types/react": "^18.3.28",
-    "@types/react-dom": "^18.3.7",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
     "eslint": "^9.9.1",
@@ -32,7 +33,7 @@
     "globals": "^15.9.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.9.3",
+    "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
     "vite": "^5.4.2"
   }

@@ -214,10 +214,8 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       // Note: This would require adding 'attempts' field to Exam interface
 
       navigate(`/results/${attemptId}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error submitting exam:', error);
-      alert('Failed to submit exam: ' + error.message);
-      setIsSubmitting(false);
     }
   };
 
