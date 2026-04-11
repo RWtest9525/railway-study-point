@@ -6,6 +6,7 @@ import { useRouter } from '../../contexts/RouterContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Category, Exam, createExam, deleteExam, getCategories, getExams, updateExam } from '../../lib/firestore';
 import { formatDate } from '../../lib/dateUtils';
+import { AddQuestionModal } from '../../components/AddQuestionModal';
 
 export function ExamCreator() {
   const { profile } = useAuth();
@@ -16,6 +17,7 @@ export function ExamCreator() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [addingQuestionToExam, setAddingQuestionToExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     category_id: '',
@@ -210,6 +212,10 @@ export function ExamCreator() {
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-3">
+                <button onClick={() => setAddingQuestionToExam(exam)} className="col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
+                  <Plus className="h-4 w-4" />
+                  Add Questions
+                </button>
                 <button onClick={() => handleEdit(exam)} className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">Edit</button>
                 <button onClick={() => navigate(`/admin/student-analytics?examId=${exam.id}`)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700">
                   <BarChart3 className="h-4 w-4" />
@@ -340,6 +346,17 @@ export function ExamCreator() {
             </form>
           </div>
         </div>
+      )}
+      {addingQuestionToExam && (
+        <AddQuestionModal 
+          isOpen={true} 
+          onClose={() => setAddingQuestionToExam(null)} 
+          onSuccess={() => setAddingQuestionToExam(null)} 
+          examId={addingQuestionToExam.id} 
+          examTitle={addingQuestionToExam.title}
+          categoryNodeId={addingQuestionToExam.category_id}
+          linkedLabel={categoryName(addingQuestionToExam.category_id)}
+        />
       )}
     </div>
   );
