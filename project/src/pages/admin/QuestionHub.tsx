@@ -46,8 +46,18 @@ export function QuestionHub() {
 
   const selectedCategoryId = path.find((item) => item.entity === 'category')?.id || '';
   const selectedNode = path.length > 0 ? path[path.length - 1] : null;
+  const parentNode = path.length > 1 ? path[path.length - 2] : null;
   const currentNodeParent = path[path.length - 1]?.entity === 'node' ? path[path.length - 1].id : null;
-  const canAddQuestionHere = path.length >= 2;
+  
+  // A node is a test container if its own is_test_container is true
+  const isCurrentPageTestContainer = selectedNode?.is_test_container === true;
+  // A node is an actual Test if its parent was a test container
+  const isCurrentPageTest = parentNode?.is_test_container === true;
+
+  // We can add questions if we're explicitly inside a test, OR if we're deep enough and it's NOT a test container.
+  // Actually, if it's a test container, it holds tests, not questions directly.
+  const canAddQuestionHere = path.length >= 2 && !isCurrentPageTestContainer;
+  const canAddFolderHere = !isCurrentPageTest;
 
   useEffect(() => {
     void loadCategories();
@@ -88,8 +98,9 @@ export function QuestionHub() {
   const addButtonLabel = useMemo(() => {
     if (path.length === 0) return 'Add Category';
     if (path.length === 1) return 'Add Sub Category';
+    if (isCurrentPageTestContainer) return 'Add New Test';
     return 'Add Next Folder';
-  }, [path.length]);
+  }, [path.length, isCurrentPageTestContainer]);
 
   const helperText = useMemo(() => {
     if (path.length === 0) return 'Select a category first.';
@@ -417,7 +428,7 @@ export function QuestionHub() {
                 </div>
                 <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle}</h1>
                 <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{helperText}</p>
-                {path.length > 0 && (
+                {path.length > 0 && !isCurrentPageTest && (
                   <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
                     <input
                       type="checkbox"
@@ -465,20 +476,22 @@ export function QuestionHub() {
                   </button>
                 </>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (path.length === 0) {
-                    openAddCategory();
-                  } else {
-                    openAddNode();
-                  }
-                }}
-                className="inline-flex items-center gap-2 rounded-2xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white"
-              >
-                <Plus className="h-4 w-4" />
-                {addButtonLabel}
-              </button>
+              {canAddFolderHere && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (path.length === 0) {
+                      openAddCategory();
+                    } else {
+                      openAddNode();
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  {addButtonLabel}
+                </button>
+              )}
             </div>
           </div>
 
@@ -606,15 +619,17 @@ function ItemCard({
           <Trash2 className="h-3.5 w-3.5" />
           Delete
         </button>
-        <button
-          type="button"
-          onClick={onResult}
-          className={`flex-1 min-w-[70px] inline-flex justify-center items-center gap-1 rounded-xl border px-2 py-2 text-xs font-medium ${
-            isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
-          }`}
-        >
-          Result
-        </button>
+        {onResult && (
+          <button
+            type="button"
+            onClick={onResult}
+            className={`flex-1 min-w-[70px] inline-flex justify-center items-center gap-1 rounded-xl border px-2 py-2 text-xs font-medium ${
+              isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
+            }`}
+          >
+            Result
+          </button>
+        )}
       </div>
       {onAddQuestion && (
         <button
