@@ -256,8 +256,23 @@ export function ExamSelection() {
 
           <div className="scrollbar-thin flex gap-3 overflow-x-auto pb-2">
             {renderedExams.length === 0 ? (
-               <div className={`w-full rounded-[26px] border border-dashed p-6 text-center text-sm ${isDark ? 'border-gray-700 text-gray-500' : 'border-slate-300 text-slate-400'}`}>
-                 No live exams scheduled right now.
+               <div className={`min-w-[260px] max-w-[260px] rounded-[24px] border p-5 opacity-50 transition duration-300 ${isDark ? 'border-white/10 bg-white/5 text-white' : 'border-slate-200/60 bg-white text-slate-900 shadow-sm'}`}>
+                 <div className="flex items-center justify-between gap-2">
+                   <div className="line-clamp-2 text-sm font-bold">Upcoming Exam</div>
+                 </div>
+                 <div className={`mt-3 flex items-center gap-2 text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                   <Clock3 className="h-3.5 w-3.5" />
+                   -- min
+                 </div>
+                 <div className="mt-4 flex items-center gap-2">
+                   <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-slate-100 text-slate-600'}`}>
+                     Coming Soon
+                   </span>
+                 </div>
+                 <button disabled className={`mt-6 inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold transition ${isDark ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-400'}`}>
+                   <PlayCircle className="h-4 w-4" />
+                   Start
+                 </button>
                </div>
             ) : (
               renderedExams.map((exam) => {
