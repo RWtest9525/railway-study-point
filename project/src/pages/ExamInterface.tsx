@@ -3,7 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { getExam, getQuestions, getQuestionsByCategoryNode, createAttempt, Question, Exam, getCategoryNode } from '../lib/firestore';
 import { Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { useTheme } from '../contexts/ThemeContext';
+import toast from 'react-hot-toast';
 
 interface ExamInterfaceProps {
   examId: string;
@@ -33,6 +35,8 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [submitSuccessAttemptId, setSubmitSuccessAttemptId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -197,11 +201,14 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       // Update exam attempt count (optional - for analytics)
       // Note: This would require adding 'attempts' field to Exam interface
 
-      navigate(`/results/${attemptId}`);
+      // Instead of navigate, show success modal
+      setSubmitSuccessAttemptId(attemptId);
+      setSubmitConfirmOpen(false);
     } catch (error: any) {
       console.error('Error submitting exam:', error);
       alert('Failed to submit exam: ' + error.message);
       setIsSubmitting(false);
+      setSubmitConfirmOpen(false);
     }
   };
 
@@ -213,6 +220,34 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className={`${isDark ? 'text-white' : 'text-gray-900'} text-lg`}>Loading exam...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (submitSuccessAttemptId) {
+    return (
+      <div className={`min-h-screen ${isDark ? 'bg-gray-900 text-white' : 'bg-gray-50 text-slate-900'} flex flex-col items-center justify-center`}>
+        <div className={`max-w-md w-full p-8 rounded-3xl shadow-2xl text-center ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Exam Submitted!</h2>
+          <p className={`mb-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>You have successfully completed this examination.</p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => navigate(`/results/${submitSuccessAttemptId}`)}
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition"
+            >
+              See Result
+            </button>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className={`w-full py-3.5 font-bold rounded-xl transition ${isDark ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              Back to Home
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -288,11 +323,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <button 
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to exit? Your exam will be submitted and you cannot resume.')) {
-                    handleSubmit();
-                  }
-                }}
+                onClick={() => setSubmitConfirmOpen(true)}
                 className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
               >
                 <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
@@ -465,11 +496,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                 </button>
               ) : (
                 <button
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to submit your exam now? You will not be able to change your answers.')) {
-                      void handleSubmit();
-                    }
-                  }}
+                  onClick={() => setSubmitConfirmOpen(true)}
                   className="flex items-center justify-center px-6 h-14 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-extrabold tracking-wide uppercase text-sm transition shadow-lg shadow-green-600/20"
                 >
                   Submit
@@ -553,7 +580,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
               <button
                 onClick={() => {
                   if (reportReason) {
-                    alert('Report successfully sent to Admin for review');
+                    toast.success('Report successfully sent to Admin for review');
                     setReportModalOpen(false);
                     setReportReason("");
                   }
@@ -567,6 +594,18 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
           </div>
         </div>
       )}
+
+      {/* Modern Submit Confirmation Modal */}
+      <ConfirmModal
+        isOpen={submitConfirmOpen}
+        onCancel={() => setSubmitConfirmOpen(false)}
+        onConfirm={handleSubmit}
+        title="Submit Exam"
+        message="Are you sure you want to submit your exam now? You will not be able to return to change your answers."
+        confirmText={isSubmitting ? "Submitting..." : "Yes, Submit"}
+        cancelText="Review More"
+        isDestructive={false}
+      />
     </div>
   );
 }

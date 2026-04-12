@@ -3,6 +3,7 @@ import { Download, Database, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { ConfirmModal } from './ConfirmModal';
 
 interface BackupData {
   users: any[];
@@ -17,6 +18,9 @@ export function DatabaseBackup() {
   const isDark = theme === 'dark';
   const [isExporting, setIsExporting] = useState(false);
   const [exported, setExported] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [errorModalOpen, setErrorModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const exportDatabase = async () => {
     setIsExporting(true);
@@ -50,9 +54,10 @@ export function DatabaseBackup() {
 
       setExported(true);
       setTimeout(() => setExported(false), 3000);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Export failed:', e);
-      alert('Export failed. Please try again.');
+      setErrorMessage('Export failed: ' + (e.message || 'Unknown error'));
+      setErrorModalOpen(true);
     } finally {
       setIsExporting(false);
     }
@@ -106,9 +111,7 @@ export function DatabaseBackup() {
           </button>
 
           <button
-            onClick={() => {
-              alert('Import functionality would be implemented here.\n\nTo import: Go to Firebase Console > Firestore > Import.');
-            }}
+            onClick={() => setImportModalOpen(true)}
             className={`px-4 py-2.5 rounded-xl font-semibold text-sm border transition ${
               isDark
                 ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
@@ -126,6 +129,28 @@ export function DatabaseBackup() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={importModalOpen}
+        onCancel={() => setImportModalOpen(false)}
+        onConfirm={() => setImportModalOpen(false)}
+        title="Import Database"
+        message="Full Database imports must be run directly through the Firebase Console for security and data integrity. Please go to your Firebase Console > Firestore Database > Import/Export to perform this action."
+        confirmText="Acknowledge"
+        cancelText="Close"
+        isDestructive={false}
+      />
+
+      <ConfirmModal
+        isOpen={errorModalOpen}
+        onCancel={() => setErrorModalOpen(false)}
+        onConfirm={() => setErrorModalOpen(false)}
+        title="Export Error"
+        message={errorMessage}
+        confirmText="Okay"
+        cancelText="Close"
+        isDestructive={true}
+      />
     </div>
   );
 }

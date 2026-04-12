@@ -22,6 +22,7 @@ export function Leaderboard() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filterType, setFilterType] = useState<'exams' | 'category'>('exams');
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -43,7 +44,12 @@ export function Leaderboard() {
         // Fetch profiles to get names
         const profilesData: Record<string, string> = {};
         
-        for (const doc of snapshot.docs) {
+        const filteredDocs = snapshot.docs.filter(doc => {
+          const examId = doc.data().exam_id || '';
+          return filterType === 'exams' ? !examId.startsWith('node_') : examId.startsWith('node_');
+        });
+
+        for (const doc of filteredDocs) {
           const data = doc.data();
           const userId = data.user_id;
           
@@ -99,7 +105,7 @@ export function Leaderboard() {
     };
 
     fetchLeaderboard();
-  }, []);
+  }, [filterType]);
 
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
@@ -117,6 +123,29 @@ export function Leaderboard() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8">
+        <div className="flex gap-3 mb-8">
+          <button
+            onClick={() => setFilterType('exams')}
+            className={`flex-1 py-3 rounded-xl font-bold transition ${
+              filterType === 'exams'
+                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-200'
+            }`}
+          >
+            Main Exams
+          </button>
+          <button
+            onClick={() => setFilterType('category')}
+            className={`flex-1 py-3 rounded-xl font-bold transition ${
+              filterType === 'category'
+                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-200'
+            }`}
+          >
+            Practice Tests
+          </button>
+        </div>
+
         {loading && (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500" />

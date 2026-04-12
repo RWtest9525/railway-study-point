@@ -18,10 +18,11 @@ export function AdminLeaderboard() {
   const isDark = theme === 'dark';
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState<'exams' | 'category'>('exams');
 
   useEffect(() => {
     loadLeaderboard();
-  }, []);
+  }, [filterType]);
 
   const loadLeaderboard = async () => {
     try {
@@ -31,7 +32,11 @@ export function AdminLeaderboard() {
       // Group attempts by user
       const userStats = new Map<string, { totalAttempts: number; totalScore: number; bestScore: number; userName: string; email: string }>();
       
-      attempts.forEach(attempt => {
+      const filteredAttempts = attempts.filter(att => 
+        filterType === 'exams' ? !att.exam_id.startsWith('node_') : att.exam_id.startsWith('node_')
+      );
+
+      filteredAttempts.forEach(attempt => {
         const userId = attempt.user_id;
         const existing = userStats.get(userId);
         
@@ -80,7 +85,30 @@ export function AdminLeaderboard() {
     <div className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen p-6`}>
       <div className="mb-6">
         <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Leaderboard</h1>
-        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Overall exam score leaderboard. Weekly motivation board updates every Monday.</p>
+        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Overall exam score leaderboard. Updates automatically.</p>
+      </div>
+
+      <div className="flex gap-3 mb-8 max-w-sm">
+        <button
+          onClick={() => setFilterType('exams')}
+          className={`flex-1 py-3 rounded-xl font-bold transition ${
+            filterType === 'exams'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+              : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-200'
+          }`}
+        >
+          Main Exams
+        </button>
+        <button
+          onClick={() => setFilterType('category')}
+          className={`flex-1 py-3 rounded-xl font-bold transition ${
+            filterType === 'category'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+              : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-200'
+          }`}
+        >
+          Practice Tests
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
-import { getAttempt, getAttemptsByExam, getExam, getQuestions, QuizAttempt, Exam, Question } from '../lib/firestore';
+import { getAttempt, getAttemptsByExam, getExam, getQuestions, getUsers, QuizAttempt, Exam, Question } from '../lib/firestore';
 import { Trophy, Clock, Target, CheckCircle, XCircle, ArrowLeft, BarChart3 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { BottomNav } from '../components/BottomNav';
@@ -21,8 +21,9 @@ export function Results({ resultId }: ResultsProps) {
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<QuestionWithSubject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'analysis'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analysis' | 'leaderboard'>('overview');
   const [examRank, setExamRank] = useState<number | null>(null);
+  const [rankedList, setRankedList] = useState<any[]>([]);
 
   useEffect(() => {
     loadResultData();
@@ -44,6 +45,26 @@ export function Results({ resultId }: ResultsProps) {
       const rankedAttempts = [...examAttempts].sort((a, b) => b.score - a.score || a.time_taken_seconds - b.time_taken_seconds);
       const rank = rankedAttempts.findIndex((entry) => entry.id === attemptData.id);
       setExamRank(rank >= 0 ? rank + 1 : null);
+      
+      const users = await getUsers();
+      const mappedRanked = rankedAttempts.map(att => {
+        const u = users.find(user => user.id === att.user_id);
+        return {
+          ...att,
+          userName: u?.full_name || 'Student',
+          avatarUrl: u?.avatarUrl
+        };
+      });
+      
+      // Keep only one best attempt per user for the leaderboard to be fair
+      const uniqueRanked = Array.from(new Map(mappedRanked.map(item => [item.user_id, item])).values())
+        .sort((a, b) => b.score - a.score || a.time_taken_seconds - b.time_taken_seconds);
+      
+      setRankedList(uniqueRanked);
+      
+      if (!attemptData.exam_id.startsWith('node_')) {
+        setActiveTab('leaderboard');
+      }
     } catch (error) {
       console.error('Error loading result:', error);
       navigate('/dashboard');
@@ -213,10 +234,25 @@ export function Results({ resultId }: ResultsProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {!attempt.exam_id.startsWith('node_') && (
+            <button
+              onClick={() => setActiveTab('leaderboard')}
+              className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
+                activeTab === 'leaderboard'
+                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20'
+                  : isDark
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Trophy className="w-4 h-4 inline mr-1" />
+              Examinee Rankings
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
+            className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'bg-blue-600 text-white'
                 : isDark
@@ -225,11 +261,11 @@ export function Results({ resultId }: ResultsProps) {
             }`}
           >
             <BarChart3 className="w-4 h-4 inline mr-1" />
-            Overview
+            My Overview
           </button>
           <button
             onClick={() => setActiveTab('analysis')}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
+            className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
               activeTab === 'analysis'
                 ? 'bg-blue-600 text-white'
                 : isDark
@@ -240,6 +276,91 @@ export function Results({ resultId }: ResultsProps) {
             Detailed Analysis
           </button>
         </div>
+
+        {activeTab === 'leaderboard' && (
+          <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border overflow-hidden shadow-lg`}>
+            <div className={`px-6 py-4 ${isDark ? 'bg-gray-700/50' : 'bg-gray-50'} border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h3 className={`text-sm font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                {exam.title} - Leaderboard
+              </h3>
+            </div>
+            <div className={`divide-y ${isDark ? 'divide-gray-700/50' : 'divide-gray-100'}`}>
+              {rankedList.map((r, i) => {
+                const actualRank = i + 1;
+                const percentile = (actualRank / rankedList.length) * 100;
+                
+                let badgeLabel = null;
+                let badgeColor = '';
+                if (actualRank <= 10) {
+                } else if (percentile <= 1) {
+                  badgeLabel = 'Top 1%';
+                  badgeColor = 'bg-fuchsia-500/20 text-fuchsia-500 border-fuchsia-500/20';
+                } else if (percentile <= 10) {
+                  badgeLabel = 'Top 10%';
+                  badgeColor = 'bg-violet-500/20 text-violet-500 border-violet-500/20';
+                } else if (percentile <= 20) {
+                  badgeLabel = 'Top 20%';
+                  badgeColor = 'bg-blue-500/20 text-blue-500 border-blue-500/20';
+                } else if (percentile <= 50) {
+                  badgeLabel = 'Top 50%';
+                  badgeColor = 'bg-emerald-500/20 text-emerald-500 border-emerald-500/20';
+                }
+
+                return (
+                  <div
+                    key={r.id}
+                    className={`flex flex-col sm:flex-row sm:items-center px-6 py-4 transition-colors gap-3 sm:gap-0 ${
+                      attempt.id === r.id || attempt.user_id === r.user_id
+                        ? (isDark ? 'bg-amber-500/10' : 'bg-amber-50') 
+                        : (isDark ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50')
+                    }`}
+                  >
+                    <div className="flex items-center flex-1 min-w-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                        actualRank === 1 ? 'bg-amber-400 text-white shadow-lg shadow-amber-500/40' :
+                        actualRank === 2 ? 'bg-slate-300 text-white shadow-lg shadow-slate-400/40' :
+                        actualRank === 3 ? 'bg-orange-400 text-white shadow-lg shadow-orange-500/40' :
+                        isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {actualRank}
+                      </div>
+                      <div className="ml-4 min-w-0 flex items-center gap-2 flex-wrap">
+                        {r.avatarUrl && (
+                          <img src={r.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full border border-gray-300" />
+                        )}
+                        <span className={`text-base font-medium truncate ${
+                          attempt.id === r.id || attempt.user_id === r.user_id
+                            ? (isDark ? 'text-amber-400 font-bold' : 'text-amber-600 font-bold') 
+                            : (isDark ? 'text-gray-200' : 'text-gray-700')
+                        }`}>
+                          {r.userName}
+                        </span>
+                        {(attempt.id === r.id || attempt.user_id === r.user_id) && (
+                          <span className="bg-amber-500/20 text-amber-500 text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border border-amber-500/20 shrink-0">
+                            You
+                          </span>
+                        )}
+                        {badgeLabel && (
+                          <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${badgeColor} shrink-0`}>
+                            {badgeLabel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:items-end pl-14 sm:pl-0">
+                      <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {r.score.toLocaleString()} pts
+                      </span>
+                      <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {Math.floor(r.time_taken_seconds / 60)}m {r.time_taken_seconds % 60}s
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {activeTab === 'overview' && (
           <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl p-6 border shadow-lg`}>

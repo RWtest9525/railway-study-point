@@ -27,11 +27,7 @@ export function History() {
   
   const [history, setHistory] = useState<AttemptHistoryInfo[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Overall stats
-  const [totalCorrect, setTotalCorrect] = useState(0);
-  const [totalWrong, setTotalWrong] = useState(0);
-  const [totalUnattempted, setTotalUnattempted] = useState(0);
+  const [filterType, setFilterType] = useState<'exams' | 'category'>('exams');
 
   useEffect(() => {
     async function loadHistory() {
@@ -55,22 +51,28 @@ export function History() {
           const correct = data.correct_answers || 0;
           const totalQ = data.total_questions || 0;
           const skippedCount = (data.answers || []).filter((a: any) => a.skipped || a.selectedOption < 0).length;
-          const wrong = totalQ - correct - skippedCount;
+          // Try to get exam title from exams col or category nodes
+          let examTitle = 'Practice Test';
           
-          rCorrect += correct;
-          rWrong += wrong;
-          rUnattempted += skippedCount;
-          
-          // Try to get exam title from exams col
-          let examTitle = 'Unknown Exam';
-          try {
-            const examRef = collection(db, 'exams');
-            const eq = query(examRef, where('__name__', '==', data.exam_id));
-            const esnap = await getDocs(eq);
-            if (!esnap.empty) {
-              examTitle = esnap.docs[0].data().title;
-            }
-          } catch(e) {}
+          if (data.exam_id.startsWith('node_')) {
+            try {
+              const nodeRef = collection(db, 'category_nodes');
+              const nEq = query(nodeRef, where('__name__', '==', data.exam_id.replace('node_', '')));
+              const nSnap = await getDocs(nEq);
+              if (!nSnap.empty) {
+                examTitle = nSnap.docs[0].data().name;
+              }
+            } catch(e) {}
+          } else {
+            try {
+              const examRef = collection(db, 'exams');
+              const eq = query(examRef, where('__name__', '==', data.exam_id));
+              const esnap = await getDocs(eq);
+              if (!esnap.empty) {
+                examTitle = esnap.docs[0].data().title;
+              }
+            } catch(e) {}
+          }
           
           loadedHistory.push({
             id: doc.id,
@@ -85,9 +87,6 @@ export function History() {
           });
         }
         
-        setTotalCorrect(rCorrect);
-        setTotalWrong(rWrong);
-        setTotalUnattempted(rUnattempted);
         setHistory(loadedHistory);
       } catch (err) {
         console.error('Error fetching history:', err);
@@ -99,8 +98,19 @@ export function History() {
     loadHistory();
   }, [user?.uid]);
 
+  const filteredHistory = history.filter(item => 
+    filterType === 'exams' ? !item.exam_id.startsWith('node_') : item.exam_id.startsWith('node_')
+  );
+
+  let totalCorrect = 0, totalWrong = 0, totalUnattempted = 0;
+  filteredHistory.forEach(item => {
+    totalCorrect += item.correct_answers || 0;
+    const skipped = item.answers.filter((a: any) => a.skipped || a.selectedOption < 0).length;
+    totalUnattempted += skipped;
+    totalWrong += ((item.total_questions || 0) - (item.correct_answers || 0) - skipped);
+  });
   const totalQuestionsAll = totalCorrect + totalWrong + totalUnattempted;
-  
+
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
       <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
@@ -116,14 +126,37 @@ export function History() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8">
+        <div className="flex gap-3 mb-8">
+          <button
+            onClick={() => setFilterType('exams')}
+            className={`flex-1 py-3 rounded-xl font-bold transition ${
+              filterType === 'exams'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-200'
+            }`}
+          >
+            Main Exams
+          </button>
+          <button
+            onClick={() => setFilterType('category')}
+            className={`flex-1 py-3 rounded-xl font-bold transition ${
+              filterType === 'category'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-200'
+            }`}
+          >
+            Practice Tests
+          </button>
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : history.length === 0 ? (
+        ) : filteredHistory.length === 0 ? (
           <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-12 text-center`}>
             <BarChart3 className={`w-12 h-12 mx-auto mb-4 opacity-20 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-            <p className={`${isDark ? 'text-gray-500' : 'text-gray-600'} text-sm`}>No test history yet. Give an exam to see analytics!</p>
+            <p className={`${isDark ? 'text-gray-500' : 'text-gray-600'} text-sm`}>No history available for this section yet.</p>
           </div>
         ) : (
           <>
@@ -173,7 +206,7 @@ export function History() {
             {/* List of Previous Attempts */}
             <h3 className={`text-lg font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Exam Logs</h3>
             <div className="space-y-4">
-              {history.map((record) => {
+              {filteredHistory.map((record) => {
                 const date = new Date(record.submitted_at);
                 const isPassed = (record.score / record.total_questions) >= 0.6; // Assuming 60% is pass for demo
                 

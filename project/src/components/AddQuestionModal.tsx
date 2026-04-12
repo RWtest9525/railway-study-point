@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { createQuestionsBatch, getQuestions, getQuestionsByCategoryNode, deleteQuestion, updateQuestion, Question, getExams, createExam, updateExam } from '../lib/firestore';
 import { uploadImage, validateImage } from '../lib/imageUtils';
+import { ConfirmModal } from './ConfirmModal';
 
 type QuestionMode = 'manual' | 'screenshot' | 'bulk';
 
@@ -97,6 +98,7 @@ export function AddQuestionModal({
   const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [uploadingBulkImages, setUploadingBulkImages] = useState(false);
   const [existingQuestions, setExistingQuestions] = useState<Question[]>([]);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const isLinkedQuestionBank = Boolean(categoryNodeId);
   const currentDraft = draftQuestions[currentIndex];
@@ -385,11 +387,7 @@ export function AddQuestionModal({
           <div className="flex items-center gap-3">
             {onDeleteFolder && (
               <button 
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete this folder/exam? This cannot be undone.')) {
-                    onDeleteFolder();
-                  }
-                }}
+                onClick={() => setDeleteConfirmOpen(true)}
                 className="rounded-xl px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition"
               >
                 Delete Folder
@@ -665,6 +663,20 @@ export function AddQuestionModal({
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => {
+          setDeleteConfirmOpen(false);
+          if (onDeleteFolder) onDeleteFolder();
+        }}
+        title="Delete Folder"
+        message="Are you sure you want to delete this folder/exam? This action cannot be undone and will delete all associated data."
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        isDestructive={true}
+      />
     </div>
   );
 }
