@@ -26,9 +26,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [loading, setLoading] = useState(true);
   const [startTime, setStartTime] = useState(Date.now());
-  const [tabSwitchCount, setTabSwitchCount] = useState(0);
-  const [isFocused, setIsFocused] = useState(true);
-  const [proctoringViolations, setProctoringViolations] = useState<string[]>([]);
   const [activeSubject, setActiveSubject] = useState<string>('All');
   
   // New States
@@ -46,28 +43,18 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     loadExamData();
   }, [examId, canAccessTests, authLoading, navigate]);
 
-  // Proctoring & Auto Submit
+  // Auto Submit
   useEffect(() => {
     if (!hasStarted) return;
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setTabSwitchCount(prev => prev + 1);
-        setIsFocused(false);
-      } else {
-        setIsFocused(true);
-      }
-    };
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
       // Auto Submit if they unmount without submitting and timer had started
@@ -140,12 +127,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     if (!profile?.id || !exam || isSubmitting) return;
     setIsSubmitting(true);
 
-    // Check for proctoring violations
-    if (tabSwitchCount > 0 && exam.proctoring_enabled) { 
-      const violationMessage = `Warning: You switched tabs ${tabSwitchCount} time(s) during the exam.`;
-      proctoringViolations.push(violationMessage);
-      setProctoringViolations([...proctoringViolations]);
-    }
+    setIsSubmitting(true);
     
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
     
@@ -184,18 +166,18 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
         answers: questions.map((question) => {
           const selectedOption = answers[question.id];
           return {
-            questionId: question.id,
+            questionId: question.id || '',
             selectedOption: selectedOption ?? -1,
-            correctOption: question.correct_index,
+            correctOption: question.correct_index ?? 0,
             is_correct: selectedOption === question.correct_index,
             skipped: selectedOption === undefined,
-            question_text: question.question_text,
-            question_image_url: question.image_url,
-            option_text: question.options,
-            option_images: question.option_images,
-            option_label_style: question.option_label_style,
-            subject: question.subject,
-            marks: question.marks,
+            question_text: question.question_text || '',
+            question_image_url: question.image_url || null,
+            option_text: question.options || [],
+            option_images: question.option_images || null,
+            option_label_style: question.option_label_style || 'alphabet',
+            subject: question.subject || 'Unspecified',
+            marks: question.marks || 1,
             negative_marks: question.negative_marks ?? exam.negative_marking ?? 0,
           };
         }),
@@ -204,11 +186,10 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
         correct_answers: correctAnswers,
         time_taken_seconds: timeTaken,
         started_at: new Date(startTime).toISOString(),
-        tab_switches: tabSwitchCount,
         device_info: {
-          type: /Mobi|Android|iPhone|iPad/i.test(window.navigator.userAgent) ? 'mobile' : 'desktop',
-          browser: window.navigator.userAgent,
-          os: window.navigator.platform,
+          type: /Mobi|Android|iPhone|iPad/i.test(window?.navigator?.userAgent || '') ? 'mobile' : 'desktop',
+          browser: window?.navigator?.userAgent || 'unknown_browser',
+          os: window?.navigator?.platform || 'unknown_os',
         },
         subject_wise_scores: subjectWiseScores,
       });
@@ -300,16 +281,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
 
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
-      {/* Proctoring Warning */}
-      {tabSwitchCount > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-5 h-5" />
-            <span className="font-medium">Proctoring Alert: You have switched tabs {tabSwitchCount} time(s) during this exam.</span>
-            <span className="text-sm text-yellow-600">This may be considered a violation of exam rules.</span>
-          </div>
-        </div>
-      )}
 
       {/* Header */}
       <header className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b flex-shrink-0 z-10`}>
@@ -522,8 +493,8 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                         : answers[question.id] !== undefined
                         ? 'bg-green-600 text-white'
                         : isDark
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        ? 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
+                        : 'bg-white text-gray-700 border-2 border-gray-200 shadow-sm hover:bg-gray-50'
                     }`}
                   >
                     {index + 1}
@@ -537,7 +508,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                   <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Answered ({Object.keys(answers).length})</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
+                  <div className={`w-4 h-4 rounded border-2 ${isDark ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}></div>
                   <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Not Answered ({questions.length - Object.keys(answers).length})</span>
                 </div>
               </div>

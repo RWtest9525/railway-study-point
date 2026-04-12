@@ -54,7 +54,6 @@ export interface Exam {
   schedule_date?: string;
   schedule_time?: string;
   auto_submit?: boolean;
-  proctoring_enabled?: boolean;
   result_declaration_date?: string;
   instructions?: string;
   attempt_limits?: number; // 1, 2, unlimited (-1)
@@ -115,14 +114,14 @@ export interface QuizAttempt {
     is_correct?: boolean;
     time_spent_seconds?: number;
     skipped?: boolean;
-    question_text?: string;
-    question_image_url?: string;
-    option_text?: string[];
-    option_images?: string[];
-    option_label_style?: 'alphabet' | 'numeric';
-    subject?: string;
-    marks?: number;
-    negative_marks?: number;
+    question_text?: string | null;
+    question_image_url?: string | null;
+    option_text?: string[] | null;
+    option_images?: string[] | null;
+    option_label_style?: 'alphabet' | 'numeric' | null;
+    subject?: string | null;
+    marks?: number | null;
+    negative_marks?: number | null;
   }[];
   score: number;
   total_questions: number;
@@ -137,8 +136,6 @@ export interface QuizAttempt {
     os: string;
   };
   ip_address?: string;
-  tab_switches?: number;
-  is_flagged?: boolean;
   status?: 'in_progress' | 'completed' | 'paused';
 }
 
@@ -251,18 +248,6 @@ export interface UserProfile {
   created_at?: string;
   updated_at?: string;
   avatarUrl?: string;
-}
-
-export interface ProctoringLog {
-  id: string;
-  attempt_id: string;
-  user_id: string;
-  device_info: any;
-  ip_address: string;
-  events: Array<{ type: string; timestamp: string; details?: any }>;
-  tab_switch_count: number;
-  violation_count: number;
-  created_at: string;
 }
 
 export interface CategoryNode {

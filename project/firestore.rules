@@ -1,0 +1,145 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------
+    // Helper Functions
+    // ---------------------------------------------------------
+    
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the user is accessing their own document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if the user has an admin role
+    // This looks up the user's profile document to verify their role
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+
+    // ---------------------------------------------------------
+    // User Profiles
+    // ---------------------------------------------------------
+    match /profiles/{userId} {
+      // Users can read their own profile, admins can read all
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Allow profile creation during sign-up
+      allow create: if isOwner(userId);
+      
+      // Allow users to update their own profile, admins can update any
+      allow update: if isOwner(userId) || isAdmin();
+      
+      // Only admins can delete profiles
+      allow delete: if isAdmin();
+    }
+
+
+    // ---------------------------------------------------------
+    // System & Security (Highly Restricted)
+    // ---------------------------------------------------------
+    match /system/{docId} {
+      // ONLY admins can access or modify system configurations
+      allow read, write: if isAdmin();
+    }
+
+
+    // ---------------------------------------------------------
+    // Content: Categories, Exams, & Questions
+    // ---------------------------------------------------------
+    match /categories/{categoryId} {
+      allow read: if true; 
+      allow write: if isAdmin();
+    }
+
+    match /category_nodes/{nodeId} {
+      allow read: if true; 
+      allow write: if isAdmin();
+    }
+
+    match /category_links/{linkId} {
+      allow read: if true; 
+      allow write: if isAdmin();
+    }
+
+    match /exams/{examId} {
+      // Students need to read exams to see details, Admins can do everything
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /questions/{questionId} {
+      // Students need to read questions while taking an exam
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+
+    // ---------------------------------------------------------
+    // User Exam Attempts
+    // ---------------------------------------------------------
+    match /attempts/{attemptId} {
+      // Users can only read their own attempts
+      allow read: if isOwner(resource.data.user_id) || isAdmin();
+      
+      // Only allow creation if the user_id matches the submitter
+      allow create: if isOwner(request.resource.data.user_id) && isAuthenticated();
+      
+      // Usually users don't update attempts (they are appended once), but admins can
+      allow update, delete: if isAdmin();
+    }
+
+
+    // ---------------------------------------------------------
+    // Support Queries
+    // ---------------------------------------------------------
+    match /support_queries/{queryId} {
+      allow read: if isOwner(resource.data.user_id) || isAdmin();
+      
+      // Users can submit a query
+      allow create: if isOwner(request.resource.data.user_id);
+      
+      // Only admins can update the status or delete
+      allow update, delete: if isAdmin();
+    }
+
+
+    // ---------------------------------------------------------
+    // Notifications
+    // ---------------------------------------------------------
+    match /notifications/{notifId} {
+      // Users can read and update (mark as read) their own notifications
+      allow read: if isOwner(resource.data.user_id) || isAdmin();
+      allow update: if isOwner(resource.data.user_id) || isAdmin();
+      
+      // Only admins can dispatch notifications
+      allow create, delete: if isAdmin();
+    }
+
+
+    // ---------------------------------------------------------
+    // Transactions & Revenue
+    // ---------------------------------------------------------
+    match /transactions/{transactionId} {
+      allow read: if isOwner(resource.data.user_id) || isAdmin();
+      
+      // Typically admins or backend functions write to this
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // Default Deny
+    // ---------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

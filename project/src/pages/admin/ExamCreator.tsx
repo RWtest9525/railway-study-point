@@ -30,7 +30,6 @@ export function ExamCreator() {
     schedule_date: '',
     schedule_time: '',
     auto_submit: true,
-    proctoring_enabled: false,
     instructions: '',
     attempt_limits: 1,
     partial_marking: false,
@@ -105,7 +104,6 @@ export function ExamCreator() {
       schedule_date: '',
       schedule_time: '',
       auto_submit: true,
-      proctoring_enabled: false,
       instructions: '',
       attempt_limits: 1,
       partial_marking: false,
@@ -179,7 +177,6 @@ export function ExamCreator() {
       schedule_date: exam.schedule_date || '',
       schedule_time: exam.schedule_time || '',
       auto_submit: exam.auto_submit ?? true,
-      proctoring_enabled: exam.proctoring_enabled ?? false,
       instructions: exam.instructions || '',
       attempt_limits: exam.attempt_limits || 1,
       partial_marking: exam.partial_marking ?? false,
@@ -254,7 +251,6 @@ export function ExamCreator() {
                 <div className="flex items-center gap-2"><Clock className="h-4 w-4" /> {exam.duration_minutes} minutes • {exam.total_marks} marks</div>
                 {exam.schedule_date && <div>Scheduled: {formatDate(exam.schedule_date)} {exam.schedule_time ? `at ${exam.schedule_time}` : ''}</div>}
                 {exam.negative_marking ? <div>Negative marking: -{exam.negative_marking}</div> : <div>No negative marking</div>}
-                {exam.proctoring_enabled && <div className="flex items-center gap-2 text-red-500"><Shield className="h-4 w-4" /> Proctoring enabled</div>}
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-3">
@@ -372,7 +368,6 @@ export function ExamCreator() {
                   <h4 className={`mb-3 font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Access</h4>
                   <div className="space-y-3 text-sm">
                     {[
-                      ['proctoring_enabled', 'Enable proctoring'],
                       ['is_private', 'Private exam'],
                       ['is_active', 'Visible to students'],
                     ].map(([key, label]) => (
