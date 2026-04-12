@@ -241,7 +241,6 @@ export function Leaderboard() {
                 </div>
               </div>
             </div>
-            </div>
 
             {/* Rest of the leaderboard (4th place onwards) */}
             {rows.length > 3 && (
