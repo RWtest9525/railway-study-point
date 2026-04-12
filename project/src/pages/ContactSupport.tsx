@@ -5,6 +5,7 @@ import { MessageSquare, PhoneCall, Clock, User as UserIcon, ArrowLeft } from 'lu
 import { getDocs, collection, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { createSupportQuery } from '../lib/firestore';
+import { formatDate } from '../lib/dateUtils';
 import { BottomNav } from '../components/BottomNav';
 
 interface SupportQuery {
@@ -18,6 +19,22 @@ interface SupportQuery {
 
 export function ContactSupport() {
   const { profile, effectiveRole } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
+  const [method, setMethod] = useState<'chat' | 'call' | null>(null);
+  const [topic, setTopic] = useState('');
+  const [message, setMessage] = useState('');
+  const [phone, setPhone] = useState('');
+  const [preferredTime, setPreferredTime] = useState('');
+  
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [error, setError] = useState('');
+
+  const [items, setItems] = useState<SupportQuery[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   
   const TOPICS = [
     ...(effectiveRole === 'banned' ? ['Unban Request'] : []),
@@ -201,22 +218,19 @@ export function ContactSupport() {
 
               <div>
                 <label className={`block text-xs font-bold uppercase tracking-widest mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Select Topic</label>
-                <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className={`w-full px-4 py-3.5 rounded-xl border appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold transition ${
+                    isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'
+                  }`}
+                  required
+                >
+                  <option value="" disabled>Select a topic...</option>
                   {TOPICS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTopic(t)}
-                      className={`px-3 py-2 rounded-lg text-xs font-medium border transition ${
-                        topic === t 
-                          ? 'bg-blue-600 border-blue-500 text-white' 
-                          : (isDark ? 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500' : 'bg-gray-100 border-gray-200 text-gray-700 hover:border-gray-400')
-                      }`}
-                    >
-                      {t}
-                    </button>
+                    <option key={t} value={t}>{t}</option>
                   ))}
-                </div>
+                </select>
               </div>
 
               <div>
@@ -298,10 +312,22 @@ export function ContactSupport() {
               </p>
             </form>
           )}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Your Requests History</h2>
-          <div className={`h-px flex-1 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} mx-4`} />
-        </div>
+
+        {!method && (
+          <div className="animate-in fade-in py-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Your Requests History</h2>
+              <div className={`h-px flex-1 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} mx-4 hidden sm:block`} />
+              {items.length > 5 && !showAllHistory && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllHistory(true)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition ${isDark ? 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white hover:bg-gray-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                >
+                  See All
+                </button>
+              )}
+            </div>
 
         {listLoading ? (
           <div className="flex justify-center py-8">
@@ -313,7 +339,7 @@ export function ContactSupport() {
           </div>
         ) : (
           <div className="space-y-4">
-            {items.map((q) => (
+            {(showAllHistory ? items : items.slice(0, 5)).map((q) => (
               <div
                 key={q.id}
                 className={`${isDark ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-gray-200 hover:border-gray-300'} rounded-2xl border p-5 transition`}
@@ -321,7 +347,7 @@ export function ContactSupport() {
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex flex-col">
                     <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-[10px] uppercase tracking-widest font-bold`}>
-                      {new Date(q.created_at).toLocaleDateString()} at {new Date(q.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatDate(q.created_at)}
                     </span>
                     <span className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${
                       q.status === 'pending' ? 'text-amber-400' : 
@@ -357,6 +383,8 @@ export function ContactSupport() {
                 )}
               </div>
             ))}
+          </div>
+        )}
           </div>
         )}
         </main>

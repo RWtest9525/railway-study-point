@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Check, Clock, MessageSquare, Search, X, LucideIcon } from 'lucide-react';
+import { Check, Clock, MessageSquare, Search, X, LucideIcon, ArrowUpDown } from 'lucide-react';
 import { getUsers, UserProfile } from '../../lib/firestore';
+import { formatDate } from '../../lib/dateUtils';
 
 interface SupportQuery {
   id: string;
@@ -24,9 +25,44 @@ export function SupportInbox() {
   const [selectedQuery, setSelectedQuery] = useState<SupportQuery | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'closed'>('all');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   useEffect(() => {
-    void loadQueries();
+    void fetchUsersOnce();
+  }, []);
+
+  const fetchUsersOnce = async () => {
+    try {
+      const users = await getUsers();
+      setProfiles(users);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    const q = query(collection(db, 'support_queries'), orderBy('created_at', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const supportQueries = snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as SupportQuery));
+      setQueries(supportQueries);
+      setLoading(false);
+      
+      // Auto-select if nothing is selected yet
+      setSelectedQuery(current => {
+        if (!current && supportQueries.length > 0) return supportQueries[0];
+        // If currently selected query was updated, update its content
+        if (current) {
+          const updated = supportQueries.find(q => q.id === current.id);
+          if (updated) return updated;
+        }
+        return current;
+      });
+    }, (error) => {
+      console.error('Error loading support queries:', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const profileById = useMemo(() => new Map(profiles.map((profile) => [profile.id, profile])), [profiles]);
@@ -37,29 +73,25 @@ export function SupportInbox() {
       result = result.filter(q => q.status === statusFilter);
     }
     const value = search.toLowerCase().trim();
-    if (!value) return result;
-    return result.filter((query) => {
-      const user = profileById.get(query.user_id);
-      return `${query.subject} ${query.message} ${user?.full_name || ''} ${user?.email || ''}`.toLowerCase().includes(value);
-    });
-  }, [queries, search, profileById, statusFilter]);
-
-  const loadQueries = async () => {
-    try {
-      const [snapshot, users] = await Promise.all([
-        getDocs(query(collection(db, 'support_queries'), orderBy('created_at', 'desc'))),
-        getUsers(),
-      ]);
-      const supportQueries = snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as SupportQuery));
-      setQueries(supportQueries);
-      setProfiles(users);
-      if (!selectedQuery && supportQueries[0]) setSelectedQuery(supportQueries[0]);
-    } catch (error) {
-      console.error('Error loading support queries:', error);
-    } finally {
-      setLoading(false);
+    
+    // Search
+    if (value) {
+      result = result.filter((query) => {
+        const user = profileById.get(query.user_id);
+        return `${query.subject} ${query.message} ${user?.full_name || ''} ${user?.email || ''}`.toLowerCase().includes(value);
+      });
     }
-  };
+
+    // Sort
+    result.sort((a, b) => {
+      const timeA = a.created_at?.seconds ? a.created_at.seconds : new Date(a.created_at).getTime();
+      const timeB = b.created_at?.seconds ? b.created_at.seconds : new Date(b.created_at).getTime();
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
+
+    return result;
+  }, [queries, search, profileById, statusFilter, sortOrder]);
+
 
   const updateStatus = async (queryId: string, status: 'pending' | 'resolved' | 'closed') => {
     try {
@@ -67,7 +99,7 @@ export function SupportInbox() {
         status,
         updated_at: new Date().toISOString(),
       });
-      await loadQueries();
+      // onSnapshot overrides it so we don't need loadQueries()
     } catch (error) {
       console.error('Error updating status:', error);
     }
@@ -99,33 +131,27 @@ export function SupportInbox() {
 
       <div className="flex flex-wrap items-center gap-3 mb-8">
         {([
-          { label: 'All', value: queries.length, icon: MessageSquare, tone: 'blue', id: 'all' },
-          { label: 'Pending', value: queries.filter((q) => q.status === 'pending').length, icon: Clock, tone: 'yellow', id: 'pending' },
-          { label: 'Resolved', value: queries.filter((q) => q.status === 'resolved').length, icon: Check, tone: 'green', id: 'resolved' },
-          { label: 'Closed', value: queries.filter((q) => q.status === 'closed').length, icon: X, tone: 'slate', id: 'closed' },
-        ] as Array<{ label: string; value: number; icon: LucideIcon; tone: string; id: any }>).map(({ label, value, icon: Icon, tone, id }) => {
-          
-          let colorProps = '';
-          if (tone === 'blue') colorProps = isDark ? 'text-blue-400 bg-blue-400/10' : 'text-blue-600 bg-blue-100';
-          if (tone === 'yellow') colorProps = isDark ? 'text-amber-400 bg-amber-400/10' : 'text-amber-600 bg-amber-100';
-          if (tone === 'green') colorProps = isDark ? 'text-green-400 bg-green-400/10' : 'text-green-600 bg-green-100';
-          if (tone === 'slate') colorProps = isDark ? 'text-slate-400 bg-slate-400/10' : 'text-slate-600 bg-slate-100';
-
+          { label: 'All', value: queries.length, icon: MessageSquare, id: 'all' },
+          { label: 'Pending', value: queries.filter((q) => q.status === 'pending').length, icon: Clock, id: 'pending' },
+          { label: 'Resolved', value: queries.filter((q) => q.status === 'resolved').length, icon: Check, id: 'resolved' },
+          { label: 'Closed', value: queries.filter((q) => q.status === 'closed').length, icon: X, id: 'closed' },
+        ] as Array<{ label: string; value: number; icon: LucideIcon; id: any }>).map(({ label, value, icon: Icon, id }) => {
+          const isActive = statusFilter === id;
           return (
             <button 
               key={label} 
               onClick={() => setStatusFilter(id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all active:scale-95 ${
-                statusFilter === id 
-                  ? (isDark ? 'bg-gray-800 border-gray-600 shadow-md' : 'bg-white border-gray-300 shadow-sm') 
-                  : (isDark ? 'bg-transparent border-transparent hover:bg-gray-800/50' : 'bg-transparent border-transparent hover:bg-gray-200/50')
+              className={`flex items-center gap-2.5 px-5 py-2.5 rounded-full border transition-all duration-200 active:scale-95 shadow-sm ${
+                isActive 
+                  ? 'bg-blue-600 border-blue-600 text-white shadow-blue-500/20 shadow-lg' 
+                  : isDark ? 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500 hover:bg-gray-700' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
-              <div className={`p-1.5 rounded-lg ${colorProps}`}>
-                <Icon className="w-4 h-4" />
-              </div>
-              <span className={`font-bold text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{label}</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-black ${colorProps}`}>
+              <Icon className={`w-4 h-4 ${isActive ? 'opacity-100' : 'opacity-60'}`} />
+              <span className="font-bold text-sm">{label}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                isActive ? 'bg-white/20 text-white' : isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500'
+              }`}>
                 {value}
               </span>
             </button>
@@ -136,8 +162,17 @@ export function SupportInbox() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
         <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border overflow-hidden shadow-sm`}>
           <div className={`border-b px-6 py-4 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>All Tickets</h2>
-            <label className="relative mt-3 block">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>All Tickets</h2>
+              <button
+                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition hover:bg-opacity-50 ${isDark ? 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                <ArrowUpDown className="w-3 h-3" />
+                {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
+              </button>
+            </div>
+            <label className="relative block">
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={search}
@@ -154,20 +189,33 @@ export function SupportInbox() {
                 <button
                   key={item.id}
                   onClick={() => setSelectedQuery(item)}
-                  className={`w-full border-b p-4 text-left transition ${
+                  className={`w-full border-b p-5 text-left transition ${
                     isDark ? 'border-gray-700 hover:bg-gray-700/50' : 'border-gray-200 hover:bg-gray-50'
                   } ${selectedQuery?.id === item.id ? (isDark ? 'bg-gray-700' : 'bg-blue-50') : ''}`}
                 >
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.subject}</span>
-                    {getStatusBadge(item.status)}
+                  <div className="flex gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 shrink-0 border mt-1">
+                      {user?.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-500 bg-gray-100">
+                          {user?.full_name?.charAt(0).toUpperCase() || '?'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className={`font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.subject}</span>
+                        {getStatusBadge(item.status)}
+                      </div>
+                      <div className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {user?.full_name || 'Unknown user'} • {formatDate(item.created_at)}
+                      </div>
+                      <p className={`mt-2 text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                        {item.message.replace(`[Topic: ${item.subject}]`, '').trim().substring(0, 80)}...
+                      </p>
+                    </div>
                   </div>
-                  <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {user?.full_name || 'Unknown user'} • {user?.email || item.user_id}
-                  </div>
-                  <p className={`mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {item.message.substring(0, 80)}...
-                  </p>
                 </button>
               );
             })}
@@ -182,26 +230,65 @@ export function SupportInbox() {
                 return (
                   <>
                     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h2 className={`mb-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                          {selectedQuery.subject}
-                        </h2>
-                        <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {user?.full_name || 'Unknown user'} • {user?.email || selectedQuery.user_id}
-                          {user?.phone ? ` • ${user.phone}` : ''}
+                      <div className="flex items-start gap-4">
+                        <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 border-2 shadow-sm border-white shrink-0 hidden sm:block">
+                          {user?.avatarUrl ? (
+                            <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xl font-bold text-gray-500 bg-gray-100">
+                              {user?.full_name?.charAt(0).toUpperCase() || '?'}
+                            </div>
+                          )}
                         </div>
-                        <div className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                          {new Date(selectedQuery.created_at).toLocaleString()}
+                        <div>
+                          <h2 className={`mb-1 text-2xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {selectedQuery.subject}
+                          </h2>
+                          <div className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {user?.full_name || 'Unknown user'} • {user?.email || selectedQuery.user_id}
+                            {user?.phone ? ` • ${user.phone}` : ''}
+                          </div>
+                          <div className={`mt-1.5 text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                            Submitted: {formatDate(selectedQuery.created_at)}
+                          </div>
                         </div>
                       </div>
                       {getStatusBadge(selectedQuery.status)}
                     </div>
 
-                    <div className={`mb-6 rounded-2xl p-5 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
-                      <p className={`${isDark ? 'text-gray-200' : 'text-gray-700'} leading-7`}>
-                        {selectedQuery.message}
-                      </p>
-                    </div>
+                    {selectedQuery.message.startsWith('[CALL') ? (
+                      <div className={`mb-6 rounded-2xl p-6 ${isDark ? 'bg-amber-900/10 border border-amber-800/30' : 'bg-amber-50 border border-amber-200'} shadow-sm`}>
+                        <h3 className={`font-bold mb-4 flex items-center gap-2 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                          <Clock className="w-5 h-5" /> Phone Callback Requested
+                        </h3>
+                        {(() => {
+                           // Example: "[CALL REQUEST] Phone: 9525182488 | Preferred Time: Morning (10 AM - 12 PM)"
+                           // We will parse it out softly.
+                           const parts = selectedQuery.message.split('|');
+                           const phonePart = parts[0]?.replace('[CALL REQUEST] Phone:', '').trim() || 'N/A';
+                           const timePart = parts[1]?.replace('Preferred Time:', '').trim() || 'N/A';
+                           
+                           return (
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                               <div className={`p-4 rounded-xl ${isDark ? 'bg-gray-800/80 border border-gray-700' : 'bg-white border border-gray-100'}`}>
+                                 <span className={`block text-xs uppercase font-extrabold tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'} mb-1`}>Callback Number</span>
+                                 <span className={`text-lg font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>{phonePart}</span>
+                               </div>
+                               <div className={`p-4 rounded-xl ${isDark ? 'bg-gray-800/80 border border-gray-700' : 'bg-white border border-gray-100'}`}>
+                                 <span className={`block text-xs uppercase font-extrabold tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'} mb-1`}>Preferred Window</span>
+                                 <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{timePart}</span>
+                               </div>
+                             </div>
+                           )
+                        })()}
+                      </div>
+                    ) : (
+                      <div className={`mb-6 rounded-2xl p-5 sm:p-6 ${isDark ? 'bg-gray-900/80 border border-gray-800' : 'bg-gray-50 border border-gray-100'}`}>
+                        <p className={`${isDark ? 'text-gray-200' : 'text-gray-700'} leading-relaxed whitespace-pre-wrap`}>
+                          {selectedQuery.message.replace(`[Topic: ${selectedQuery.subject}]`, '').trim()}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap gap-3">
                       {selectedQuery.status !== 'resolved' && (
