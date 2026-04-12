@@ -113,7 +113,7 @@ export function SupportInbox() {
     });
 
     return result;
-  }, [queries, search, profileById, statusFilter, sortOrder]);
+  }, [queries, search, profileById, statusFilter, sortOrder, typeFilter]);
 
 
   const updateStatus = async (queryId: string, status: 'pending' | 'resolved' | 'closed') => {

@@ -57,7 +57,7 @@ let loginSessionStart: Date | null = null;
 
 // Helper function to determine effective role
 const getEffectiveRole = (profile: Profile | null, userEmail?: string): 'admin' | 'student' | 'banned' => {
-  if (profile?.ban_reason || profile?.role === 'banned') return 'banned';
+  if (profile?.ban_reason) return 'banned';
   
   // Check if user email is in admin list (for initial setup)
   const adminEmails = ['admin@railwaystudy.com', 'admin@test.com', 'yashvishal647@gmail.com', 'saichauhan239@gmail.com'];
