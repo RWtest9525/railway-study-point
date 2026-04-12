@@ -86,16 +86,17 @@ export function Results({ resultId }: ResultsProps) {
   const wrongCount = attempt.total_questions - correctCount - skippedCount;
   const userAnswers = attempt.answers;
 
-  // Subject-wise analysis
+  // Subject-wise analysis (Case Insensitive)
   const subjectAnalysis: { [subject: string]: { correct: number; total: number; percentage: number } } = {};
   questions.forEach(q => {
-    if (!subjectAnalysis[q.subject]) {
-      subjectAnalysis[q.subject] = { correct: 0, total: 0, percentage: 0 };
+    const subjectName = q.subject?.toLowerCase() || 'unspecified';
+    if (!subjectAnalysis[subjectName]) {
+      subjectAnalysis[subjectName] = { correct: 0, total: 0, percentage: 0 };
     }
-    subjectAnalysis[q.subject].total++;
+    subjectAnalysis[subjectName].total++;
     const userAnswer = userAnswers.find(a => a.questionId === q.id);
     if (userAnswer && userAnswer.selectedOption === q.correct_index) {
-      subjectAnalysis[q.subject].correct++;
+      subjectAnalysis[subjectName].correct++;
     }
   });
   Object.values(subjectAnalysis).forEach(s => {
@@ -116,7 +117,7 @@ export function Results({ resultId }: ResultsProps) {
       <header className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white border-gray-200'} sticky top-0 z-50 backdrop-blur-md border-b`}>
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-4">
           <button 
-            onClick={() => window.history.back()}
+            onClick={() => navigate('/dashboard')}
             className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
           >
             <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
@@ -247,7 +248,7 @@ export function Results({ resultId }: ResultsProps) {
               {Object.entries(subjectAnalysis).map(([subject, stats]) => (
                 <div key={subject}>
                   <div className="flex justify-between items-center mb-2">
-                    <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{subject}</span>
+                    <span className={`font-medium capitalize ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{subject}</span>
                     <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                       {stats.correct}/{stats.total} ({stats.percentage.toFixed(0)}%)
                     </span>

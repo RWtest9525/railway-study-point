@@ -431,7 +431,7 @@ export function QuestionHub() {
                 <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
                   {pageBadge}
                 </div>
-                <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle}</h1>
+                <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle === 'Category' ? 'Category / Folders Setup' : pageTitle}</h1>
                 <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{helperText}</p>
                 {path.length > 0 && !isCurrentPageTest && (
                   <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">

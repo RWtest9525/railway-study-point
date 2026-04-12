@@ -70,12 +70,13 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
-      // Auto Submit if they unmount without submitting
-      if (timeRemaining > 0 && !isSubmitting) {
+      // Auto Submit if they unmount without submitting and timer had started
+      if (timeRemaining > 0 && !isSubmitting && hasStarted) {
+        // Warning: React strict mode might trigger this twice in dev. Handled by isSubmitting state locking.
         handleSubmit();
       }
     };
-  }, [hasStarted]);
+  }, [hasStarted, timeRemaining, isSubmitting, exam]);
 
   useEffect(() => {
     if (hasStarted && timeRemaining > 0) {
@@ -140,8 +141,8 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     setIsSubmitting(true);
 
     // Check for proctoring violations
-    if (tabSwitchCount > 0 && false) { // suppress annoyances temporarily for auto submit
-      const violationMessage = `Warning: You switched tabs ${tabSwitchCount} time(s) during the exam. This may be considered a violation of exam rules.`;
+    if (tabSwitchCount > 0 && exam.proctoring_enabled) { 
+      const violationMessage = `Warning: You switched tabs ${tabSwitchCount} time(s) during the exam.`;
       proctoringViolations.push(violationMessage);
       setProctoringViolations([...proctoringViolations]);
     }
@@ -165,12 +166,14 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
         score -= question.negative_marks ?? exam.negative_marking ?? 0;
       }
       
-      if (!subjectWiseScores[question.subject]) {
-        subjectWiseScores[question.subject] = { correct: 0, total: 0 };
+      // Case insensitive normalization for subject
+      const subjectName = question.subject?.toLowerCase() || 'unspecified';
+      if (!subjectWiseScores[subjectName]) {
+        subjectWiseScores[subjectName] = { correct: 0, total: 0 };
       }
-      subjectWiseScores[question.subject].total++;
+      subjectWiseScores[subjectName].total++;
       if (isCorrect) {
-        subjectWiseScores[question.subject].correct++;
+        subjectWiseScores[subjectName].correct++;
       }
     });
 
@@ -203,7 +206,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
         started_at: new Date(startTime).toISOString(),
         tab_switches: tabSwitchCount,
         device_info: {
-          type: /Mobi|Android/i.test(window.navigator.userAgent) ? 'mobile' : 'desktop',
+          type: /Mobi|Android|iPhone|iPad/i.test(window.navigator.userAgent) ? 'mobile' : 'desktop',
           browser: window.navigator.userAgent,
           os: window.navigator.platform,
         },
@@ -315,7 +318,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => {
-                  if (window.confirm('Are you sure you want to exit? Your exam will be submitted.')) {
+                  if (window.confirm('Are you sure you want to exit? Your exam will be submitted and you cannot resume.')) {
                     handleSubmit();
                   }
                 }}

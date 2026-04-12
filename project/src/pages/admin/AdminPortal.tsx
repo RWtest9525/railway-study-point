@@ -54,8 +54,8 @@ export function AdminPortal() {
 
   const mainTabs = [
     { id: 'dashboard' as const, name: 'Dashboard', icon: BarChart3, desc: 'Analytics & Overview' },
-    { id: 'questions' as const, name: 'Questions', icon: FileText, desc: 'Manage Question Bank' },
-    { id: 'exams' as const, name: 'Exams', icon: PlusCircle, desc: 'Create & Edit Exams' },
+    { id: 'questions' as const, name: 'Category / Folders', icon: FileText, desc: 'Manage Question Banks & Practice Tests' },
+    { id: 'exams' as const, name: 'Mock Exams', icon: PlusCircle, desc: 'Create Scheduled & Timed Exams' },
     { id: 'notifications' as const, name: 'Notifications', icon: MessageSquare, desc: 'Send User Updates' },
     { id: 'support' as const, name: 'Support', icon: MessageSquare, desc: 'Student Help Tickets' },
   ];
