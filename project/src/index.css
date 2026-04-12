@@ -41,3 +41,8 @@
   to { width: 0%; left: 0; right: auto; }
 }
 
+/* Ensure the time picker clock icon is visible in dark mode */
+.css-invert-time-icon::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}

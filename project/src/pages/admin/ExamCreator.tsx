@@ -309,8 +309,29 @@ export function ExamCreator() {
 
               <div className="grid gap-4 md:grid-cols-4">
                 <label className="block">
-                  <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Duration</span>
-                  <input type="number" value={formData.duration_minutes} onChange={(e) => setFormData((prev) => ({ ...prev, duration_minutes: Number(e.target.value) }))} className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
+                  <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Duration (HH:MM:SS)</span>
+                  <input 
+                    type="time" 
+                    step="1"
+                    value={(() => {
+                      const totalMins = formData.duration_minutes || 0;
+                      const h = Math.floor(totalMins / 60);
+                      const m = Math.floor(totalMins % 60);
+                      const s = Math.round((totalMins % 1) * 60);
+                      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                    })()} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setFormData((prev) => ({ ...prev, duration_minutes: 0 }));
+                        return;
+                      }
+                      const [hours, minutes, seconds] = val.split(':').map(Number);
+                      const totalMinutes = (hours || 0) * 60 + (minutes || 0) + ((seconds || 0) / 60);
+                      setFormData((prev) => ({ ...prev, duration_minutes: totalMinutes }));
+                    }} 
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm flex items-center justify-between ${isDark ? 'border-gray-700 bg-gray-900 text-white css-invert-time-icon' : 'border-gray-300 bg-white text-gray-900'}`} 
+                  />
                 </label>
                 <label className="block">
                   <span className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Total marks</span>
