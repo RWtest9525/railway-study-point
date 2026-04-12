@@ -16,15 +16,16 @@ interface SupportQuery {
   created_at: string;
 }
 
-const TOPICS = [
-  'Account issue',
-  'Premium related issue',
-  'Test related',
-  'Another issue'
-];
-
 export function ContactSupport() {
-  const { profile } = useAuth();
+  const { profile, effectiveRole } = useAuth();
+  
+  const TOPICS = [
+    ...(effectiveRole === 'banned' ? ['Unban Request'] : []),
+    'Account issue',
+    'Premium related issue',
+    'Test related',
+    'Another issue'
+  ];
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [method, setMethod] = useState<'chat' | 'call' | null>(null);
@@ -137,6 +138,15 @@ export function ContactSupport() {
             <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Help & Support</h1>
           </div>
           
+          {effectiveRole === 'banned' && (
+            <div className={`mb-6 p-4 rounded-xl text-sm font-semibold border ${isDark ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-red-50 text-red-600 border-red-200'} flex items-start gap-3`}>
+              <div className="mt-0.5">⚠️</div>
+              <div>
+                Your account is currently suspended. You can use this form to submit an unban request or explanation. Our administration will review it.
+              </div>
+            </div>
+          )}
+
           <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mb-8`}>
             Choose how you'd like to get assistance from our team.
           </p>
