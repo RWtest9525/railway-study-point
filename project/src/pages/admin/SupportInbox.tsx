@@ -12,8 +12,8 @@ interface SupportQuery {
   subject: string;
   message: string;
   status: 'pending' | 'resolved' | 'closed';
-  created_at: string;
-  updated_at: string;
+  created_at: any;
+  updated_at: any;
 }
 
 export function SupportInbox() {
@@ -24,7 +24,8 @@ export function SupportInbox() {
   const [loading, setLoading] = useState(true);
   const [selectedQuery, setSelectedQuery] = useState<SupportQuery | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'closed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'chat' | 'call'>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   useEffect(() => {
@@ -70,8 +71,22 @@ export function SupportInbox() {
   const filteredQueries = useMemo(() => {
     let result = queries;
     if (statusFilter !== 'all') {
-      result = result.filter(q => q.status === statusFilter);
+      if (statusFilter === 'resolved') {
+        result = result.filter(q => q.status === 'resolved' || q.status === 'closed');
+      } else {
+        result = result.filter(q => q.status === statusFilter);
+      }
     }
+    
+    // Type Filter
+    if (typeFilter !== 'all') {
+      if (typeFilter === 'call') {
+        result = result.filter(q => q.subject === 'Call Request' || q.message.startsWith('[CALL'));
+      } else if (typeFilter === 'chat') {
+        result = result.filter(q => q.subject !== 'Call Request' && !q.message.startsWith('[CALL'));
+      }
+    }
+
     const value = search.toLowerCase().trim();
     
     // Search
@@ -106,13 +121,12 @@ export function SupportInbox() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    const effectiveStatus = status === 'closed' ? 'resolved' : status;
+    switch (effectiveStatus) {
       case 'pending':
         return <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700"><Clock className="h-3.5 w-3.5" /> Pending</span>;
       case 'resolved':
         return <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700"><Check className="h-3.5 w-3.5" /> Resolved</span>;
-      case 'closed':
-        return <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"><X className="h-3.5 w-3.5" /> Closed</span>;
       default:
         return <span className="text-gray-400">{status}</span>;
     }
@@ -133,8 +147,7 @@ export function SupportInbox() {
         {([
           { label: 'All', value: queries.length, icon: MessageSquare, id: 'all' },
           { label: 'Pending', value: queries.filter((q) => q.status === 'pending').length, icon: Clock, id: 'pending' },
-          { label: 'Resolved', value: queries.filter((q) => q.status === 'resolved').length, icon: Check, id: 'resolved' },
-          { label: 'Closed', value: queries.filter((q) => q.status === 'closed').length, icon: X, id: 'closed' },
+          { label: 'Resolved', value: queries.filter((q) => q.status === 'resolved' || q.status === 'closed').length, icon: Check, id: 'resolved' },
         ] as Array<{ label: string; value: number; icon: LucideIcon; id: any }>).map(({ label, value, icon: Icon, id }) => {
           const isActive = statusFilter === id;
           return (
@@ -162,15 +175,26 @@ export function SupportInbox() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
         <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl border overflow-hidden shadow-sm`}>
           <div className={`border-b px-6 py-4 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
               <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>All Tickets</h2>
-              <button
-                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition hover:bg-opacity-50 ${isDark ? 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-              >
-                <ArrowUpDown className="w-3 h-3" />
-                {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border focus:outline-none transition ${isDark ? 'bg-gray-900 border-gray-700 text-gray-300' : 'bg-white border-gray-200 text-gray-600'}`}
+                >
+                  <option value="all">All Types</option>
+                  <option value="chat">Chat Requests</option>
+                  <option value="call">Call Requests</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition hover:bg-opacity-50 ${isDark ? 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                  {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
+                </button>
+              </div>
             </div>
             <label className="relative block">
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -208,12 +232,9 @@ export function SupportInbox() {
                         <span className={`font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.subject}</span>
                         {getStatusBadge(item.status)}
                       </div>
-                      <div className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <div className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                         {user?.full_name || 'Unknown user'} • {formatDate(item.created_at)}
                       </div>
-                      <p className={`mt-2 text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                        {item.message.replace(`[Topic: ${item.subject}]`, '').trim().substring(0, 80)}...
-                      </p>
                     </div>
                   </div>
                 </button>
@@ -291,20 +312,12 @@ export function SupportInbox() {
                     )}
 
                     <div className="flex flex-wrap gap-3">
-                      {selectedQuery.status !== 'resolved' && (
+                      {selectedQuery.status !== 'resolved' && selectedQuery.status !== 'closed' && (
                         <button
                           onClick={() => void updateStatus(selectedQuery.id, 'resolved')}
-                          className="rounded-2xl bg-green-600 px-4 py-3 text-sm font-semibold text-white"
+                          className="rounded-2xl bg-green-600 hover:bg-green-700 transition px-6 py-3 text-sm font-bold text-white shadow-lg shadow-green-600/20"
                         >
-                          Mark Resolved
-                        </button>
-                      )}
-                      {selectedQuery.status !== 'closed' && (
-                        <button
-                          onClick={() => void updateStatus(selectedQuery.id, 'closed')}
-                          className={`rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-700'}`}
-                        >
-                          Close Ticket
+                          Mark as Resolved
                         </button>
                       )}
                       {selectedQuery.status !== 'pending' && (

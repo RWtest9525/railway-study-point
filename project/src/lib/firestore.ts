@@ -250,6 +250,7 @@ export interface UserProfile {
   premium_until?: string | null;
   created_at?: string;
   updated_at?: string;
+  avatarUrl?: string;
 }
 
 export interface ProctoringLog {
