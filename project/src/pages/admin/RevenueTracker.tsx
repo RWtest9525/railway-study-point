@@ -128,40 +128,7 @@ export function RevenueTracker() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={async () => {
-            const pwd = window.prompt("Enter Admin security password to clear test data:");
-            if (!pwd) return;
 
-            try {
-              toast.loading("Verifying security clearance...", { id: "secCheck" });
-              const { getDoc, doc } = await import('firebase/firestore');
-              const secRef = doc(db, 'system', 'admin_security');
-              const secSnap = await getDoc(secRef);
-              
-              if (!secSnap.exists() || secSnap.data()?.clear_data_password !== pwd) {
-                toast.error("Invalid Security Password!", { id: "secCheck" });
-                return;
-              }
-              toast.success("Security verified.", { id: "secCheck" });
-
-              if (window.confirm('Are you absolute sure you want to DELETE ALL revenue transactions? This is meant for clearing test data. Cannot be undone.')) {
-                if (window.confirm('Final confirmation: Delete all transaction logs?')) {
-                  toast.loading('Deleting all transactions...', { id: "delAll" });
-                  const { deleteDoc } = await import('firebase/firestore');
-                  for (const t of transactions) {
-                    await deleteDoc(doc(db, 'transactions', t.id));
-                  }
-                  toast.success('All transactions cleared.', { id: "delAll" });
-                  loadRevenueData();
-                }
-              }
-            } catch (err) {
-              console.error(err);
-              toast.error("Failed to verify security credentials.", { id: "secCheck" });
-            }
-          }} className="inline-flex items-center gap-2 rounded-2xl bg-red-100 px-5 py-3 text-sm font-semibold text-red-700 hover:bg-red-200">
-            Clear Testing Data
-          </button>
           <button onClick={handleExportCSV} className="inline-flex items-center gap-2 rounded-2xl bg-green-600 px-5 py-3 text-sm font-semibold text-white">
             <Download className="h-4 w-4" />
             Export CSV

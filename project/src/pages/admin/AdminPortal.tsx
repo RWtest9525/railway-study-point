@@ -20,8 +20,14 @@ import {
   CreditCard, 
   Crown, 
   Activity, 
-  HardDriveDownload 
+  HardDriveDownload,
+  Trash2,
+  AlertOctagon,
+  Lock
 } from 'lucide-react';
+import { db } from '../../lib/firebase';
+import { collection, getDocs, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionHub } from './QuestionHub';
 import { ExamCreator } from './ExamCreator';
@@ -47,6 +53,9 @@ export function AdminPortal() {
     'questions' | 'exams' | 'revenue' | 'premium' | 'users' | 'support' | 'subscription' | 'leaderboard' | 'dashboard' | 'activity' | 'backup' | 'links' | 'notifications'
   >('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showClearDataModal, setShowClearDataModal] = useState(false);
+  const [clearDataPassword, setClearDataPassword] = useState('');
+  const [isClearingData, setIsClearingData] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -103,6 +112,47 @@ export function AdminPortal() {
   const handleTabClick = (tabId: typeof activeTab) => {
     setActiveTab(tabId);
     navigate(tabRouteMap[tabId]);
+  };
+
+  const handleClearData = async () => {
+    if (!clearDataPassword) {
+      toast.error('Password is required');
+      return;
+    }
+    
+    setIsClearingData(true);
+    try {
+      toast.loading("Verifying security clearance...", { id: "secCheck" });
+      const secRef = doc(db, 'system', 'admin_security');
+      const secSnap = await getDoc(secRef);
+      
+      if (!secSnap.exists() || secSnap.data()?.clear_data_password !== clearDataPassword) {
+        toast.error("Invalid Security Password!", { id: "secCheck" });
+        setIsClearingData(false);
+        return;
+      }
+      toast.success("Security verified. Starting deletion...", { id: "secCheck" });
+
+      // Delete Notifications
+      const notifs = await getDocs(collection(db, 'notifications'));
+      for (const n of notifs.docs) await deleteDoc(doc(db, 'notifications', n.id));
+
+      // Delete Support Queries
+      const supports = await getDocs(collection(db, 'support_queries'));
+      for (const s of supports.docs) await deleteDoc(doc(db, 'support_queries', s.id));
+
+      // Delete Transactions (Revenue)
+      const trans = await getDocs(collection(db, 'transactions'));
+      for (const t of trans.docs) await deleteDoc(doc(db, 'transactions', t.id));
+
+      toast.success('Successfully cleared Support, Notifications, and Revenue testing data!');
+      setShowClearDataModal(false);
+      setClearDataPassword('');
+    } catch (err) {
+      console.error(err);
+      toast.error('An error occurred while clearing data.');
+    }
+    setIsClearingData(false);
   };
 
   return (
@@ -251,10 +301,18 @@ export function AdminPortal() {
           </div>
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-red-400 hover:bg-red-400/10 rounded-lg transition"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 mt-1 text-sm font-bold text-gray-500 hover:text-white hover:bg-gray-500/50 rounded-lg transition"
           >
             <LogOut className="w-4 h-4" /> 
             {!isSidebarCollapsed && 'Sign Out'}
+          </button>
+          
+          <button
+            onClick={() => setShowClearDataModal(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 mt-2 text-[11px] font-bold text-red-500 hover:text-white hover:bg-red-600 rounded-lg transition uppercase tracking-widest border border-red-500/20"
+          >
+            <Trash2 className="w-4 h-4" /> 
+            {!isSidebarCollapsed && 'Clear Test Data'}
           </button>
         </div>
       </aside>
@@ -314,6 +372,79 @@ export function AdminPortal() {
           </div>
         </div>
       </main>
+      
+      {/* Premium Clear Data Modal */}
+      {showClearDataModal && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className={`w-full max-w-md overflow-hidden rounded-[24px] border ${theme === 'dark' ? 'border-red-900/50 bg-slate-900' : 'border-red-200 bg-white'} shadow-2xl`}>
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-red-900/30 bg-red-900/10' : 'border-red-100 bg-red-50'}`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-full ${theme === 'dark' ? 'bg-red-900/40 text-red-400' : 'bg-red-100 text-red-600'}`}>
+                  <AlertOctagon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className={`text-xl font-black ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Clear Testing Data</h3>
+                  <p className={`text-xs font-bold mt-1 uppercase tracking-wider ${theme === 'dark' ? 'text-red-400/70' : 'text-red-600/70'}`}>Irreversible Action</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <p className={`text-sm mb-4 leading-relaxed ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                This will permanently delete testing data from the database. Only the following collections will be wiped:
+              </p>
+              
+              <ul className={`text-sm font-bold mb-6 space-y-2 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
+                <li className="flex items-center gap-2"><Trash2 className="w-4 h-4 text-red-500" /> Notifications</li>
+                <li className="flex items-center gap-2"><Trash2 className="w-4 h-4 text-red-500" /> Support Tickets</li>
+                <li className="flex items-center gap-2"><Trash2 className="w-4 h-4 text-red-500" /> Revenue & Transactions</li>
+              </ul>
+
+              <div className="space-y-4">
+                <div>
+                  <label className={`block text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <Lock className="w-3 h-3" /> Admin Security Password
+                  </label>
+                  <input
+                    type="password"
+                    value={clearDataPassword}
+                    onChange={(e) => setClearDataPassword(e.target.value)}
+                    placeholder="Enter security password..."
+                    className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-red-500 font-medium ${
+                      theme === 'dark' 
+                        ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' 
+                        : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
+                
+                <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowClearDataModal(false);
+                      setClearDataPassword('');
+                    }}
+                    className={`w-full px-5 py-3 rounded-xl font-bold transition flex-1 border ${
+                      theme === 'dark'
+                        ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleClearData}
+                    disabled={isClearingData || !clearDataPassword}
+                    className="w-full px-5 py-3 rounded-xl font-bold transition shadow-lg shadow-red-500/20 text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex-1"
+                  >
+                    {isClearingData ? 'Clearing...' : 'Confirm Wipe'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
