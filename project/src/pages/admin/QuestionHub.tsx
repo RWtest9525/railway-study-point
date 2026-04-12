@@ -322,20 +322,24 @@ export function QuestionHub() {
 
   const renderCards = () => {
     if (path.length === 0) {
-      return categories.map((category) => (
-        <ItemCard
-          key={category.id}
-          title={category.name}
-          subtitle={category.description || 'Open category'}
-          isDark={isDark}
-          onOpen={() => {
-            setPath([{ entity: 'category', id: category.id, name: category.name, categoryId: category.id, is_test_container: category.is_test_container }]);
-            setItems([]);
-          }}
-          onEdit={() => openAddCategory(category)}
-          onDelete={() => void removeCategory(category)}
-        />
-      ));
+      return (
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4 xl:grid-cols-5">
+          {categories.map((category) => (
+            <ItemCard
+              key={category.id}
+              title={category.name}
+              subtitle={category.description || 'Open category'}
+              isDark={isDark}
+              onOpen={() => {
+                setPath([{ entity: 'category', id: category.id, name: category.name, categoryId: category.id, is_test_container: category.is_test_container }]);
+                setItems([]);
+              }}
+              onEdit={() => openAddCategory(category)}
+              onDelete={() => void removeCategory(category)}
+            />
+          ))}
+        </div>
+      );
     }
 
     return (
@@ -344,7 +348,7 @@ export function QuestionHub() {
         {!isCurrentPageTest && (
           <div className="mb-2">
             {items.length > 0 && <h3 className={`mb-3 text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Folders</h3>}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4 xl:grid-cols-5">
               {items.map((node) => (
                 <ItemCard
                   key={node.id}
@@ -615,61 +619,24 @@ function ItemCard({
   onResult?: () => void;
 }) {
   return (
-    <div className={`rounded-[28px] border p-4 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'} flex flex-col justify-between`}>
+    <div className={`group flex flex-col justify-between overflow-hidden rounded-2xl border transition-all hover:shadow-md ${isDark ? 'border-slate-700 bg-slate-900 hover:border-slate-600' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
       <button
         type="button"
         onClick={onOpen}
-        className={`w-full rounded-[24px] border-2 px-5 py-6 text-left transition ${
-          isDark
-            ? 'border-slate-700 bg-slate-900 hover:border-blue-500'
-            : 'border-slate-300 bg-white hover:border-blue-500'
-        }`}
+        className="flex-1 p-4 text-left"
       >
-        <div className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</div>
-        <div className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{subtitle}</div>
+        <div className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</div>
+        <div className={`mt-1 text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{subtitle}</div>
       </button>
-      <div className="mt-4 flex flex-wrap gap-2 justify-center">
-        <button
-          type="button"
-          onClick={onEdit}
-          className={`flex-1 min-w-[70px] inline-flex justify-center items-center gap-1 rounded-xl border px-2 py-2 text-xs font-medium ${
-            isDark ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-          }`}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className={`flex-1 min-w-[70px] inline-flex justify-center items-center gap-1 rounded-xl border px-2 py-2 text-xs font-medium ${
-            isDark ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-          }`}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Delete
-        </button>
+      <div className={`flex items-center gap-1 border-t px-2 py-1.5 ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-100 bg-slate-50'} justify-end`}>
+        <button onClick={onEdit} className={`rounded-lg p-1.5 transition ${isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-200 hover:text-slate-900'}`} title="Edit"><Pencil className="h-3.5 w-3.5" /></button>
+        <button onClick={onDelete} className={`rounded-lg p-1.5 transition ${isDark ? 'text-red-400 hover:bg-red-500/10 hover:text-red-400' : 'text-red-500 hover:bg-red-50 hover:text-red-600'}`} title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
         {onResult && (
-          <button
-            type="button"
-            onClick={onResult}
-            className={`flex-1 min-w-[70px] inline-flex justify-center items-center gap-1 rounded-xl border px-2 py-2 text-xs font-medium ${
-              isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
-            }`}
-          >
-            Result
-          </button>
+          <button onClick={onResult} className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition ${isDark ? 'text-amber-400 hover:bg-amber-500/10' : 'text-amber-600 hover:bg-amber-50'}`}>Result</button>
         )}
       </div>
       {onAddQuestion && (
-        <button
-          type="button"
-          onClick={onAddQuestion}
-          className="mt-2 w-full inline-flex justify-center items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Add Question
-        </button>
+        <button onClick={onAddQuestion} className="w-full bg-blue-600 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700">Add Question</button>
       )}
     </div>
   );
