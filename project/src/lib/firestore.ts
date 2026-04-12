@@ -608,9 +608,14 @@ export const notificationsRef = collection(db, 'notifications');
 
 export const getUserNotifications = async (userId: string) => {
   const snapshot = await getDocs(
-    query(notificationsRef, where('user_id', '==', userId), orderBy('created_at', 'desc'))
+    query(notificationsRef, where('user_id', '==', userId))
   );
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Notification));
+  const data = snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Notification));
+  return data.sort((a, b) => {
+    const timeA = (a.created_at as any)?.toDate ? (a.created_at as any).toDate().getTime() : new Date(a.created_at).getTime();
+    const timeB = (b.created_at as any)?.toDate ? (b.created_at as any).toDate().getTime() : new Date(b.created_at).getTime();
+    return timeB - timeA;
+  });
 };
 
 export const createNotifications = async (
