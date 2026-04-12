@@ -28,7 +28,7 @@ import { StudentAnalytics } from './pages/admin/StudentAnalytics';
 
 function AppContent() {
   const { currentPath, navigate } = useRouter();
-  const { user, loading, effectiveRole, isBanned, signOut } = useAuth();
+  const { user, loading, effectiveRole } = useAuth();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
 
