@@ -10,7 +10,7 @@ import { useRouter } from '../contexts/RouterContext';
 type Row = {
   user_id: string;
   full_name: string;
-  avatarUrl?: string;
+  avatar_url?: string;
   total_score: number;
   exams_taken: number;
 };
@@ -44,7 +44,7 @@ export function Leaderboard() {
         const userStats: Record<string, { full_name: string; avatarUrl: string; total_score: number; exams_taken: number; role: string }> = {};
         
         // Fetch profiles to get names
-        const profilesData: Record<string, { full_name: string, avatarUrl: string }> = {};
+        const profilesData: Record<string, { full_name: string, avatar_url: string }> = {};
         
         const filteredDocs = snapshot.docs.filter(doc => {
           const examId = doc.data().exam_id || '';
@@ -66,19 +66,19 @@ export function Leaderboard() {
                   const profileData = profileSnap.docs[0].data();
                   profilesData[userId] = { 
                     full_name: profileData.full_name || 'Student', 
-                    avatarUrl: profileData.avatarUrl || '' 
+                    avatar_url: profileData.avatar_url || '' 
                   };
                 } else {
-                  profilesData[userId] = { full_name: 'Student', avatarUrl: '' };
+                  profilesData[userId] = { full_name: 'Student', avatar_url: '' };
                 }
               } catch (e) {
-                profilesData[userId] = { full_name: 'Student', avatarUrl: '' };
+                profilesData[userId] = { full_name: 'Student', avatar_url: '' };
               }
             }
             
             userStats[userId] = {
               full_name: profilesData[userId].full_name,
-              avatarUrl: profilesData[userId].avatarUrl,
+              avatarUrl: profilesData[userId].avatar_url,
               total_score: 0,
               exams_taken: 0,
               role: 'student', // Default role
@@ -95,7 +95,7 @@ export function Leaderboard() {
           .map(([id, stats]) => ({
             user_id: id,
             full_name: stats.full_name,
-            avatarUrl: stats.avatarUrl,
+            avatar_url: stats.avatarUrl,
             total_score: stats.total_score,
             exams_taken: stats.exams_taken,
           }))
@@ -235,8 +235,8 @@ export function Leaderboard() {
                           
                           {/* Avatar */}
                           <div className={`w-9 h-9 rounded-full overflow-hidden shrink-0 ml-3 border-2 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-                            {r.avatarUrl ? (
-                              <img src={r.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            {r.avatar_url ? (
+                              <img src={r.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                             ) : (
                               <div className={`w-full h-full flex items-center justify-center ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
                                 <UserRound className="w-5 h-5 text-gray-400" />
@@ -289,7 +289,7 @@ export function Leaderboard() {
                     <div className="flex-1 flex flex-col items-center justify-end relative h-full">
                       <button onClick={() => setSelectedUser(rows[1])} className="group flex flex-col items-center z-20 mb-2 hover:scale-105 transition-transform">
                         <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 flex items-center justify-center ${isDark ? 'border-gray-400 bg-gray-800' : 'border-slate-300 bg-white'}`}>
-                          {rows[1].avatarUrl ? <img src={rows[1].avatarUrl} alt="2nd" className="w-full h-full object-cover" /> : <UserRound className="w-5 h-5 text-gray-400" />}
+                          {rows[1].avatar_url ? <img src={rows[1].avatar_url} alt="2nd" className="w-full h-full object-cover" /> : <UserRound className="w-5 h-5 text-gray-400" />}
                         </div>
                         <p className={`text-[10px] sm:text-xs font-bold w-16 text-center truncate mt-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{rows[1].full_name.split(' ')[0]}</p>
                       </button>
@@ -307,7 +307,7 @@ export function Leaderboard() {
                       </div>
                       <button onClick={() => setSelectedUser(rows[0])} className="group flex flex-col items-center z-20 mb-2 mt-4 hover:scale-105 transition-transform">
                         <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden border-[3px] border-amber-400 flex items-center justify-center ${isDark ? 'bg-amber-900/30' : 'bg-amber-50'}`}>
-                          {rows[0].avatarUrl ? <img src={rows[0].avatarUrl} alt="1st" className="w-full h-full object-cover" /> : <UserRound className="w-6 h-6 text-amber-500" />}
+                          {rows[0].avatar_url ? <img src={rows[0].avatar_url} alt="1st" className="w-full h-full object-cover" /> : <UserRound className="w-6 h-6 text-amber-500" />}
                         </div>
                         <p className={`text-[11px] sm:text-xs font-black w-20 text-center truncate mt-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{rows[0].full_name.split(' ')[0]}</p>
                       </button>
@@ -322,7 +322,7 @@ export function Leaderboard() {
                     <div className="flex-1 flex flex-col items-center justify-end relative h-full">
                       <button onClick={() => setSelectedUser(rows[2])} className="group flex flex-col items-center z-20 mb-2 hover:scale-105 transition-transform">
                         <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 flex items-center justify-center ${isDark ? 'border-orange-500 bg-orange-900/30' : 'border-orange-300 bg-orange-50'}`}>
-                          {rows[2].avatarUrl ? <img src={rows[2].avatarUrl} alt="3rd" className="w-full h-full object-cover" /> : <UserRound className="w-5 h-5 text-orange-400" />}
+                          {rows[2].avatar_url ? <img src={rows[2].avatar_url} alt="3rd" className="w-full h-full object-cover" /> : <UserRound className="w-5 h-5 text-orange-400" />}
                         </div>
                         <p className={`text-[10px] sm:text-xs font-bold w-16 text-center truncate mt-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{rows[2].full_name.split(' ')[0]}</p>
                       </button>
@@ -357,8 +357,8 @@ export function Leaderboard() {
 
             <div className="p-6 flex flex-col items-center">
               <div className={`w-20 h-20 rounded-full border-4 ${isDark ? 'border-gray-800' : 'border-white shadow-lg'} overflow-hidden bg-gray-100 mb-4`}>
-                {selectedUser.avatarUrl ? (
-                  <img src={selectedUser.avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+                {selectedUser.avatar_url ? (
+                  <img src={selectedUser.avatar_url} alt="User Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center"><UserRound className="w-10 h-10 text-gray-400" /></div>
                 )}

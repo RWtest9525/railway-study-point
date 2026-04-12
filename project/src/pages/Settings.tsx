@@ -120,9 +120,9 @@ export function Settings() {
             : 'bg-gradient-to-br from-white to-blue-50 border-gray-200 shadow-sm'
         }`}>
           <div className="flex items-center gap-4">
-            {profile?.avatarUrl ? (
+            {profile?.avatar_url ? (
               <div className="w-16 h-16 rounded-[24px] overflow-hidden bg-blue-50/50 shadow-md border border-gray-100 dark:border-gray-800 shrink-0">
-                <img src={profile.avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+                <img src={profile.avatar_url} alt="User Avatar" className="w-full h-full object-cover" />
               </div>
             ) : (
               <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
