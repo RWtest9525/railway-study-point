@@ -81,9 +81,17 @@ export function SupportInbox() {
     // Type Filter
     if (typeFilter !== 'all') {
       if (typeFilter === 'call') {
-        result = result.filter(q => q.subject === 'Call Request' || q.message.startsWith('[CALL'));
+        result = result.filter((q) => {
+          const s = q.subject?.toLowerCase() || '';
+          const m = q.message?.toUpperCase() || '';
+          return s === 'call request' || m.includes('[CALL REQUEST]') || m.startsWith('[CALL');
+        });
       } else if (typeFilter === 'chat') {
-        result = result.filter(q => q.subject !== 'Call Request' && !q.message.startsWith('[CALL'));
+        result = result.filter((q) => {
+          const s = q.subject?.toLowerCase() || '';
+          const m = q.message?.toUpperCase() || '';
+          return s !== 'call request' && !m.includes('[CALL REQUEST]') && !m.startsWith('[CALL');
+        });
       }
     }
 
@@ -277,17 +285,34 @@ export function SupportInbox() {
                       {getStatusBadge(selectedQuery.status)}
                     </div>
 
-                    {selectedQuery.message.startsWith('[CALL') ? (
+                    {(() => {
+                      const m = selectedQuery.message || '';
+                      const s = selectedQuery.subject || '';
+                      const isCallRequest = s.toLowerCase() === 'call request' || m.toUpperCase().includes('[CALL REQUEST]') || m.toUpperCase().startsWith('[CALL');
+
+                      if (isCallRequest) {
+                        return (
                       <div className={`mb-6 rounded-2xl p-6 ${isDark ? 'bg-amber-900/10 border border-amber-800/30' : 'bg-amber-50 border border-amber-200'} shadow-sm`}>
                         <h3 className={`font-bold mb-4 flex items-center gap-2 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
                           <Clock className="w-5 h-5" /> Phone Callback Requested
                         </h3>
                         {(() => {
-                           // Example: "[CALL REQUEST] Phone: 9525182488 | Preferred Time: Morning (10 AM - 12 PM)"
-                           // We will parse it out softly.
                            const parts = selectedQuery.message.split('|');
-                           const phonePart = parts[0]?.replace('[CALL REQUEST] Phone:', '').trim() || 'N/A';
-                           const timePart = parts[1]?.replace('Preferred Time:', '').trim() || 'N/A';
+                           let phonePart = 'N/A';
+                           let timePart = 'N/A';
+                           if (parts.length > 1) {
+                             phonePart = parts[0]?.replace(/\[CALL REQUEST\]\s*Phone:/i, '').trim() || 'N/A';
+                             timePart = parts[1]?.replace(/Preferred Time:/i, '').trim() || 'N/A';
+                           } else {
+                             // Fallback if there is no pipe character
+                             const match = selectedQuery.message.match(/Phone:\s*(.*?)(?:\s*\|\s*Preferred Time:\s*(.*))?$/i);
+                             if (match) {
+                               phonePart = match[1]?.trim() || 'N/A';
+                               timePart = match[2]?.trim() || 'N/A';
+                             } else {
+                               phonePart = selectedQuery.message.replace(/\[CALL REQUEST\]/i, '').trim();
+                             }
+                           }
                            
                            return (
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -303,13 +328,17 @@ export function SupportInbox() {
                            )
                         })()}
                       </div>
-                    ) : (
+                        );
+                      } else {
+                        return (
                       <div className={`mb-6 rounded-2xl p-5 sm:p-6 ${isDark ? 'bg-gray-900/80 border border-gray-800' : 'bg-gray-50 border border-gray-100'}`}>
                         <p className={`${isDark ? 'text-gray-200' : 'text-gray-700'} leading-relaxed whitespace-pre-wrap`}>
                           {selectedQuery.message.replace(`[Topic: ${selectedQuery.subject}]`, '').trim()}
                         </p>
                       </div>
-                    )}
+                        );
+                      }
+                    })()}
 
                     <div className="flex flex-wrap gap-3">
                       {selectedQuery.status !== 'resolved' && selectedQuery.status !== 'closed' && (
