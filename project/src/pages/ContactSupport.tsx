@@ -43,19 +43,7 @@ export function ContactSupport() {
     'Test related',
     'Another issue'
   ];
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
-  const [method, setMethod] = useState<'chat' | 'call' | null>(null);
-  const [topic, setTopic] = useState('');
-  const [message, setMessage] = useState('');
-  const [phone, setPhone] = useState('');
-  const [preferredTime, setPreferredTime] = useState('');
-  
-  const [loading, setLoading] = useState(false);
-  const [listLoading, setListLoading] = useState(true);
-  const [items, setItems] = useState<SupportQuery[]>([]);
-  const [feedback, setFeedback] = useState('');
-  const [error, setError] = useState('');
+
 
   useEffect(() => {
     if (profile?.id) load();
