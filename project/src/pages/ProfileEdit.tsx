@@ -245,6 +245,8 @@ export function ProfileEdit() {
             </button>
           </div>
         </div>
+      </main>
+
       {/* Avatar Selection Modal */}
       {showAvatarModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity">
