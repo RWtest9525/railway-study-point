@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Pencil, Plus, Settings, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, Settings, Trash2, X, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useRouter } from '../../contexts/RouterContext';
@@ -382,21 +382,33 @@ export function QuestionHub() {
             <h3 className={`mb-3 text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Questions ({questions.length})</h3>
             <div className="grid gap-4">
               {questions.map((q, idx) => (
-                <div key={q.id} className={`flex items-center justify-between rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-white'}`}>
-                  <div className="flex flex-1 items-center gap-3">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-xl font-bold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                      Q{idx + 1}
+                <div key={q.id} className={`flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl border p-4 gap-4 ${isDark ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex flex-1 items-center gap-3 overflow-hidden">
+                    <div className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-xl font-bold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                      Q{q.order || idx + 1}
                     </div>
-                    <div className={`line-clamp-1 flex-1 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                      {q.question_text === 'Screenshot question' && q.image_url ? '📷 Screenshot attached' : q.question_text}
+                    <div className={`line-clamp-2 text-sm flex-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {q.image_url ? '📷 Screenshot Question' : q.question_text}
                     </div>
                   </div>
-                  <button
-                    onClick={() => executeRemoveQuestion(q)}
-                    className={`ml-4 rounded-xl p-2 transition ${isDark ? 'text-red-400 hover:bg-red-400/10' : 'text-red-500 hover:bg-red-50'}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {q.image_url && (
+                      <button
+                        onClick={() => window.open(q.image_url, '_blank')}
+                        className={`inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold transition ${isDark ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                      >
+                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                        View Screenshot
+                      </button>
+                    )}
+                    <button
+                      onClick={() => executeRemoveQuestion(q)}
+                      className={`rounded-xl p-2 transition flex items-center justify-center ${isDark ? 'bg-red-400/10 text-red-400 hover:bg-red-400/20' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
+                      title="Delete Question"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
               {questions.length === 0 && (

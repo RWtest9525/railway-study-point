@@ -86,6 +86,7 @@ export function AddQuestionModal({
   linkedLabel,
   initialMode = 'manual',
   defaultSettings,
+  onDeleteFolder,
 }: AddQuestionModalProps) {
   const { profile } = useAuth();
   const [draftQuestions, setDraftQuestions] = useState<QuestionDraft[]>([defaultDraft(initialMode, defaultSettings)]);
@@ -540,8 +541,20 @@ export function AddQuestionModal({
                   ) : (
                     bulkFiles.map((file, index) => (
                       <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                        <span className="truncate">{index + 1}. {file.name}</span>
-                        <span className="ml-4 shrink-0 text-xs text-slate-400">{Math.round(file.size / 1024)} KB</span>
+                        <div className="flex flex-1 items-center gap-3 overflow-hidden">
+                          <span className="truncate flex-1">{index + 1}. {file.name}</span>
+                          <span className="text-xs text-slate-400 whitespace-nowrap">{Math.round(file.size / 1024)} KB</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = URL.createObjectURL(file);
+                            window.open(url, '_blank');
+                          }}
+                          className="ml-3 shrink-0 rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100"
+                        >
+                          View
+                        </button>
                       </div>
                     ))
                   )}
