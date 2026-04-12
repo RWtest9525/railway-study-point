@@ -216,6 +216,7 @@ export function Leaderboard() {
                       badgeColor = 'bg-emerald-500/20 text-emerald-500 border-emerald-500/20';
                     }
 
+                    return (
                       <button
                         key={r.user_id}
                         onClick={() => setSelectedUser(r)}
@@ -271,12 +272,12 @@ export function Leaderboard() {
                             {r.total_score.toLocaleString()} pts
                           </span>
                         </div>
-                        </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
+            )}
             
             {/* Fixed Bottom Podium */}
             {rows.length > 0 && (
