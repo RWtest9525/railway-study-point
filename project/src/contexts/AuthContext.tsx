@@ -244,8 +244,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    // Force refresh - bypass cache
-    await loadProfile(user.uid, user.email ?? undefined, user.displayName ?? undefined, true);
+    try {
+      // Force refresh - bypass cache
+      await loadProfile(user.uid, user.email ?? undefined, user.displayName ?? undefined, true);
+    } finally {
+      setLoading(false);
+    }
   }, [user, loadProfile]);
 
   const effectiveRole = useMemo(() => {
