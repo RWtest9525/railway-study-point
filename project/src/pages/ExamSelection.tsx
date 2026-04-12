@@ -146,35 +146,6 @@ export function ExamSelection() {
           </section>
         )}
 
-        {upcomingNotificationsPreview.length > 0 && (
-          <section className="mt-6 space-y-3">
-            {upcomingNotificationsPreview.map((item, index) => (
-              <button
-                key={item.id}
-                onClick={() => navigate('/notifications')}
-                className={`w-full rounded-[24px] border px-4 py-4 text-left ${
-                  isDark ? 'border-gray-700 bg-gray-800 text-white' : 'border-slate-200 bg-white text-slate-900 shadow-sm'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{item.title}</span>
-                      {index === 0 && !item.is_read && (
-                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
-                          NEW
-                        </span>
-                      )}
-                    </div>
-                    <div className={`mt-1 line-clamp-1 text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>{item.message}</div>
-                  </div>
-                  <ChevronRight className={`h-5 w-5 ${isDark ? 'text-gray-500' : 'text-slate-400'}`} />
-                </div>
-              </button>
-            ))}
-          </section>
-        )}
-
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Choose Category</h2>
