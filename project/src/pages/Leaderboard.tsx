@@ -3,13 +3,14 @@ import { collection, getDocs, query, orderBy, limit, where } from 'firebase/fire
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { Trophy, Medal, ArrowLeft, Crown } from 'lucide-react';
+import { Trophy, Medal, ArrowLeft, Crown, X, UserRound, GraduationCap, Percent } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 import { useRouter } from '../contexts/RouterContext';
 
 type Row = {
   user_id: string;
   full_name: string;
+  avatarUrl?: string;
   total_score: number;
   exams_taken: number;
 };
@@ -23,6 +24,7 @@ export function Leaderboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterType, setFilterType] = useState<'exams' | 'category'>('exams');
+  const [selectedUser, setSelectedUser] = useState<Row | null>(null);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -39,10 +41,10 @@ export function Leaderboard() {
         }
 
         // Aggregate scores by user
-        const userStats: Record<string, { full_name: string; total_score: number; exams_taken: number; role: string }> = {};
+        const userStats: Record<string, { full_name: string; avatarUrl: string; total_score: number; exams_taken: number; role: string }> = {};
         
         // Fetch profiles to get names
-        const profilesData: Record<string, string> = {};
+        const profilesData: Record<string, { full_name: string, avatarUrl: string }> = {};
         
         const filteredDocs = snapshot.docs.filter(doc => {
           const examId = doc.data().exam_id || '';
@@ -62,17 +64,21 @@ export function Leaderboard() {
                 const profileSnap = await getDocs(profileQuery);
                 if (!profileSnap.empty) {
                   const profileData = profileSnap.docs[0].data();
-                  profilesData[userId] = profileData.full_name || 'Student';
+                  profilesData[userId] = { 
+                    full_name: profileData.full_name || 'Student', 
+                    avatarUrl: profileData.avatarUrl || '' 
+                  };
                 } else {
-                  profilesData[userId] = 'Student';
+                  profilesData[userId] = { full_name: 'Student', avatarUrl: '' };
                 }
               } catch (e) {
-                profilesData[userId] = 'Student';
+                profilesData[userId] = { full_name: 'Student', avatarUrl: '' };
               }
             }
             
             userStats[userId] = {
-              full_name: profilesData[userId],
+              full_name: profilesData[userId].full_name,
+              avatarUrl: profilesData[userId].avatarUrl,
               total_score: 0,
               exams_taken: 0,
               role: 'student', // Default role
@@ -89,6 +95,7 @@ export function Leaderboard() {
           .map(([id, stats]) => ({
             user_id: id,
             full_name: stats.full_name,
+            avatarUrl: stats.avatarUrl,
             total_score: stats.total_score,
             exams_taken: stats.exams_taken,
           }))
@@ -122,13 +129,13 @@ export function Leaderboard() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        <div className="flex gap-3 mb-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 pb-56">
+        <div className="flex gap-2 mb-6 w-full max-w-sm mx-auto">
           <button
             onClick={() => setFilterType('exams')}
-            className={`flex-1 py-3 rounded-xl font-bold transition ${
+            className={`flex-1 py-2 text-sm rounded-lg font-bold transition ${
               filterType === 'exams'
-                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
                 : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-200'
             }`}
           >
@@ -136,9 +143,9 @@ export function Leaderboard() {
           </button>
           <button
             onClick={() => setFilterType('category')}
-            className={`flex-1 py-3 rounded-xl font-bold transition ${
+            className={`flex-1 py-2 text-sm rounded-lg font-bold transition ${
               filterType === 'category'
-                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
                 : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-200'
             }`}
           >
@@ -167,97 +174,33 @@ export function Leaderboard() {
         )}
 
         {!loading && !error && (
-          <div className="space-y-6">
-            {/* Top 3 Podium/Stairs Display (ALWAYS VISIBLE) */}
-            <div className="flex items-end justify-center gap-2 sm:gap-4 py-12 px-4 relative">
-              {/* 2nd Place - Left */}
-              <div className="flex flex-col items-center flex-1 max-w-[130px] animate-in slide-in-from-bottom duration-700">
-                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-3 ${
-                  rows[1] 
-                    ? (isDark ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-slate-100 shadow-[0_0_20px_rgba(148,163,184,0.3)]' : 'bg-gradient-to-br from-slate-200 to-slate-400 text-white shadow-[0_0_20px_rgba(148,163,184,0.5)]')
-                    : (isDark ? 'bg-gray-800 text-gray-700 border-gray-700' : 'bg-gray-100 text-gray-300 border-gray-200')
-                } border-2 border-white/20 relative z-10`}>
-                  <Medal className="w-6 h-6 sm:w-8 sm:h-8" />
-                </div>
-                <p className={`text-xs sm:text-sm font-bold text-center truncate w-full px-2 ${rows[1] ? (isDark ? 'text-slate-200' : 'text-slate-700') : (isDark ? 'text-gray-600' : 'text-gray-400')}`}>
-                  {rows[1]?.full_name || '--'}
-                </p>
-                <p className={`text-[10px] sm:text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} ${!rows[1] && 'opacity-0'}`}>
-                  {rows[1]?.total_score?.toLocaleString()} pts
-                </p>
-                <div className={`w-full mt-4 rounded-t-2xl ${isDark ? 'bg-gradient-to-t from-slate-800 to-slate-700 border-t border-slate-600' : 'bg-gradient-to-t from-slate-200 to-slate-100 border-t border-white'} h-24 sm:h-32 flex items-start justify-center pt-3 shadow-2xl relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent" />
-                  <span className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-slate-400 to-slate-500 drop-shadow-sm">2</span>
-                </div>
-              </div>
-
-              {/* 1st Place - Center (Tallest) */}
-              <div className="flex flex-col items-center flex-1 max-w-[150px] relative z-20 animate-in slide-in-from-bottom duration-1000 zoom-in-95">
-                {rows[0] && (
-                  <div className="absolute -top-6 animate-bounce">
-                    <Crown className="w-8 h-8 text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)]" />
-                  </div>
-                )}
-                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-3 ${
-                  rows[0]
-                    ? (isDark ? 'bg-gradient-to-br from-amber-300 to-amber-600 text-amber-50 shadow-[0_0_30px_rgba(245,158,11,0.4)]' : 'bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-[0_0_30px_rgba(245,158,11,0.6)]')
-                    : (isDark ? 'bg-gray-800 text-gray-700 border-gray-700' : 'bg-gray-100 text-gray-300 border-gray-200')
-                } border-4 border-amber-200/30 relative z-10`}>
-                  <Trophy className="w-8 h-8 sm:w-10 sm:h-10" />
-                </div>
-                <p className={`text-sm sm:text-base font-extrabold text-center truncate w-full px-2 ${rows[0] ? (isDark ? 'text-amber-400' : 'text-amber-600') : (isDark ? 'text-gray-600' : 'text-gray-400')}`}>
-                  {rows[0]?.full_name || '--'}
-                  {profile?.id === rows[0]?.user_id && (
-                    <span className="block text-[10px] uppercase font-bold tracking-widest mt-0.5 opacity-90 text-amber-500">You</span>
-                  )}
-                </p>
-                <p className={`text-xs sm:text-sm font-bold ${isDark ? 'text-amber-500' : 'text-amber-600'} ${!rows[0] && 'opacity-0'}`}>
-                  {rows[0]?.total_score?.toLocaleString()} pts
-                </p>
-                <div className={`w-full mt-4 rounded-t-2xl ${isDark ? 'bg-gradient-to-t from-amber-900 to-amber-700 border-t border-amber-500' : 'bg-gradient-to-t from-amber-400 to-amber-200 border-t border-white'} h-36 sm:h-44 flex items-start justify-center pt-3 shadow-2xl relative overflow-hidden`}>
-                  <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent" />
-                  <span className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-amber-100 drop-shadow-md">1</span>
-                </div>
-              </div>
-
-              {/* 3rd Place - Right */}
-              <div className="flex flex-col items-center flex-1 max-w-[130px] animate-in slide-in-from-bottom duration-700">
-                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-3 ${
-                  rows[2]
-                    ? (isDark ? 'bg-gradient-to-br from-orange-400 to-orange-700 text-orange-50 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'bg-gradient-to-br from-orange-300 to-orange-500 text-white shadow-[0_0_20px_rgba(249,115,22,0.5)]')
-                    : (isDark ? 'bg-gray-800 text-gray-700 border-gray-700' : 'bg-gray-100 text-gray-300 border-gray-200')
-                } border-2 border-white/20 relative z-10`}>
-                  <Medal className="w-6 h-6 sm:w-8 sm:h-8" />
-                </div>
-                <p className={`text-xs sm:text-sm font-bold text-center truncate w-full px-2 ${rows[2] ? (isDark ? 'text-orange-200' : 'text-orange-700') : (isDark ? 'text-gray-600' : 'text-gray-400')}`}>
-                  {rows[2]?.full_name || '--'}
-                </p>
-                <p className={`text-[10px] sm:text-xs font-semibold ${isDark ? 'text-orange-400/80' : 'text-orange-600'} ${!rows[2] && 'opacity-0'}`}>
-                  {rows[2]?.total_score?.toLocaleString()} pts
-                </p>
-                <div className={`w-full mt-4 rounded-t-2xl ${isDark ? 'bg-gradient-to-t from-orange-950 to-orange-900 border-t border-orange-800' : 'bg-gradient-to-t from-orange-200 to-orange-100 border-t border-white'} h-20 sm:h-24 flex items-start justify-center pt-3 shadow-2xl relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent" />
-                  <span className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-orange-500 to-orange-600 drop-shadow-sm">3</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Rest of the leaderboard (4th place onwards) */}
-            {rows.length > 3 && (
+          <div className="space-y-4">
+            
+            {/* Scrollable Global Rankings List */}
+            {rows.length > 0 && (
               <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border overflow-hidden shadow-lg`}>
-                <div className={`px-4 py-3 ${isDark ? 'bg-gray-700/50' : 'bg-gray-50'} border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                <div className={`px-4 py-3 ${isDark ? 'bg-gray-700/50' : 'bg-gray-50'} border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
                   <h3 className={`text-sm font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     Global Rankings
                   </h3>
+                  <span className={`text-[10px] uppercase font-bold tracking-widest px-2 py-1 rounded-md ${isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>
+                    {rows.length} participants
+                  </span>
                 </div>
                 <div className={`divide-y ${isDark ? 'divide-gray-700/50' : 'divide-gray-100'}`}>
-                  {rows.slice(3).map((r, i) => {
-                    const actualRank = i + 4;
+                  {rows.map((r, i) => {
+                    const actualRank = i + 1;
                     const percentile = (actualRank / rows.length) * 100;
                     
                     let badgeLabel = null;
                     let badgeColor = '';
-                    if (actualRank <= 10) {
+                    if (actualRank === 1) {
+                      badgeLabel = 'Top Performer';
+                      badgeColor = 'bg-amber-500/20 text-amber-500 border-amber-500/20';
+                    } else if (actualRank === 2 || actualRank === 3) {
+                      badgeLabel = 'Podium';
+                      badgeColor = 'bg-orange-500/20 text-orange-500 border-orange-500/20';
+                    } else if (actualRank <= 10) {
                       // Just show the rank natively, no special badge for 4-10
                     } else if (percentile <= 1) {
                       badgeLabel = 'Top 1%';
@@ -273,10 +216,10 @@ export function Leaderboard() {
                       badgeColor = 'bg-emerald-500/20 text-emerald-500 border-emerald-500/20';
                     }
 
-                    return (
-                      <div
+                      <button
                         key={r.user_id}
-                        className={`flex flex-col sm:flex-row sm:items-center px-4 py-4 transition-colors gap-3 sm:gap-0 ${
+                        onClick={() => setSelectedUser(r)}
+                        className={`w-full flex flex-col sm:flex-row sm:items-center px-4 py-3 transition-colors gap-3 sm:gap-0 text-left ${
                           profile?.id === r.user_id 
                             ? (isDark ? 'bg-amber-500/10' : 'bg-amber-50') 
                             : (isDark ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50')
@@ -286,8 +229,20 @@ export function Leaderboard() {
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
                             isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
                           }`}>
-                            {actualRank}
+                            {actualRank === 1 ? <Crown className="w-4 h-4 text-amber-500" /> : actualRank}
                           </div>
+                          
+                          {/* Avatar */}
+                          <div className={`w-9 h-9 rounded-full overflow-hidden shrink-0 ml-3 border-2 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                            {r.avatarUrl ? (
+                              <img src={r.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className={`w-full h-full flex items-center justify-center ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                                <UserRound className="w-5 h-5 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+
                           <div className="ml-3 min-w-0 flex items-center gap-2 flex-wrap">
                             <span className={`text-sm font-medium truncate ${
                               profile?.id === r.user_id 
@@ -316,15 +271,129 @@ export function Leaderboard() {
                             {r.total_score.toLocaleString()} pts
                           </span>
                         </div>
-                      </div>
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
+            
+            {/* Fixed Bottom Podium */}
+            {rows.length > 0 && (
+              <div className={`fixed bottom-[72px] sm:bottom-0 left-0 right-0 z-40 border-t ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} shadow-[0_-20px_30px_rgba(0,0,0,0.1)]`} style={{ height: '140px' }}>
+                <div className="max-w-3xl mx-auto h-full flex items-end justify-center gap-2 px-4 pb-0 pt-2 relative">
+                  
+                  {/* 2nd Place */}
+                  {rows[1] && (
+                    <div className="flex-1 flex flex-col items-center justify-end relative h-full">
+                      <button onClick={() => setSelectedUser(rows[1])} className="group flex flex-col items-center z-20 mb-2 hover:scale-105 transition-transform">
+                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 flex items-center justify-center ${isDark ? 'border-gray-400 bg-gray-800' : 'border-slate-300 bg-white'}`}>
+                          {rows[1].avatarUrl ? <img src={rows[1].avatarUrl} alt="2nd" className="w-full h-full object-cover" /> : <UserRound className="w-5 h-5 text-gray-400" />}
+                        </div>
+                        <p className={`text-[10px] sm:text-xs font-bold w-16 text-center truncate mt-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{rows[1].full_name.split(' ')[0]}</p>
+                      </button>
+                      <div className={`w-full rounded-t-xl ${isDark ? 'bg-gradient-to-t from-gray-700 to-gray-600' : 'bg-gradient-to-t from-slate-200 to-slate-100 border border-t-slate-300 border-x-slate-300'} h-[50px] flex justify-center pt-1 shadow-inner relative`}>
+                        <span className="text-xl font-black text-white/50 mix-blend-overlay">2</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 1st Place */}
+                  {rows[0] && (
+                    <div className="flex-1 flex flex-col items-center justify-end relative h-full mb-[10px]">
+                      <div className="absolute top-2 animate-bounce z-30">
+                        <Crown className="w-5 h-5 text-amber-500" />
+                      </div>
+                      <button onClick={() => setSelectedUser(rows[0])} className="group flex flex-col items-center z-20 mb-2 mt-4 hover:scale-105 transition-transform">
+                        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden border-[3px] border-amber-400 flex items-center justify-center ${isDark ? 'bg-amber-900/30' : 'bg-amber-50'}`}>
+                          {rows[0].avatarUrl ? <img src={rows[0].avatarUrl} alt="1st" className="w-full h-full object-cover" /> : <UserRound className="w-6 h-6 text-amber-500" />}
+                        </div>
+                        <p className={`text-[11px] sm:text-xs font-black w-20 text-center truncate mt-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{rows[0].full_name.split(' ')[0]}</p>
+                      </button>
+                      <div className={`w-full rounded-t-xl ${isDark ? 'bg-gradient-to-t from-amber-700 to-amber-600' : 'bg-gradient-to-t from-amber-300 to-amber-200 border border-t-amber-400 border-x-amber-400'} h-[70px] flex justify-center pt-1 shadow-inner relative`}>
+                        <span className="text-2xl font-black text-white/50 mix-blend-overlay">1</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3rd Place */}
+                  {rows[2] && (
+                    <div className="flex-1 flex flex-col items-center justify-end relative h-full">
+                      <button onClick={() => setSelectedUser(rows[2])} className="group flex flex-col items-center z-20 mb-2 hover:scale-105 transition-transform">
+                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 flex items-center justify-center ${isDark ? 'border-orange-500 bg-orange-900/30' : 'border-orange-300 bg-orange-50'}`}>
+                          {rows[2].avatarUrl ? <img src={rows[2].avatarUrl} alt="3rd" className="w-full h-full object-cover" /> : <UserRound className="w-5 h-5 text-orange-400" />}
+                        </div>
+                        <p className={`text-[10px] sm:text-xs font-bold w-16 text-center truncate mt-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{rows[2].full_name.split(' ')[0]}</p>
+                      </button>
+                      <div className={`w-full rounded-t-xl ${isDark ? 'bg-gradient-to-t from-orange-800 to-orange-700' : 'bg-gradient-to-t from-orange-200 to-orange-100 border border-t-orange-300 border-x-orange-300'} h-[40px] flex justify-center pt-1 shadow-inner relative`}>
+                        <span className="text-lg font-black text-white/50 mix-blend-overlay">3</span>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
             )}
+            
           </div>
         )}
       </main>
+
+      {/* Selected User Modal Overlay */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className={`w-full max-w-sm rounded-[24px] overflow-hidden ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'} border shadow-2xl zoom-in-95`}>
+            
+            <div className={`flex justify-between items-center px-4 py-3 border-b ${isDark ? 'border-gray-800' : 'border-gray-100'}`}>
+               <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Profile Details</span>
+               <button 
+                  onClick={() => setSelectedUser(null)}
+                  className={`p-1.5 rounded-full transition ${isDark ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+               >
+                 <X className="w-4 h-4" />
+               </button>
+            </div>
+
+            <div className="p-6 flex flex-col items-center">
+              <div className={`w-20 h-20 rounded-full border-4 ${isDark ? 'border-gray-800' : 'border-white shadow-lg'} overflow-hidden bg-gray-100 mb-4`}>
+                {selectedUser.avatarUrl ? (
+                  <img src={selectedUser.avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center"><UserRound className="w-10 h-10 text-gray-400" /></div>
+                )}
+              </div>
+              <h3 className={`text-xl font-black mb-1 text-center ${isDark ? 'text-white' : 'text-gray-900'}`}>{selectedUser.full_name}</h3>
+              <p className={`text-xs font-bold tracking-widest uppercase mb-6 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                Rank #{rows.findIndex(r => r.user_id === selectedUser.user_id) + 1}
+              </p>
+
+              <div className="w-full grid grid-cols-2 gap-3 mb-4">
+                <div className={`p-4 rounded-xl border flex flex-col items-center text-center ${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-100'}`}>
+                  <Trophy className={`w-5 h-5 mb-2 ${isDark ? 'text-amber-500' : 'text-amber-500'}`} />
+                  <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>{selectedUser.total_score}</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Total Score</span>
+                </div>
+                <div className={`p-4 rounded-xl border flex flex-col items-center text-center ${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-100'}`}>
+                  <GraduationCap className={`w-5 h-5 mb-2 ${isDark ? 'text-blue-500' : 'text-blue-500'}`} />
+                  <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>{selectedUser.exams_taken}</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Exams Taken</span>
+                </div>
+              </div>
+
+              <div className={`w-full px-4 py-3 rounded-xl border flex items-center justify-between ${isDark ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-indigo-50 border-indigo-100 text-indigo-700'}`}>
+                <div className="flex items-center gap-2">
+                  <Percent className="w-4 h-4" />
+                  <span className="text-sm font-bold">Top Percentile</span>
+                </div>
+                <span className="text-lg font-black">
+                  Top {Math.ceil(((rows.findIndex(r => r.user_id === selectedUser.user_id) + 1) / rows.length) * 100)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom Navigation */}
       <BottomNav />
     </div>
