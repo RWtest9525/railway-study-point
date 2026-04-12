@@ -97,25 +97,40 @@ export function SupportInbox() {
         <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Manage user support queries with faster search and cleaner ticket handling.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 mb-8 md:grid-cols-4">
+      <div className="flex flex-wrap items-center gap-3 mb-8">
         {([
-          { label: 'All', value: queries.length, icon: MessageSquare, tone: 'text-blue-500', id: 'all' },
-          { label: 'Pending', value: queries.filter((q) => q.status === 'pending').length, icon: Clock, tone: 'text-yellow-500', id: 'pending' },
-          { label: 'Resolved', value: queries.filter((q) => q.status === 'resolved').length, icon: Check, tone: 'text-green-500', id: 'resolved' },
-          { label: 'Closed', value: queries.filter((q) => q.status === 'closed').length, icon: X, tone: 'text-slate-500', id: 'closed' },
-        ] as Array<{ label: string; value: number; icon: LucideIcon; tone: string; id: any }>).map(({ label, value, icon: Icon, tone, id }) => (
-          <button 
-            key={label} 
-            onClick={() => setStatusFilter(id)}
-            className={`text-left text-inherit transition-all ${isDark ? 'bg-gray-800' : 'bg-white'} ${statusFilter === id ? `border-2 ${isDark ? 'border-teal-500' : 'border-teal-600'} shadow-md` : `border ${isDark ? 'border-gray-700 hover:border-gray-600' : 'border-gray-200 hover:border-gray-300'}`} rounded-3xl p-6`}
-          >
-            <div className="mb-2 flex items-center gap-3">
-              <Icon className={`h-6 w-6 ${tone}`} />
-              <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{label}</span>
-            </div>
-            <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{value}</p>
-          </button>
-        ))}
+          { label: 'All', value: queries.length, icon: MessageSquare, tone: 'blue', id: 'all' },
+          { label: 'Pending', value: queries.filter((q) => q.status === 'pending').length, icon: Clock, tone: 'yellow', id: 'pending' },
+          { label: 'Resolved', value: queries.filter((q) => q.status === 'resolved').length, icon: Check, tone: 'green', id: 'resolved' },
+          { label: 'Closed', value: queries.filter((q) => q.status === 'closed').length, icon: X, tone: 'slate', id: 'closed' },
+        ] as Array<{ label: string; value: number; icon: LucideIcon; tone: string; id: any }>).map(({ label, value, icon: Icon, tone, id }) => {
+          
+          let colorProps = '';
+          if (tone === 'blue') colorProps = isDark ? 'text-blue-400 bg-blue-400/10' : 'text-blue-600 bg-blue-100';
+          if (tone === 'yellow') colorProps = isDark ? 'text-amber-400 bg-amber-400/10' : 'text-amber-600 bg-amber-100';
+          if (tone === 'green') colorProps = isDark ? 'text-green-400 bg-green-400/10' : 'text-green-600 bg-green-100';
+          if (tone === 'slate') colorProps = isDark ? 'text-slate-400 bg-slate-400/10' : 'text-slate-600 bg-slate-100';
+
+          return (
+            <button 
+              key={label} 
+              onClick={() => setStatusFilter(id)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all active:scale-95 ${
+                statusFilter === id 
+                  ? (isDark ? 'bg-gray-800 border-gray-600 shadow-md' : 'bg-white border-gray-300 shadow-sm') 
+                  : (isDark ? 'bg-transparent border-transparent hover:bg-gray-800/50' : 'bg-transparent border-transparent hover:bg-gray-200/50')
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg ${colorProps}`}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <span className={`font-bold text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{label}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-black ${colorProps}`}>
+                {value}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
