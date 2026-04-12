@@ -56,6 +56,7 @@ export function QuestionHub() {
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void, isDestructive?: boolean}>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
+  const [viewImageFull, setViewImageFull] = useState<string | null>(null);
 
   const selectedCategoryId = path.find((item) => item.entity === 'category')?.id || '';
   const selectedNode = path.length > 0 ? path[path.length - 1] : null;
@@ -402,14 +403,19 @@ export function QuestionHub() {
                     <div className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-xl font-bold ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
                       Q{q.order || idx + 1}
                     </div>
+                    {q.image_url && (
+                      <div className="h-10 w-16 shrink-0 rounded border border-slate-200 overflow-hidden cursor-pointer bg-white" onClick={() => setViewImageFull(q.image_url!)}>
+                        <img src={q.image_url} className="h-full w-full object-cover" />
+                      </div>
+                    )}
                     <div className={`line-clamp-2 text-sm flex-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                      {q.image_url ? '📷 Screenshot Question' : q.question_text}
+                      {q.image_url ? 'Screenshot Question' : q.question_text}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {q.image_url && (
                       <button
-                        onClick={() => window.open(q.image_url, '_blank')}
+                        onClick={() => setViewImageFull(q.image_url!)}
                         className={`inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold transition ${isDark ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
                       >
                         <Eye className="mr-1.5 h-3.5 w-3.5" />
@@ -551,19 +557,6 @@ export function QuestionHub() {
           toast.success('Question saved');
           if (selectedNode?.entity === 'node') loadQuestions();
         }}
-        onDeleteFolder={() => {
-          if (selectedNode?.entity === 'node') {
-            const rawNode = items.find(i => i.id === selectedNode.id);
-            if (rawNode) {
-              setQuestionModalOpen(false);
-              removeNode(rawNode);
-            } else {
-               // Fallback if not directly in items (e.g. nested navigation)
-               setQuestionModalOpen(false);
-               removeNode({ id: selectedNode.id, name: selectedNode.name } as any);
-            }
-          }
-        }}
         categoryId={selectedCategoryId}
         categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
         linkedLabel={selectedNode?.name}
@@ -605,6 +598,21 @@ export function QuestionHub() {
             <button type="submit" className="w-full rounded-2xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white">Submit</button>
           </form>
         </ModalShell>
+      )}
+
+      {/* Screen Shot Popup Modal */}
+      {viewImageFull && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 p-4" onClick={() => setViewImageFull(null)}>
+          <button className="absolute top-6 right-6 p-2 text-white/50 hover:text-white rounded-xl bg-black/50 transition-colors" onClick={() => setViewImageFull(null)}>
+            <X className="w-6 h-6" />
+          </button>
+          <img 
+            src={viewImageFull} 
+            alt="Full Screenshot" 
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" 
+            onClick={(e) => e.stopPropagation()} 
+          />
+        </div>
       )}
     </div>
   );

@@ -19,7 +19,6 @@ interface AddQuestionModalProps {
   linkedLabel?: string;
   initialMode?: QuestionMode;
   defaultSettings?: DefaultSettings;
-  onDeleteFolder?: () => void;
 }
 
 interface OptionDraft {
@@ -87,7 +86,6 @@ export function AddQuestionModal({
   linkedLabel,
   initialMode = 'manual',
   defaultSettings,
-  onDeleteFolder,
 }: AddQuestionModalProps) {
   const { profile } = useAuth();
   const [draftQuestions, setDraftQuestions] = useState<QuestionDraft[]>([defaultDraft(initialMode, defaultSettings)]);
@@ -98,7 +96,7 @@ export function AddQuestionModal({
   const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [uploadingBulkImages, setUploadingBulkImages] = useState(false);
   const [existingQuestions, setExistingQuestions] = useState<Question[]>([]);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
 
   const isLinkedQuestionBank = Boolean(categoryNodeId);
   const currentDraft = draftQuestions[currentIndex];
@@ -118,14 +116,46 @@ export function AddQuestionModal({
     // Load existing questions
     const loadExisting = async () => {
       try {
-        if (examId) {
-          const qs = await getQuestions(examId);
-          setExistingQuestions(qs);
-        } else if (categoryNodeId) {
-          const qs = await getQuestionsByCategoryNode(categoryNodeId);
-          setExistingQuestions(qs);
-        } else {
-          setExistingQuestions([]);
+        let qs: Question[] = [];
+        if (examId) qs = await getQuestions(examId);
+        else if (categoryNodeId) qs = await getQuestionsByCategoryNode(categoryNodeId);
+        
+        setExistingQuestions(qs);
+        
+        if (qs.length > 0) {
+          const mappedQs: QuestionDraft[] = qs.map(q => {
+            const mappedOptions = [
+              { id: '1', text: '' },
+              { id: '2', text: '' },
+              { id: '3', text: '' },
+              { id: '4', text: '' }
+            ];
+            // Safely map existing options or keep empty
+            if (Array.isArray(q.options)) {
+              q.options.forEach((optText, idx) => {
+                if (idx < 4) mappedOptions[idx].text = optText;
+              });
+            }
+            
+            return {
+              id: q.id,
+              mode: q.image_url ? 'screenshot' : 'manual',
+              question_text: q.question_text || '',
+              explanation: q.explanation || '',
+              video_explanation_url: q.video_explanation_url || '',
+              difficulty: (q.difficulty as 'easy'|'medium'|'hard') || 'medium',
+              marks: q.marks || 1,
+              negative_marks: q.negative_marks || 0,
+              is_draft: q.is_draft || false,
+              image_url: q.image_url || '',
+              option_label_style: (q.option_label_style as 'alphabet'|'numeric') || 'alphabet',
+              options: mappedOptions,
+              correct_index: q.correct_index ?? 0,
+            };
+          });
+          
+          setDraftQuestions([...mappedQs, defaultDraft(initialMode, defaultSettings)]);
+          setCurrentIndex(mappedQs.length); // auto select the blank "new" draft at the end
         }
       } catch (err) {
         console.error("Failed to load existing questions", err);
@@ -148,6 +178,7 @@ export function AddQuestionModal({
     setDraftQuestions([defaultDraft(initialMode, defaultSettings)]);
     setCurrentIndex(0);
     setBulkFiles([]);
+    setResetKey(prev => prev + 1);
   };
 
   const handleClose = () => {
@@ -385,14 +416,6 @@ export function AddQuestionModal({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {onDeleteFolder && (
-              <button 
-                onClick={() => setDeleteConfirmOpen(true)}
-                className="rounded-xl px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition"
-              >
-                Delete Folder
-              </button>
-            )}
             <button onClick={handleClose} className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
               <X className="h-5 w-5" />
             </button>
@@ -494,6 +517,7 @@ export function AddQuestionModal({
                     {uploadingQuestionImage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                     Choose file
                     <input
+                      key={`single-${resetKey}`}
                       type="file"
                       accept="image/*"
                       className="hidden"
@@ -523,6 +547,7 @@ export function AddQuestionModal({
                     {uploadingBulkImages ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                     Choose files
                     <input
+                      key={`bulk-${resetKey}`}
                       type="file"
                       accept="image/*"
                       multiple
@@ -588,14 +613,14 @@ export function AddQuestionModal({
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-900">
-                  Draft Q{existingQuestions.length + currentIndex + 1} Preview
+                  Question {currentIndex + 1} Preview
                 </h3>
               </div>
 
               <div className="space-y-3">
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm ring-1 ring-blue-500/20">
                   <div className="mb-2 text-xs font-bold uppercase tracking-wider text-blue-600">
-                    Draft Preview • {currentDraft.marks} mark(s)
+                    Question Preview • {currentDraft.marks} mark(s)
                   </div>
                   <div className="text-sm font-medium text-slate-900">
                     {currentDraft.mode === 'manual' ? currentDraft.question_text || 'Question preview...' : 'Screenshot question preview...'}
@@ -663,20 +688,6 @@ export function AddQuestionModal({
           </div>
         </form>
       </div>
-
-      <ConfirmModal
-        isOpen={deleteConfirmOpen}
-        onCancel={() => setDeleteConfirmOpen(false)}
-        onConfirm={() => {
-          setDeleteConfirmOpen(false);
-          if (onDeleteFolder) onDeleteFolder();
-        }}
-        title="Delete Folder"
-        message="Are you sure you want to delete this folder/exam? This action cannot be undone and will delete all associated data."
-        confirmText="Yes, Delete"
-        cancelText="Cancel"
-        isDestructive={true}
-      />
     </div>
   );
 }
