@@ -524,6 +524,19 @@ export function QuestionHub() {
           toast.success('Question saved');
           if (selectedNode?.entity === 'node') loadQuestions();
         }}
+        onDeleteFolder={() => {
+          if (selectedNode?.entity === 'node') {
+            const rawNode = items.find(i => i.id === selectedNode.id);
+            if (rawNode) {
+              setQuestionModalOpen(false);
+              removeNode(rawNode);
+            } else {
+               // Fallback if not directly in items (e.g. nested navigation)
+               setQuestionModalOpen(false);
+               removeNode({ id: selectedNode.id, name: selectedNode.name } as any);
+            }
+          }
+        }}
         categoryId={selectedCategoryId}
         categoryNodeId={selectedNode?.entity === 'node' ? selectedNode.id : undefined}
         linkedLabel={selectedNode?.name}

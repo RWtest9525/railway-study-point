@@ -18,6 +18,7 @@ interface AddQuestionModalProps {
   linkedLabel?: string;
   initialMode?: QuestionMode;
   defaultSettings?: DefaultSettings;
+  onDeleteFolder?: () => void;
 }
 
 interface OptionDraft {
@@ -94,6 +95,7 @@ export function AddQuestionModal({
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [uploadingBulkImages, setUploadingBulkImages] = useState(false);
+  const [existingQuestions, setExistingQuestions] = useState<Question[]>([]);
 
   const isLinkedQuestionBank = Boolean(categoryNodeId);
   const currentDraft = draftQuestions[currentIndex];
@@ -109,6 +111,24 @@ export function AddQuestionModal({
     setDraftQuestions([defaultDraft(initialMode, defaultSettings)]);
     setCurrentIndex(0);
     setBulkFiles([]);
+    
+    // Load existing questions
+    const loadExisting = async () => {
+      try {
+        if (examId) {
+          const qs = await getQuestions(examId);
+          setExistingQuestions(qs);
+        } else if (categoryNodeId) {
+          const qs = await getQuestionsByCategoryNode(categoryNodeId);
+          setExistingQuestions(qs);
+        } else {
+          setExistingQuestions([]);
+        }
+      } catch (err) {
+        console.error("Failed to load existing questions", err);
+      }
+    };
+    void loadExisting();
   }, [isOpen, initialMode, defaultSettings, categoryNodeId, examId]);
 
   const updateCurrentDraft = (updates: Partial<QuestionDraft>) => {
@@ -157,9 +177,15 @@ export function AddQuestionModal({
 
   const saveQuestions = async () => {
     if (!profile?.id) throw new Error('Please sign in again.');
-    if (!categoryNodeId) throw new Error('Please choose the folder first.');
+    if (!categoryNodeId && !examId) throw new Error('Please choose the folder or exam first.');
 
-    const existingQuestions = examId ? await getQuestions(examId) : [];
+    let realExistingQs: Question[] = [];
+    if (examId) {
+      realExistingQs = await getQuestions(examId);
+    } else if (categoryNodeId) {
+      realExistingQs = await getQuestionsByCategoryNode(categoryNodeId);
+    }
+    const currentMaxOrder = realExistingQs.length;
     
     // Filter out completely empty drafts
     const validDrafts = draftQuestions.filter(d => 
@@ -182,7 +208,7 @@ export function AddQuestionModal({
            category_node_id: categoryNodeId,
            title: linkedLabel || 'Folder Test',
            description: `Questions under ${linkedLabel}`,
-           duration_minutes: existingQuestions.length + validDrafts.length * 2,
+           duration_minutes: currentMaxOrder + validDrafts.length * 2,
            total_marks: sumMarks,
            is_active: true,
            is_premium: true,
@@ -190,7 +216,7 @@ export function AddQuestionModal({
        } else {
          targetExamId = existingExam.id;
          await updateExam(existingExam.id, {
-           duration_minutes: existingQuestions.length + validDrafts.length * 2,
+           duration_minutes: currentMaxOrder + validDrafts.length * 2,
            total_marks: existingExam.total_marks + sumMarks,
          });
        }
@@ -222,7 +248,7 @@ export function AddQuestionModal({
       if (draft.id) {
         await updateQuestion(draft.id, payload);
       } else {
-        payload.order = existingQuestions.length + newQuestions.length + 1;
+        payload.order = currentMaxOrder + newQuestions.length + 1;
         payload.created_by = profile.id;
         newQuestions.push(payload);
       }
@@ -240,7 +266,13 @@ export function AddQuestionModal({
 
     setUploadingBulkImages(true);
     try {
-      const existingQuestions = examId ? await getQuestions(examId) : [];
+      let realExistingQs: Question[] = [];
+      if (examId) {
+        realExistingQs = await getQuestions(examId);
+      } else if (categoryNodeId) {
+        realExistingQs = await getQuestionsByCategoryNode(categoryNodeId);
+      }
+      const currentMaxOrder = realExistingQs.length;
       
       let targetExamId = examId || null;
 
@@ -254,7 +286,7 @@ export function AddQuestionModal({
              category_node_id: categoryNodeId,
              title: linkedLabel || 'Folder Test',
              description: `Questions under ${linkedLabel}`,
-             duration_minutes: existingQuestions.length + bulkFiles.length * 2,
+             duration_minutes: currentMaxOrder + bulkFiles.length * 2,
              total_marks: sumMarks,
              is_active: true,
              is_premium: true,
@@ -262,7 +294,7 @@ export function AddQuestionModal({
          } else {
            targetExamId = existingExam.id;
            await updateExam(existingExam.id, {
-             duration_minutes: existingQuestions.length + bulkFiles.length * 2,
+             duration_minutes: currentMaxOrder + bulkFiles.length * 2,
              total_marks: existingExam.total_marks + sumMarks,
            });
          }
@@ -284,7 +316,7 @@ export function AddQuestionModal({
           exam_id: targetExamId,
           category_node_id: categoryNodeId,
           subject: linkedLabel || 'General',
-          question_text: `Screenshot question ${existingQuestions.length + index + 1}`,
+          question_text: `Screenshot question ${currentMaxOrder + index + 1}`,
           options: buildFallbackOptions(currentDraft.option_label_style),
           option_label_style: currentDraft.option_label_style,
           correct_index: currentDraft.correct_index,
@@ -294,7 +326,7 @@ export function AddQuestionModal({
           image_url: url,
           marks: Number(currentDraft.marks) || 1,
           negative_marks: Number(currentDraft.negative_marks) || 0,
-          order: existingQuestions.length + index + 1,
+          order: currentMaxOrder + index + 1,
           is_draft: currentDraft.is_draft,
           version: 1,
           created_by: profile.id,
@@ -338,13 +370,34 @@ export function AddQuestionModal({
         <div className="flex items-start justify-between border-b border-slate-200 px-5 py-5 sm:px-6">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Add Questions</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Save questions directly into the selected folder.
-            </p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-sm text-slate-500">
+                Save questions directly into <span className="font-semibold text-slate-700">{linkedLabel || 'exam'}</span>.
+              </p>
+              {existingQuestions.length > 0 && (
+                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                  {existingQuestions.length} Questions saved
+                </span>
+              )}
+            </div>
           </div>
-          <button onClick={handleClose} className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            {onDeleteFolder && (
+              <button 
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to delete this folder/exam? This cannot be undone.')) {
+                    onDeleteFolder();
+                  }
+                }}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition"
+              >
+                Delete Folder
+              </button>
+            )}
+            <button onClick={handleClose} className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="grid gap-6 p-5 lg:grid-cols-[1.3fr_0.8fr] lg:p-6">
@@ -524,20 +577,20 @@ export function AddQuestionModal({
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-900">
-                  Preview
+                  Draft Q{existingQuestions.length + currentIndex + 1} Preview
                 </h3>
               </div>
 
               <div className="space-y-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="mb-2 text-xs text-slate-400">
-                    {linkedLabel || 'Selected folder'} • {currentDraft.marks} mark(s)
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm ring-1 ring-blue-500/20">
+                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-blue-600">
+                    Draft Preview • {currentDraft.marks} mark(s)
                   </div>
-                  <div className="text-sm text-slate-900">
-                    {currentDraft.mode === 'manual' ? currentDraft.question_text || 'Question preview' : 'Screenshot question preview'}
+                  <div className="text-sm font-medium text-slate-900">
+                    {currentDraft.mode === 'manual' ? currentDraft.question_text || 'Question preview...' : 'Screenshot question preview...'}
                   </div>
                   {currentDraft.image_url && (
-                    <img src={currentDraft.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl border border-slate-200 object-contain" />
+                    <img src={currentDraft.image_url} alt="Preview" className="mt-3 max-h-48 w-full rounded-2xl border border-blue-200 bg-white object-contain" />
                   )}
                 </div>
                 {previewOptions.map((option, index) => (

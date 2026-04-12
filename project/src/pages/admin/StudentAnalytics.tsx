@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BarChart3, CheckCircle2, Clock3, Eye, Search, Target, UserRound, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock3, Search, Target, UserRound, XCircle, Trophy, BarChart3 } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from '../../contexts/RouterContext';
 import { getAllAttempts, getExams, getQuestions, getQuestionsByCategoryNode, getCategoryNode, getUsers, Exam, Question, QuizAttempt } from '../../lib/firestore';
 import { formatDateTime, formatDuration } from '../../lib/dateUtils';
@@ -18,6 +19,8 @@ type AttemptRow = QuizAttempt & {
   wrongAnswers: number;
   skippedAnswers: number;
 };
+
+const COLORS = ['#10B981', '#F43F5E', '#64748B']; // Correct, Wrong, Skipped
 
 export function StudentAnalytics() {
   const { navigate } = useRouter();
@@ -49,7 +52,6 @@ export function StudentAnalytics() {
         profiles.map((profile) => [profile.id, { name: profile.full_name || 'Student', email: profile.email || 'No email' }])
       );
 
-      // Collect all unique node IDs from attempts
       const nodeIdsWithAttempts = new Set<string>();
       attemptsData.forEach(attempt => {
         if (attempt.exam_id.startsWith('node_')) {
@@ -57,7 +59,6 @@ export function StudentAnalytics() {
         }
       });
 
-      // Fetch node titles
       await Promise.all(
         Array.from(nodeIdsWithAttempts).map(async (nodeId) => {
           try {
@@ -87,7 +88,6 @@ export function StudentAnalytics() {
       setExams(examsData);
       setAttempts(enrichedAttempts);
 
-      // Combine exams and test nodes into a single dropdown
       const combinedDropdown: {id: string, title: string}[] = [
         ...examsData.map(e => ({ id: e.id, title: e.title }))
       ];
@@ -96,9 +96,8 @@ export function StudentAnalytics() {
           combinedDropdown.push({ id, title: `Test Folder: ${title}` });
         }
       });
-      // Deduplicate manually since test nodes might be added dynamically
       const uniqueDropdown = Array.from(new Map(combinedDropdown.map(item => [item.id, item])).values());
-      (window as any).__examsDropdownList = uniqueDropdown; // Pass secretly without breaking state
+      (window as any).__examsDropdownList = uniqueDropdown;
 
       if (presetExamId) {
         const latest = enrichedAttempts.find((attempt) => attempt.exam_id === presetExamId);
@@ -158,216 +157,288 @@ export function StudentAnalytics() {
   const getAnswerLabel = (style: 'alphabet' | 'numeric' | undefined, index: number) =>
     style === 'numeric' ? String(index + 1) : String.fromCharCode(65 + index);
 
+  const selectedChartData = selectedAttempt ? [
+    { name: 'Correct', value: selectedAttempt.correct_answers },
+    { name: 'Wrong', value: selectedAttempt.wrongAnswers },
+    { name: 'Skipped', value: selectedAttempt.skippedAnswers },
+  ] : [];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-3xl border border-gray-700 bg-gray-900/70 p-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <button onClick={() => navigate('/admin-portal')} className="mb-3 inline-flex items-center gap-2 text-sm text-blue-300 hover:text-blue-200">
-            <ArrowLeft className="h-4 w-4" />
-            Back to admin portal
-          </button>
-          <h1 className="text-3xl font-bold text-white">Exam Performance Analytics</h1>
-          <p className="text-sm text-gray-400">Check who attempted each exam, what they scored, and the exact questions they missed.</p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-gray-700 bg-gray-800 p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-gray-500">Attempts</div>
-            <div className="mt-2 text-2xl font-bold text-white">{summary.totalAttempts}</div>
-          </div>
-          <div className="rounded-2xl border border-gray-700 bg-gray-800 p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-gray-500">Average</div>
-            <div className="mt-2 text-2xl font-bold text-emerald-400">{summary.avgScore.toFixed(1)}%</div>
-          </div>
-          <div className="rounded-2xl border border-gray-700 bg-gray-800 p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-gray-500">Top scorer</div>
-            <div className="mt-2 truncate text-lg font-bold text-white">{summary.best?.userName || '-'}</div>
+    <div className="min-h-screen bg-[#080B12] text-slate-200">
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0A0D14]/80 backdrop-blur-xl">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center gap-4">
+            <button onClick={() => navigate('/admin-portal')} className="inline-flex items-center gap-2 rounded-full p-2 text-slate-400 transition hover:bg-white/5 hover:text-white">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <h1 className="text-xl font-bold tracking-tight text-white">Student Analytics</h1>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.9fr]">
-        <div className="space-y-4">
-          <div className="grid gap-3 rounded-3xl border border-gray-700 bg-gray-900/70 p-4 md:grid-cols-[1fr_220px]">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-gray-500" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by student or exam..."
-                className="w-full rounded-2xl border border-gray-700 bg-gray-800 px-11 py-3 text-sm text-white"
-              />
-            </label>
-            <select
-              value={selectedExam}
-              onChange={(e) => setSelectedExam(e.target.value)}
-              className="rounded-2xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-white"
-            >
-              <option value="">All assessments</option>
-              {((window as any).__examsDropdownList || exams).map((exam: any) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="overflow-hidden rounded-3xl border border-gray-700 bg-gray-900/70">
-            <div className="border-b border-gray-700 px-5 py-4">
-              <h2 className="text-lg font-semibold text-white">Attempts</h2>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-blue-900/40 to-slate-900/40 p-6 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-widest text-blue-300/70">Total Attempts</div>
+              <BarChart3 className="h-5 w-5 text-blue-400" />
             </div>
-            {loading ? (
-              <div className="p-6 text-sm text-gray-400">Loading analytics...</div>
-            ) : filteredAttempts.length === 0 ? (
-              <div className="p-6 text-sm text-gray-400">No attempts found for the current filter.</div>
-            ) : (
-              <div className="divide-y divide-gray-800">
-                {filteredAttempts.map((attempt) => (
-                  <button
-                    key={attempt.id}
-                    onClick={() => void viewAttempt(attempt)}
-                    className={`w-full px-5 py-4 text-left transition hover:bg-gray-800/60 ${
-                      selectedAttempt?.id === attempt.id ? 'bg-blue-500/10' : ''
-                    }`}
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <UserRound className="h-4 w-4 text-blue-300" />
-                          <span className="font-semibold text-white">{attempt.userName}</span>
-                          <span className="text-xs text-gray-500">{attempt.userEmail}</span>
-                        </div>
-                        <div className="mt-1 text-sm text-gray-400">{attempt.examTitle}</div>
-                        <div className="mt-2 text-xs text-gray-500">{formatDateTime(attempt.submitted_at)}</div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                        <div className="rounded-2xl border border-gray-700 bg-gray-950/60 px-3 py-2">
-                          <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">Score</div>
-                          <div className="mt-1 font-bold text-white">{attempt.score}</div>
-                        </div>
-                        <div className="rounded-2xl border border-gray-700 bg-gray-950/60 px-3 py-2">
-                          <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">Correct</div>
-                          <div className="mt-1 font-bold text-emerald-400">{attempt.correct_answers}</div>
-                        </div>
-                        <div className="rounded-2xl border border-gray-700 bg-gray-950/60 px-3 py-2">
-                          <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">Wrong</div>
-                          <div className="mt-1 font-bold text-rose-400">{attempt.wrongAnswers}</div>
-                        </div>
-                        <div className="rounded-2xl border border-gray-700 bg-gray-950/60 px-3 py-2">
-                          <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">Skipped</div>
-                          <div className="mt-1 font-bold text-slate-300">{attempt.skippedAnswers}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="text-4xl font-black text-white">{summary.totalAttempts}</div>
+          </div>
+          
+          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-emerald-900/40 to-slate-900/40 p-6 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-widest text-emerald-300/70">Avg Score</div>
+              <Target className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div className="text-4xl font-black text-white">{summary.avgScore.toFixed(1)}%</div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-900/40 to-slate-900/40 p-6 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-widest text-amber-300/70">Top Scorer</div>
+              <Trophy className="h-5 w-5 text-amber-500" />
+            </div>
+            <div className="truncate text-2xl font-bold text-white mt-2">{summary.best?.userName || '-'}</div>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-gray-700 bg-gray-900/70">
-          <div className="border-b border-gray-700 px-5 py-4">
-            <h2 className="text-lg font-semibold text-white">Attempt Details</h2>
-          </div>
-          {!selectedAttempt ? (
-            <div className="p-6 text-sm text-gray-400">Select an attempt to inspect the full question-by-question breakdown.</div>
-          ) : (
-            <div className="space-y-4 p-5">
-              <div className="rounded-2xl border border-gray-700 bg-gray-950/60 p-4">
-                <div className="text-lg font-semibold text-white">{selectedAttempt.userName}</div>
-                <div className="mt-1 text-sm text-gray-400">{selectedAttempt.examTitle}</div>
-                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-2xl border border-gray-700 bg-gray-800 px-3 py-2 text-white">
-                    <Target className="mb-1 h-4 w-4 text-blue-300" />
-                    {selectedAttempt.score} marks
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
+          <div className="flex flex-col gap-4">
+            <div className="rounded-3xl border border-white/10 bg-[#0F141F] p-4 shadow-xl">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-500" />
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by student..."
+                    className="w-full rounded-2xl border border-white/10 bg-[#0A0D14] px-11 py-3 text-sm text-white placeholder-slate-500 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                  />
+                </label>
+                <select
+                  value={selectedExam}
+                  onChange={(e) => setSelectedExam(e.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-[#0A0D14] px-4 py-3 text-sm text-slate-300 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                >
+                  <option value="">All Assessments</option>
+                  {((window as any).__examsDropdownList || exams).map((exam: any) => (
+                    <option key={exam.id} value={exam.id}>
+                      {exam.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-hidden rounded-3xl border border-white/10 bg-[#0F141F] shadow-xl">
+              <div className="border-b border-white/5 px-6 py-5">
+                <h2 className="text-lg font-bold text-white">Student Submissions</h2>
+              </div>
+              <div className="h-[600px] overflow-y-auto">
+                {loading ? (
+                  <div className="p-8 text-center text-sm text-slate-400">Loading analytics...</div>
+                ) : filteredAttempts.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-slate-400">No matching attempts found.</div>
+                ) : (
+                  <div className="divide-y divide-white/5">
+                    {filteredAttempts.map((attempt) => (
+                      <button
+                        key={attempt.id}
+                        onClick={() => void viewAttempt(attempt)}
+                        className={`w-full px-6 py-5 text-left transition hover:bg-white/5 ${
+                          selectedAttempt?.id === attempt.id ? 'bg-blue-500/10 shadow-[inset_4px_0_0_0_#3b82f6]' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate font-semibold text-white">{attempt.userName}</span>
+                            </div>
+                            <div className="mt-1 truncate text-xs text-slate-400">{attempt.examTitle}</div>
+                            <div className="mt-2 text-[11px] font-medium tracking-wide text-slate-500">{formatDateTime(attempt.submitted_at)}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-bold text-blue-400">{attempt.score}</div>
+                            <div className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">Marks</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                  <div className="rounded-2xl border border-gray-700 bg-gray-800 px-3 py-2 text-white">
-                    <Clock3 className="mb-1 h-4 w-4 text-amber-300" />
-                    {formatDuration(selectedAttempt.time_taken_seconds)}
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col">
+            <div className="flex-1 overflow-hidden rounded-3xl border border-white/10 bg-[#0F141F] shadow-xl flex flex-col">
+              <div className="border-b border-white/5 px-6 py-5">
+                <h2 className="text-lg font-bold text-white">Detailed Breakdown</h2>
+              </div>
+              
+              {!selectedAttempt ? (
+                 <div className="flex flex-1 items-center justify-center p-8 text-center">
+                   <div className="max-w-xs">
+                      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-800 border border-slate-700">
+                        <Search className="h-6 w-6 text-slate-400" />
+                      </div>
+                      <h3 className="text-base font-medium text-slate-300">No Attempt Selected</h3>
+                      <p className="mt-2 text-sm text-slate-500">Select an attempt from the list to see question-by-question analysis.</p>
+                   </div>
+                 </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto px-6 py-6">
+                  {/* Top Stats Overview */}
+                  <div className="mb-6 grid gap-4 grid-cols-2 sm:grid-cols-4">
+                     <div className="rounded-2xl border border-white/5 bg-[#0A0D14] p-4 text-center">
+                        <div className="text-2xl font-black text-emerald-500">{selectedAttempt.correct_answers}</div>
+                        <div className="mt-1 text-[11px] uppercase tracking-widest text-slate-500">Correct</div>
+                     </div>
+                     <div className="rounded-2xl border border-white/5 bg-[#0A0D14] p-4 text-center">
+                        <div className="text-2xl font-black text-rose-500">{selectedAttempt.wrongAnswers}</div>
+                        <div className="mt-1 text-[11px] uppercase tracking-widest text-slate-500">Wrong</div>
+                     </div>
+                     <div className="rounded-2xl border border-white/5 bg-[#0A0D14] p-4 text-center">
+                        <div className="text-2xl font-black text-slate-400">{selectedAttempt.skippedAnswers}</div>
+                        <div className="mt-1 text-[11px] uppercase tracking-widest text-slate-500">Skipped</div>
+                     </div>
+                     <div className="rounded-2xl border border-white/5 bg-[#0A0D14] p-4 text-center">
+                        <div className="text-2xl font-black text-amber-500">{formatDuration(selectedAttempt.time_taken_seconds)}</div>
+                        <div className="mt-1 text-[11px] uppercase tracking-widest text-slate-500">Time</div>
+                     </div>
+                  </div>
+
+                  {/* Chart section */}
+                  <div className="mb-8 rounded-2xl border border-white/5 bg-[#0A0D14] p-6 flex flex-col sm:flex-row items-center gap-8">
+                     <div className="h-48 w-48 shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={selectedChartData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              {selectedChartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{ backgroundColor: '#0F141F', borderColor: '#1E293B', color: '#fff', borderRadius: '12px' }} 
+                              itemStyle={{ color: '#fff' }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                     </div>
+                     <div className="flex-1 space-y-4">
+                       <h3 className="text-xl font-bold text-white">{selectedAttempt.userName}</h3>
+                       <div className="text-sm font-medium text-slate-400">{selectedAttempt.examTitle}</div>
+                       <div className="flex gap-4">
+                          <div className="flex items-center gap-2">
+                             <div className="h-3 w-3 rounded-full bg-emerald-500" />
+                             <span className="text-sm text-slate-300">Correct ({selectedAttempt.correct_answers})</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <div className="h-3 w-3 rounded-full bg-rose-500" />
+                             <span className="text-sm text-slate-300">Wrong ({selectedAttempt.wrongAnswers})</span>
+                          </div>
+                       </div>
+                     </div>
+                  </div>
+
+                  {/* Questions Details */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white mb-4">Question Breakdown</h3>
+                    {selectedAttempt.answers.map((answer, index) => {
+                      const question = attemptQuestions.find((entry) => entry.id === answer.questionId);
+                      const isSkipped = answer.skipped || answer.selectedOption < 0;
+                      const isCorrect = !!answer.is_correct;
+                      return (
+                        <div
+                          key={`${answer.questionId}-${index}`}
+                          className={`rounded-2xl border p-5 transition hover:shadow-lg ${
+                            isSkipped
+                              ? 'border-slate-800 bg-[#0A0D14]'
+                              : isCorrect
+                              ? 'border-emerald-500/20 bg-emerald-500/5'
+                              : 'border-rose-500/20 bg-rose-500/5'
+                          }`}
+                        >
+                          <div className="mb-4 flex items-center justify-between gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-white shadow-inner">
+                              Q{index + 1}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                              {isSkipped ? (
+                                <span className="text-slate-500">Skipped</span>
+                              ) : isCorrect ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-400">
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Correct
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-rose-400">
+                                  <XCircle className="h-4 w-4" />
+                                  Incorrect
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-[15px] leading-relaxed text-slate-200">{answer.question_text || question?.question_text || 'Question text unavailable'}</div>
+                          {(answer.question_image_url || question?.image_url) && (
+                            <img
+                              src={answer.question_image_url || question?.image_url}
+                              alt={`Question ${index + 1}`}
+                              className="mt-4 max-h-52 rounded-xl object-contain ring-1 ring-white/10"
+                            />
+                          )}
+                          <div className="mt-5 space-y-2">
+                            {(answer.option_text || question?.options || []).map((option, optionIndex) => {
+                              const isChosen = answer.selectedOption === optionIndex;
+                              const isCorrectOption = (answer.correctOption ?? question?.correct_index) === optionIndex;
+                              const label = getAnswerLabel(answer.option_label_style || question?.option_label_style, optionIndex);
+                              const optionImage = answer.option_images?.[optionIndex] || question?.option_images?.[optionIndex];
+                              return (
+                                <div
+                                  key={`${answer.questionId}-${optionIndex}`}
+                                  className={`rounded-xl border px-4 py-3 text-sm transition ${
+                                    isCorrectOption
+                                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                                      : isChosen
+                                      ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                                      : 'border-white/5 bg-slate-900/50 text-slate-400'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-4">
+                                    <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                                      isCorrectOption ? 'border-emerald-500 bg-emerald-500 text-slate-900' : isChosen ? 'border-rose-500 bg-rose-500 text-white' : 'border-slate-700 bg-slate-800'
+                                    }`}>
+                                      {label}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                      <div className={isCorrectOption ? 'font-medium' : ''}>{option}</div>
+                                      {optionImage && <img src={optionImage} alt={`Option ${label}`} className="mt-3 max-h-32 rounded-xl object-contain ring-1 ring-white/10" />}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
-
-              <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-                {selectedAttempt.answers.map((answer, index) => {
-                  const question = attemptQuestions.find((entry) => entry.id === answer.questionId);
-                  const isSkipped = answer.skipped || answer.selectedOption < 0;
-                  const isCorrect = !!answer.is_correct;
-                  return (
-                    <div
-                      key={`${answer.questionId}-${index}`}
-                      className={`rounded-2xl border p-4 ${
-                        isSkipped
-                          ? 'border-slate-700 bg-slate-950/60'
-                          : isCorrect
-                          ? 'border-emerald-500/30 bg-emerald-500/10'
-                          : 'border-rose-500/30 bg-rose-500/10'
-                      }`}
-                    >
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-white">Q{index + 1}</div>
-                        <div className="flex items-center gap-2 text-xs">
-                          {isSkipped ? (
-                            <span className="rounded-full border border-slate-600 px-3 py-1 text-slate-300">Skipped</span>
-                          ) : isCorrect ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 px-3 py-1 text-emerald-300">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Correct
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 px-3 py-1 text-rose-300">
-                              <XCircle className="h-3.5 w-3.5" />
-                              Wrong
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-sm leading-6 text-gray-200">{answer.question_text || question?.question_text || 'Question text unavailable'}</div>
-                      {(answer.question_image_url || question?.image_url) && (
-                        <img
-                          src={answer.question_image_url || question?.image_url}
-                          alt={`Question ${index + 1}`}
-                          className="mt-3 max-h-52 rounded-xl object-contain"
-                        />
-                      )}
-                      <div className="mt-3 space-y-2">
-                        {(answer.option_text || question?.options || []).map((option, optionIndex) => {
-                          const isChosen = answer.selectedOption === optionIndex;
-                          const isCorrectOption = (answer.correctOption ?? question?.correct_index) === optionIndex;
-                          const label = getAnswerLabel(answer.option_label_style || question?.option_label_style, optionIndex);
-                          const optionImage = answer.option_images?.[optionIndex] || question?.option_images?.[optionIndex];
-                          return (
-                            <div
-                              key={`${answer.questionId}-${optionIndex}`}
-                              className={`rounded-xl border px-3 py-2 text-sm ${
-                                isCorrectOption
-                                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
-                                  : isChosen
-                                  ? 'border-rose-500/30 bg-rose-500/10 text-rose-100'
-                                  : 'border-gray-700 bg-gray-900 text-gray-300'
-                              }`}
-                            >
-                              <div className="flex items-start gap-3">
-                                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current text-xs font-semibold">
-                                  {label}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div>{option}</div>
-                                  {optionImage && <img src={optionImage} alt={`Option ${label}`} className="mt-2 max-h-32 rounded-xl object-contain" />}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
+
