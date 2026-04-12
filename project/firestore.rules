@@ -29,8 +29,8 @@ service cloud.firestore {
     // User Profiles
     // ---------------------------------------------------------
     match /profiles/{userId} {
-      // Users can read their own profile, admins can read all
-      allow read: if isOwner(userId) || isAdmin();
+      // Users need to read profiles for leaderboards and social features
+      allow read: if isAuthenticated();
       
       // Allow profile creation during sign-up
       allow create: if isOwner(userId);
@@ -87,8 +87,8 @@ service cloud.firestore {
     // User Exam Attempts
     // ---------------------------------------------------------
     match /attempts/{attemptId} {
-      // Users can only read their own attempts
-      allow read: if isOwner(resource.data.user_id) || isAdmin();
+      // Users need to read attempts for Leaderboard and Result rankings
+      allow read: if isAuthenticated();
       
       // Only allow creation if the user_id matches the submitter
       allow create: if isOwner(request.resource.data.user_id) && isAuthenticated();
