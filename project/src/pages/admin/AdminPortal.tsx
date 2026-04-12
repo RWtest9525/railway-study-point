@@ -3,23 +3,24 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from '../../contexts/RouterContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { 
-  FileText, 
-  PlusCircle, 
-  DollarSign, 
   LogOut, 
-  Users, 
-  MessageSquare, 
-  LayoutDashboard,
-  ShieldCheck,
   ChevronRight,
-  CreditCard,
   Moon,
   Sun,
   ChevronLeft,
-  Trophy,
-  BarChart3,
-  Activity,
-  Database
+  LayoutDashboard, 
+  LibraryBig, 
+  FileBadge, 
+  BellRing, 
+  Headset, 
+  SmartphoneNfc,
+  UsersRound, 
+  Medal, 
+  WalletCards, 
+  CreditCard, 
+  Crown, 
+  Activity, 
+  HardDriveDownload 
 } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
 import { QuestionHub } from './QuestionHub';
@@ -53,22 +54,22 @@ export function AdminPortal() {
   };
 
   const mainTabs = [
-    { id: 'dashboard' as const, name: 'Dashboard', icon: BarChart3, desc: 'Analytics & Overview' },
-    { id: 'questions' as const, name: 'Category / Folders', icon: FileText, desc: 'Manage Question Banks & Practice Tests' },
-    { id: 'exams' as const, name: 'Mock Exams', icon: PlusCircle, desc: 'Create Scheduled & Timed Exams' },
-    { id: 'notifications' as const, name: 'Notifications', icon: MessageSquare, desc: 'Send User Updates' },
-    { id: 'support' as const, name: 'Support', icon: MessageSquare, desc: 'Student Help Tickets' },
+    { id: 'dashboard' as const, name: 'Dashboard', icon: LayoutDashboard, desc: 'Analytics & Overview', color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
+    { id: 'questions' as const, name: 'Category / Folders', icon: LibraryBig, desc: 'Manage Question Banks & Practice Tests', color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' },
+    { id: 'exams' as const, name: 'Mock Exams', icon: FileBadge, desc: 'Create Scheduled & Timed Exams', color: 'text-fuchsia-500', bgColor: 'bg-fuchsia-500/10' },
+    { id: 'notifications' as const, name: 'Notifications', icon: BellRing, desc: 'Send User Updates', color: 'text-amber-500', bgColor: 'bg-amber-500/10' },
+    { id: 'support' as const, name: 'Support', icon: Headset, desc: 'Student Help Tickets', color: 'text-rose-500', bgColor: 'bg-rose-500/10' },
   ];
 
   const managementTabs = [
-    { id: 'revenue' as const, name: 'Revenue', icon: DollarSign, desc: 'Track Payments' },
-    { id: 'users' as const, name: 'Users', icon: Users, desc: 'Manage All Students' },
-    { id: 'leaderboard' as const, name: 'Leaderboard', icon: Trophy, desc: 'User Learning Stats' },
-    { id: 'premium' as const, name: 'Premium', icon: ShieldCheck, desc: 'Price & Validity' },
-    { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions' },
-    { id: 'activity' as const, name: 'Manage Admins', icon: Activity, desc: 'Admin Accounts & Logs' },
-    { id: 'links' as const, name: 'Manage Links', icon: Database, desc: 'Category WhatsApp Links' },
-    { id: 'backup' as const, name: 'Backup', icon: Database, desc: 'Export Data' },
+    { id: 'revenue' as const, name: 'Revenue', icon: WalletCards, desc: 'Track Payments', color: 'text-green-500', bgColor: 'bg-green-500/10' },
+    { id: 'users' as const, name: 'Users', icon: UsersRound, desc: 'Manage All Students', color: 'text-indigo-500', bgColor: 'bg-indigo-500/10' },
+    { id: 'leaderboard' as const, name: 'Leaderboard', icon: Medal, desc: 'User Learning Stats', color: 'text-yellow-500', bgColor: 'bg-yellow-500/10' },
+    { id: 'premium' as const, name: 'Premium', icon: Crown, desc: 'Price & Validity', color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
+    { id: 'subscription' as const, name: 'Subscription', icon: CreditCard, desc: 'User Subscriptions', color: 'text-sky-500', bgColor: 'bg-sky-500/10' },
+    { id: 'activity' as const, name: 'Manage Admins', icon: Activity, desc: 'Admin Accounts & Logs', color: 'text-cyan-500', bgColor: 'bg-cyan-500/10' },
+    { id: 'links' as const, name: 'Manage Links', icon: SmartphoneNfc, desc: 'Category WhatsApp Links', color: 'text-pink-500', bgColor: 'bg-pink-500/10' },
+    { id: 'backup' as const, name: 'Backup', icon: HardDriveDownload, desc: 'Export Data', color: 'text-slate-500', bgColor: 'bg-slate-500/10' },
   ];
 
   const tabRouteMap = useMemo(
@@ -150,24 +151,26 @@ export function AdminPortal() {
                 Core Features
               </h3>
             )}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {mainTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabClick(tab.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all group border ${
                     activeTab === tab.id 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+                      ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20' 
                       : theme === 'dark'
-                        ? 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        ? 'border-transparent text-gray-400 hover:bg-gray-800 hover:border-gray-700 hover:text-gray-200 hover:shadow-sm'
+                        : 'border-transparent text-gray-600 hover:bg-white hover:border-gray-200 hover:text-gray-900 hover:shadow-sm'
                   }`}
                 >
-                  <tab.icon className={`w-5 h-5 shrink-0 ${activeTab === tab.id ? 'text-white' : ''}`} />
+                  <div className={`p-1.5 rounded-xl shrink-0 transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white' : `${tab.bgColor} ${tab.color} group-hover:scale-110 duration-300`}`}>
+                     <tab.icon className={`w-5 h-5 drop-shadow-sm`} />
+                  </div>
                   {!isSidebarCollapsed && (
-                    <span className="text-sm font-semibold truncate">{tab.name}</span>
+                    <span className="text-sm font-semibold truncate tracking-wide">{tab.name}</span>
                   )}
-                  {activeTab === tab.id && !isSidebarCollapsed && <ChevronRight className="w-4 h-4 ml-auto shrink-0" />}
+                  {activeTab === tab.id && !isSidebarCollapsed && <ChevronRight className="w-4 h-4 ml-auto shrink-0 opacity-70" />}
                 </button>
               ))}
             </div>
@@ -180,24 +183,26 @@ export function AdminPortal() {
                 Management
               </h3>
             )}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {managementTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabClick(tab.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all group border ${
                     activeTab === tab.id 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+                      ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20' 
                       : theme === 'dark'
-                        ? 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        ? 'border-transparent text-gray-400 hover:bg-gray-800 hover:border-gray-700 hover:text-gray-200 hover:shadow-sm'
+                        : 'border-transparent text-gray-600 hover:bg-white hover:border-gray-200 hover:text-gray-900 hover:shadow-sm'
                   }`}
                 >
-                  <tab.icon className={`w-5 h-5 shrink-0 ${activeTab === tab.id ? 'text-white' : ''}`} />
+                  <div className={`p-1.5 rounded-xl shrink-0 transition-colors ${activeTab === tab.id ? 'bg-white/20 text-white' : `${tab.bgColor} ${tab.color} group-hover:scale-110 duration-300`}`}>
+                     <tab.icon className={`w-5 h-5 drop-shadow-sm`} />
+                  </div>
                   {!isSidebarCollapsed && (
-                    <span className="text-sm font-semibold truncate">{tab.name}</span>
+                    <span className="text-sm font-semibold truncate tracking-wide">{tab.name}</span>
                   )}
-                  {activeTab === tab.id && !isSidebarCollapsed && <ChevronRight className="w-4 h-4 ml-auto shrink-0" />}
+                  {activeTab === tab.id && !isSidebarCollapsed && <ChevronRight className="w-4 h-4 ml-auto shrink-0 opacity-70" />}
                 </button>
               ))}
             </div>

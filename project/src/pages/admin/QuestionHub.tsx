@@ -30,7 +30,18 @@ export function QuestionHub() {
   const isDark = theme === 'dark';
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<CategoryNode[]>([]);
-  const [path, setPath] = useState<StepItem[]>([]);
+  const [path, setPath] = useState<StepItem[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('admin_questionhub_path');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('admin_questionhub_path', JSON.stringify(path));
+  }, [path]);
   const [loading, setLoading] = useState(true);
   const [stepLoading, setStepLoading] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);

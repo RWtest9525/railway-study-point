@@ -12,6 +12,7 @@ import {
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
 import { cache, createCacheKey } from '../lib/dataCache';
+import { getRandomAvatar } from '../lib/avatars';
 
 interface Profile {
   id: string;
@@ -56,7 +57,7 @@ let loginSessionStart: Date | null = null;
 
 // Helper function to determine effective role
 const getEffectiveRole = (profile: Profile | null, userEmail?: string): 'admin' | 'student' | 'banned' => {
-  if (profile?.ban_reason) return 'banned';
+  if (profile?.ban_reason || profile?.role === 'banned') return 'banned';
   
   // Check if user email is in admin list (for initial setup)
   const adminEmails = ['admin@railwaystudy.com', 'admin@test.com', 'yashvishal647@gmail.com', 'saichauhan239@gmail.com'];
@@ -133,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: fullName || email.split('@')[0],
           role: 'student',
           is_premium: false,
+          avatar_url: getRandomAvatar(),
         };
 
         const profileData: Profile = {
@@ -307,6 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: fullName,
           role: 'student',
           is_premium: false,
+          avatar_url: getRandomAvatar(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };

@@ -171,7 +171,16 @@ export function StudentAnalytics() {
       <header className={`sticky top-0 z-50 border-b backdrop-blur-xl ${isDark ? 'border-white/5 bg-[#0A0D14]/80' : 'border-slate-200 bg-white/80'}`}>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center gap-4">
-            <button onClick={() => navigate('/admin-portal')} className={`inline-flex items-center gap-2 rounded-full p-2 transition ${isDark ? 'text-slate-400 hover:bg-white/5 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
+            <button 
+              onClick={() => {
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate('/admin-portal');
+                }
+              }} 
+              className={`inline-flex items-center gap-2 rounded-full p-2 transition ${isDark ? 'text-slate-400 hover:bg-white/5 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+            >
               <ArrowLeft className="h-5 w-5" />
             </button>
             <h1 className={`text-xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Student Analytics</h1>

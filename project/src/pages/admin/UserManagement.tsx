@@ -17,6 +17,7 @@ interface UserProfile {
   premium_until?: string | null;
   role: 'admin' | 'student' | 'banned';
   created_at: string;
+  updated_at?: string;
 }
 
 export function UserManagement() {
@@ -60,7 +61,7 @@ export function UserManagement() {
   );
 
   const updateRole = async (user: UserProfile, role: 'admin' | 'student' | 'banned') => {
-    const actionLabel = role === 'admin' ? 'make admin' : role === 'banned' ? 'ban' : 'restore';
+    const actionLabel = role === 'admin' ? 'make admin' : role === 'banned' ? 'ban' : 'unban';
     setConfirmModal({
       isOpen: true,
       title: `${actionLabel} User`,
@@ -147,7 +148,12 @@ export function UserManagement() {
                   </span>
                 </td>
                 <td className={`px-4 py-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                  {user.created_at ? formatDate(user.created_at) : '-'}
+                  <div>{user.created_at ? formatDate(user.created_at) : '-'}</div>
+                  {user.role === 'banned' && user.updated_at && (
+                    <div className="text-xs text-red-500 mt-1.5 font-bold bg-red-500/10 inline-block px-2 py-0.5 rounded-md border border-red-500/20">
+                      Banned: {formatDate(user.updated_at)}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-wrap justify-end gap-2">
@@ -170,7 +176,7 @@ export function UserManagement() {
                     {user.role === 'banned' && (
                       <button onClick={() => void updateRole(user, 'student')} className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">
                         <UserCheck className="h-3.5 w-3.5" />
-                        Restore
+                        Unban
                       </button>
                     )}
                   </div>

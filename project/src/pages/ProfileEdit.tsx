@@ -4,8 +4,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import { sendPasswordResetEmail, updateProfile } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { User as UserIcon, Mail, Phone, KeyRound, ArrowLeft } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, KeyRound, ArrowLeft, Camera, X } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
+import { DEFAULT_AVATARS } from '../lib/avatars';
 
 export function ProfileEdit() {
   const { theme } = useTheme();
@@ -13,13 +14,16 @@ export function ProfileEdit() {
   const { profile, user, refreshProfile } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
   const [loading, setLoading] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
     setPhone(profile?.phone ?? '');
-  }, [profile?.full_name, profile?.phone, profile?.id]);
+    setAvatarUrl(profile?.avatar_url ?? '');
+  }, [profile?.full_name, profile?.phone, profile?.avatar_url, profile?.id]);
   
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -50,6 +54,7 @@ export function ProfileEdit() {
       await updateDoc(profileRef, {
         full_name: fullName.trim(),
         phone: phone.trim(),
+        avatar_url: avatarUrl,
         updated_at: new Date().toISOString(),
       });
 
@@ -102,12 +107,27 @@ export function ProfileEdit() {
       <main className="max-w-lg mx-auto px-4 py-8">
         <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-5 sm:p-8 ${isDark ? 'shadow-xl' : 'shadow-lg'}`}>
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-blue-600 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-900/20">
-              <UserIcon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-            </div>
+            <button 
+              type="button" 
+              onClick={() => setShowAvatarModal(true)} 
+              className="relative group transition-transform active:scale-95"
+            >
+              {avatarUrl ? (
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-[28px] overflow-hidden bg-blue-50 ring-4 ring-offset-2 ring-transparent transition group-hover:ring-blue-500/30">
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-[28px] flex items-center justify-center shrink-0 shadow-lg shadow-blue-900/20">
+                  <UserIcon className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+                </div>
+              )}
+              <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 p-1.5 rounded-full shadow-lg border border-gray-100 dark:border-gray-700">
+                <Camera className="w-4 h-4" />
+              </div>
+            </button>
             <div>
-              <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Profile & Security</h1>
-              <p className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-xs sm:text-sm`}>Manage your personal information</p>
+              <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Profile & Identity</h1>
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs sm:text-sm font-medium mt-0.5`}>Tap photo to customize avatar</p>
             </div>
           </div>
 
@@ -225,7 +245,55 @@ export function ProfileEdit() {
             </button>
           </div>
         </div>
-        </main>
+      {/* Avatar Selection Modal */}
+      {showAvatarModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity">
+          <div className={`w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden rounded-[32px] border ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'} shadow-2xl animate-in fade-in zoom-in-95 duration-200`}>
+            <div className={`p-6 border-b flex justify-between items-center ${isDark ? 'border-gray-800 bg-gray-900/80' : 'border-gray-100 bg-gray-50/80'} backdrop-blur-md`}>
+              <div>
+                <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Choose Avatar</h3>
+                <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Pick a new look for your profile</p>
+              </div>
+              <button 
+                onClick={() => setShowAvatarModal(false)}
+                className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                {DEFAULT_AVATARS.map((url, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setAvatarUrl(url);
+                      setShowAvatarModal(false);
+                    }}
+                    className={`relative group aspect-square rounded-3xl overflow-hidden shadow-sm transition-all hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-500/50 ${
+                      avatarUrl === url ? 'ring-4 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 scale-105' : 'border border-gray-100 dark:border-gray-800'
+                    }`}
+                  >
+                    <img src={url} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover" />
+                    {avatarUrl === url && (
+                      <div className="absolute inset-x-0 bottom-0 py-1 bg-blue-500 text-[10px] text-white font-bold tracking-wider uppercase backdrop-blur-md z-10">
+                        Selected
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={`p-4 border-t ${isDark ? 'border-gray-800 bg-gray-900/50' : 'border-gray-100 bg-gray-50/50'} flex justify-end`}>
+               <p className={`text-[11px] font-medium tracking-wide uppercase ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                 Tap an avatar to set immediately
+               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom Navigation */}
       <BottomNav />
     </div>

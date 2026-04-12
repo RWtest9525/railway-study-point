@@ -15,9 +15,13 @@ import {
   User,
   ChevronRight,
   Bell,
+  CalendarDays,
+  Lock,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { trialWholeDaysLeft } from '../lib/authUtils';
+import { ConfirmModal } from '../components/ConfirmModal';
+import toast from 'react-hot-toast';
 
 export function StudentDashboard() {
   const { profile, signOut, isPremium, effectiveRole, canAccessTests, trialExpiredNeedsPremium } =
@@ -27,6 +31,7 @@ export function StudentDashboard() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [recentResults, setRecentResults] = useState<QuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [examToStart, setExamToStart] = useState<Exam | null>(null);
   const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile), [profile]);
 
 
@@ -342,6 +347,39 @@ export function StudentDashboard() {
                 })}
               </div>
             </div>
+
+            {/* Upcoming / Disabled Exams Section */}
+            <div className="mt-12 mb-8">
+              <div className="flex items-center gap-3 mb-6">
+                 <CalendarDays className="w-6 h-6 text-indigo-400" />
+                 <h2 className="text-2xl font-bold text-white">Upcoming Series</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[
+                  { title: 'RRB NTPC CBT-2 Mega Mock Series', desc: 'Expected Next Month', tags: ['120 Questions', 'Advanced'] },
+                  { title: 'RPF Sub-Inspector Target Complete', desc: 'Notifications Soon', tags: ['Full Length', 'Mock'] },
+                  { title: 'RRB JE Technical Stage 1', desc: 'Preparing Content', tags: ['100 Questions', 'Core'] }
+                ].map((item, idx) => (
+                  <button 
+                    key={idx} 
+                    onClick={() => toast('This exam series is currently unavailable and will be launched soon!', { icon: '⏳' })} 
+                    className="relative overflow-hidden bg-gray-800/30 rounded-2xl p-6 border border-gray-700/50 transition group text-left opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 focus:outline-none"
+                  >
+                    <div className="absolute top-4 right-4 bg-gray-700 px-3 py-1 rounded-full text-[10px] font-extrabold text-blue-300 uppercase tracking-widest shadow-md">Coming Soon</div>
+                    <div className="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center mb-4">
+                      <Lock className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-300 mb-1.5 pr-16 leading-tight">{item.title}</h3>
+                    <p className="text-gray-500 text-sm mb-6">{item.desc}</p>
+                    <div className="flex items-center gap-2 mt-auto">
+                      {item.tags.map(tag => (
+                        <div key={tag} className="px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-400 text-[10px] font-bold uppercase">{tag}</div>
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </>
         ) : (
           <div className="animate-in fade-in slide-in-from-left-4 duration-300">
@@ -407,7 +445,7 @@ export function StudentDashboard() {
                         navigate('/upgrade');
                         return;
                       }
-                      navigate(`/exam/${exam.id}`);
+                      setExamToStart(exam);
                     }}
                     className={`w-full py-3 rounded-xl font-bold transition shadow-lg mt-auto ${
                       !canAccessTests || (exam.is_premium && !isPremium)
@@ -427,6 +465,20 @@ export function StudentDashboard() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!examToStart}
+        onCancel={() => setExamToStart(null)}
+        onConfirm={() => {
+          if (examToStart) {
+            navigate(`/exam/${examToStart.id}`);
+          }
+        }}
+        title="Start Exam"
+        message={examToStart ? `Are you sure you want to start "${examToStart.title}" now? The timer will begin immediately once started.` : ''}
+        confirmText="Start Exam"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
