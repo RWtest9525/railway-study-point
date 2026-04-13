@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Clock, CreditCard, Download, TrendingUp, XCircle } from 'lucide-react';
-import { collection, doc, getDocs, orderBy, query, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, orderBy, query, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { formatDateTime } from '../../lib/dateUtils';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -38,25 +38,32 @@ export function RevenueTracker() {
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    void loadRevenueData();
-  }, []);
+    let unsubscribe: () => void;
 
-  const loadRevenueData = async () => {
-    setLoading(true);
-    try {
-      const [transactionsSnapshot, users] = await Promise.all([
-        getDocs(query(collection(db, 'transactions'), orderBy('created_at', 'desc'))),
-        getUsers(),
-      ]);
-      setTransactions(transactionsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Transaction)));
-      setProfiles(users);
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to load revenue data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const users = await getUsers();
+        setProfiles(users);
+
+        const q = query(collection(db, 'transactions'), orderBy('created_at', 'desc'));
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          setTransactions(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Transaction)));
+          setLoading(false); // Only set false after first snapshot
+        });
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to load revenue data');
+        setLoading(false);
+      }
+    };
+
+    void loadData();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   const profileById = useMemo(
     () => new Map(profiles.map((profile) => [profile.id, profile])),
@@ -90,7 +97,6 @@ export function RevenueTracker() {
       status: 'success',
       updated_at: new Date().toISOString(),
     });
-    await loadRevenueData();
     toast.success('Transaction marked as success');
   };
 
