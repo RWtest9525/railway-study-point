@@ -487,19 +487,6 @@ export function QuestionHub() {
                     </div>
                     <div className="flex items-center gap-4">
                       <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle === 'Category' ? 'Category / Folders Setup' : pageTitle}</h1>
-                      {currentLink && (
-                        <a
-                          href={currentLink.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-green-100 px-3 py-1.5 text-xs font-bold text-green-700 hover:bg-green-200"
-                        >
-                          <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white">
-                            <ExternalLink className="h-3 w-3" />
-                          </div>
-                          WhatsApp
-                        </a>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -536,7 +523,20 @@ export function QuestionHub() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3 self-start mt-2 sm:mt-0">
+              {currentLink && (
+                <a
+                  href={currentLink.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-100 px-5 py-3 text-sm font-semibold text-green-700 hover:bg-green-200"
+                >
+                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white">
+                    <ExternalLink className="h-3 w-3" />
+                  </div>
+                  WhatsApp Link
+                </a>
+              )}
               {canAddQuestionHere && (
                 <>
                   <button
