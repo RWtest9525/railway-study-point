@@ -276,15 +276,21 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
             </p>
           </div>
 
-          <button
-            onClick={() => {
-              setStartTime(Date.now());
-              setHasStarted(true);
-            }}
-            className="w-full sm:w-auto px-12 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 transition-transform active:scale-95"
-          >
-            Start Assessment
-          </button>
+          {questions.length === 0 ? (
+            <div className={`w-full max-w-md p-4 rounded-xl border ${isDark ? 'bg-amber-500/10 border-amber-500/20 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+              This folder has no tests available.
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setStartTime(Date.now());
+                setHasStarted(true);
+              }}
+              className="w-full sm:w-auto px-12 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 transition-transform active:scale-95"
+            >
+              Start Assessment
+            </button>
+          )}
         </main>
       </div>
     );

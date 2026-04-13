@@ -131,8 +131,10 @@ service cloud.firestore {
     match /transactions/{transactionId} {
       allow read: if isOwner(resource.data.user_id) || isAdmin();
       
-      // Typically admins or backend functions write to this
-      allow write: if isAdmin();
+      // Allow users to create and update their own transactions
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isOwner(resource.data.user_id) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ---------------------------------------------------------

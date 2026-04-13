@@ -214,7 +214,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
           <section>
             {visibleExams.length === 0 && currentNodes.length === 0 ? (
               <div className={`${isDark ? 'bg-white/5 border-white/10 text-gray-400' : 'bg-white border-slate-200/60 text-gray-500'} rounded-[24px] border border-dashed p-8 text-center`}>
-                No tests available in this section yet.
+                This folder has no tests available.
               </div>
             ) : (
               <div className="space-y-4">
