@@ -97,10 +97,26 @@ export function Upgrade() {
         created_at: serverTimestamp(),
       });
 
-      const options = {
+      let orderId = undefined;
+      try {
+        const orderRes = await fetch('/api/createOrder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: finalAmount })
+        });
+        const orderData = await orderRes.json();
+        if (!orderRes.ok) throw new Error(orderData.error || 'Failed to generate Secure Order');
+        orderId = orderData.id;
+      } catch (orderApiError) {
+        console.warn('Order API Failed:', orderApiError);
+        // Continue and try fallback direct checkout if their account somehow still allows it
+      }
+
+      const options: any = {
         key,
         amount: finalAmount,
         currency: 'INR',
+        ...(orderId ? { order_id: orderId } : {}),
         name: 'Railway Study Point',
         description: `Premium Access - ${validityDays} Days`,
         image: '/railway-study-point-logo.png',
