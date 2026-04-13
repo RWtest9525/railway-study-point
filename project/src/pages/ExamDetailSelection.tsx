@@ -316,9 +316,22 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
           >
             <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
           </button>
-            <h1 className={`truncate font-extrabold text-xl ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h1 className={`truncate font-extrabold text-xl flex-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
               {path.length > 0 ? path[path.length - 1].name : category?.name || 'Available Tests'}
             </h1>
+            {(isPremium || profile?.role === 'admin') && currentLink && (
+              <a
+                href={currentLink.url}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-auto inline-flex items-center justify-center gap-2 rounded-xl bg-green-100 px-3 py-1.5 text-xs font-bold text-green-700 hover:bg-green-200"
+              >
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white">
+                  <ExternalLink className="h-3 w-3" />
+                </div>
+                WhatsApp
+              </a>
+            )}
         </div>
       </header>
 
@@ -329,29 +342,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
           </div>
         )}
 
-        {(isPremium || profile?.role === 'admin') && currentLink && (
-          <div className={`${isDark ? 'border-green-500/20 bg-green-500/10' : 'border-green-200 bg-green-50'} mb-5 rounded-[24px] border p-4`}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className={`text-sm font-semibold ${isDark ? 'text-green-200' : 'text-green-700'}`}>
-                  Join channel for this category
-                </div>
-                <div className={`mt-1 text-sm ${isDark ? 'text-green-100/80' : 'text-green-600'}`}>
-                  {currentLink.title}
-                </div>
-              </div>
-              <a
-                href={currentLink.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-600 px-4 py-3 text-sm font-semibold text-white"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Join Channel
-              </a>
-            </div>
-          </div>
-        )}
+
 
         {renderContent()}
       </main>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Pencil, Plus, Settings, Trash2, X, Eye } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, Settings, Trash2, X, Eye, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useRouter } from '../../contexts/RouterContext';
@@ -17,6 +17,8 @@ import {
   Question,
   getQuestionsByCategoryNode,
   deleteQuestion,
+  getCategoryLinks,
+  CategoryLink,
 } from '../../lib/firestore';
 import { AddQuestionModal } from '../../components/AddQuestionModal';
 import { ConfirmModal } from '../../components/ConfirmModal';
@@ -57,9 +59,25 @@ export function QuestionHub() {
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
   const [viewImageFull, setViewImageFull] = useState<string | null>(null);
+  const [currentLink, setCurrentLink] = useState<CategoryLink | null>(null);
 
   const selectedCategoryId = path.find((item) => item.entity === 'category')?.id || '';
   const selectedNode = path.length > 0 ? path[path.length - 1] : null;
+
+  useEffect(() => {
+    const loadCurrentLink = async () => {
+      if (path.length > 0) {
+        const links = await getCategoryLinks(selectedCategoryId!, selectedNode!.id);
+        setCurrentLink(links[0] || null);
+      } else if (selectedCategoryId) {
+        const links = await getCategoryLinks(selectedCategoryId, null);
+        setCurrentLink(links[0] || null);
+      } else {
+        setCurrentLink(null);
+      }
+    };
+    loadCurrentLink();
+  }, [path, selectedCategoryId, selectedNode]);
   const parentNode = path.length > 1 ? path[path.length - 2] : null;
   const currentNodeParent = path[path.length - 1]?.entity === 'node' ? path[path.length - 1].id : null;
   
@@ -460,12 +478,31 @@ export function QuestionHub() {
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <div>
-                <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                  {pageBadge}
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                      {pageBadge}
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle === 'Category' ? 'Category / Folders Setup' : pageTitle}</h1>
+                      {currentLink && (
+                        <a
+                          href={currentLink.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-green-100 px-3 py-1.5 text-xs font-bold text-green-700 hover:bg-green-200"
+                        >
+                          <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white">
+                            <ExternalLink className="h-3 w-3" />
+                          </div>
+                          WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <h1 className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pageTitle === 'Category' ? 'Category / Folders Setup' : pageTitle}</h1>
-                <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{helperText}</p>
+                <div className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{helperText}</div>
                 {path.length > 0 && !isCurrentPageTest && (
                   <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
                     <input
