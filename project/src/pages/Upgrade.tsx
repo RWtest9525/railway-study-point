@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { doc, getDoc, updateDoc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ArrowLeft, BarChart3, BookOpen, Check, Crown, Trophy, X, Zap } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 function computePremiumUntil(currentUntil: string | null | undefined, validityDays: number): string {
   const base = currentUntil && new Date(currentUntil) > new Date() ? new Date(currentUntil) : new Date();
@@ -169,6 +170,15 @@ export function Upgrade() {
               console.error('Failed to mark transaction cancelled:', dismissError);
             }
             setLoading(false);
+            toast('You have cancelled the payment', {
+              icon: '⚠️',
+              style: {
+                borderRadius: '16px',
+                background: '#4b5563',
+                color: '#fff',
+              },
+            });
+            navigate('/');
           },
         },
       };
