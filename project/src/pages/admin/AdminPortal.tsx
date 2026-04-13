@@ -344,7 +344,15 @@ export function AdminPortal() {
                       Overview of system performance and analytics
                     </p>
                   </div>
-                <div className="hidden md:flex gap-3" />
+                <div className="hidden md:flex gap-3">
+                  <button
+                    onClick={() => handleTabClick('links')}
+                    className={`inline-flex items-center gap-2 rounded-xl bg-pink-500/10 px-4 py-2 text-sm font-bold text-pink-500 hover:bg-pink-500/20 transition`}
+                  >
+                    <SmartphoneNfc className="h-4 w-4" />
+                    Manage WhatsApp Links
+                  </button>
+                </div>
                 </div>
                 
                 <AdminDashboardCharts />

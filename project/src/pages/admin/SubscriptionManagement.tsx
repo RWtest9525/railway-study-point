@@ -56,13 +56,22 @@ export function SubscriptionManagement() {
   };
 
   const grantPremium = async (userId: string, days: number) => {
+    const profile = profiles.find(p => p.id === userId);
     const premiumUntil = new Date();
     premiumUntil.setDate(premiumUntil.getDate() + days);
-    await updateDoc(doc(db, 'profiles', userId), {
+    
+    const patch: any = {
       is_premium: true,
       premium_until: premiumUntil.toISOString(),
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    const wasActive = profile?.is_premium && profile?.premium_until && new Date(profile.premium_until) > new Date();
+    if (!wasActive || !(profile as any)?.premium_started_at) {
+      patch.premium_started_at = new Date().toISOString();
+    }
+
+    await updateDoc(doc(db, 'profiles', userId), patch);
     await loadData();
     toast.success(`Premium granted for ${days} days`);
   };

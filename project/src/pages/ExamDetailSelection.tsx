@@ -329,7 +329,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
           </div>
         )}
 
-        {isPremium && currentLink && (
+        {(isPremium || profile?.role === 'admin') && currentLink && (
           <div className={`${isDark ? 'border-green-500/20 bg-green-500/10' : 'border-green-200 bg-green-50'} mb-5 rounded-[24px] border p-4`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
