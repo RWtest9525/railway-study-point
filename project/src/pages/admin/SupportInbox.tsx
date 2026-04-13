@@ -24,7 +24,7 @@ export function SupportInbox() {
   const [loading, setLoading] = useState(true);
   const [selectedQuery, setSelectedQuery] = useState<SupportQuery | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved'>('pending');
   const [typeFilter, setTypeFilter] = useState<'all' | 'chat' | 'call'>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
@@ -48,10 +48,8 @@ export function SupportInbox() {
       setQueries(supportQueries);
       setLoading(false);
       
-      // Auto-select if nothing is selected yet
+      // Auto-update content if selected
       setSelectedQuery(current => {
-        if (!current && supportQueries.length > 0) return supportQueries[0];
-        // If currently selected query was updated, update its content
         if (current) {
           const updated = supportQueries.find(q => q.id === current.id);
           if (updated) return updated;
@@ -114,6 +112,19 @@ export function SupportInbox() {
 
     return result;
   }, [queries, search, profileById, statusFilter, sortOrder, typeFilter]);
+
+  useEffect(() => {
+    setSelectedQuery(current => {
+      if (!current) {
+        return filteredQueries.length > 0 ? filteredQueries[0] : null;
+      }
+      const exists = filteredQueries.find(q => q.id === current.id);
+      if (!exists) {
+        return filteredQueries.length > 0 ? filteredQueries[0] : null;
+      }
+      return current;
+    });
+  }, [filteredQueries]);
 
 
   const updateStatus = async (queryId: string, status: 'pending' | 'resolved' | 'closed') => {
