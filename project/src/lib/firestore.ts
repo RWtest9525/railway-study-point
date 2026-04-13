@@ -370,13 +370,18 @@ export const getCategoryLinks = async (categoryId: string, categoryNodeId?: stri
   const snapshot = await getDocs(
     query(
       categoryLinksRef,
-      where('category_id', '==', categoryId),
-      where('category_node_id', '==', categoryNodeId ?? null),
-      where('is_active', '==', true),
-      orderBy('updated_at', 'desc')
+      where('category_id', '==', categoryId)
     )
   );
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CategoryLink));
+  const allLinks = snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CategoryLink));
+  
+  return allLinks
+    .filter(item => item.is_active && (item.category_node_id || null) === (categoryNodeId || null))
+    .sort((a, b) => {
+      const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return bTime - aTime;
+    });
 };
 
 export const upsertCategoryLink = async (data: Omit<CategoryLink, 'id' | 'created_at' | 'updated_at'>) => {

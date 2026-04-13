@@ -66,15 +66,16 @@ export function QuestionHub() {
 
   useEffect(() => {
     const loadCurrentLink = async () => {
-      if (path.length > 0) {
-        const links = await getCategoryLinks(selectedCategoryId!, selectedNode!.id);
-        setCurrentLink(links[0] || null);
-      } else if (selectedCategoryId) {
-        const links = await getCategoryLinks(selectedCategoryId, null);
-        setCurrentLink(links[0] || null);
-      } else {
+      if (!selectedCategoryId) {
         setCurrentLink(null);
+        return;
       }
+      
+      let links = await getCategoryLinks(selectedCategoryId, selectedNode ? selectedNode.id : null);
+      if (links.length === 0 && selectedNode) {
+        links = await getCategoryLinks(selectedCategoryId, null); // Fallback to root
+      }
+      setCurrentLink(links[0] || null);
     };
     loadCurrentLink();
   }, [path, selectedCategoryId, selectedNode]);

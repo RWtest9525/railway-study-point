@@ -88,7 +88,10 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
 
   const loadCurrentLink = async () => {
     try {
-      const links = await getCategoryLinks(categoryId, currentNodeId);
+      let links = await getCategoryLinks(categoryId, currentNodeId);
+      if (links.length === 0 && currentNodeId) {
+        links = await getCategoryLinks(categoryId, null); // Fallback to root category link
+      }
       setCurrentLink(links[0] || null);
     } catch (error) {
       console.error('Error loading current link:', error);
