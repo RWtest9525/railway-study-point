@@ -5,9 +5,9 @@ export default async function handler(req, res) {
 
   const { amount } = req.body;
 
-  // Supports both VITE_ and regular env vars
-  const keyId = process.env.VITE_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_SECRET;
+  // Supports both VITE_ and regular env vars, trims to remove invisible whitespace/newlines
+  const keyId = String(process.env.VITE_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || '').trim();
+  const keySecret = String(process.env.RAZORPAY_SECRET || '').trim();
 
   if (!keyId || !keySecret) {
     return res.status(500).json({ error: 'Missing Razorpay keys in server environment.' });

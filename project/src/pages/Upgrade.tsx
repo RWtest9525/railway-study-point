@@ -68,8 +68,8 @@ export function Upgrade() {
   const handleUpgrade = async () => {
     if (!profile) return;
 
-    const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
-    if (!key || String(key).trim() === '') {
+    const key = String(import.meta.env.VITE_RAZORPAY_KEY_ID || '').trim();
+    if (!key) {
       setError('Razorpay is not configured. Add VITE_RAZORPAY_KEY_ID in your environment.');
       return;
     }
