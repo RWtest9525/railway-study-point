@@ -473,6 +473,22 @@ export function AddQuestionModal({
                   <option value="numeric">1 2 3 4</option>
                 </select>
               </label>
+
+              {!isBulkMode && (
+                 <label className="block">
+                   <span className="mb-2 block text-sm font-medium text-slate-700">Correct Option</span>
+                   <select
+                     value={currentDraft.correct_index}
+                     onChange={(e) => updateCurrentDraft({ correct_index: parseInt(e.target.value) })}
+                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+                   >
+                     <option value={0}>{currentDraft.option_label_style === 'numeric' ? 'Option 1' : 'Option A'}</option>
+                     <option value={1}>{currentDraft.option_label_style === 'numeric' ? 'Option 2' : 'Option B'}</option>
+                     <option value={2}>{currentDraft.option_label_style === 'numeric' ? 'Option 3' : 'Option C'}</option>
+                     <option value={3}>{currentDraft.option_label_style === 'numeric' ? 'Option 4' : 'Option D'}</option>
+                   </select>
+                 </label>
+              )}
             </div>
 
 
@@ -630,21 +646,26 @@ export function AddQuestionModal({
                   )}
                 </div>
                 {previewOptions.map((option, index) => (
-                  <div
+                  <button
                     key={index}
-                    className={`rounded-2xl border p-3 ${
-                      index === currentDraft.correct_index ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
+                    type="button"
+                    onClick={() => updateCurrentDraft({ correct_index: index })}
+                    className={`w-full text-left rounded-2xl border p-3 transition hover:border-emerald-300 ${
+                      index === currentDraft.correct_index ? 'border-emerald-300 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white'
                     }`}
+                    title="Click to mark as correct option"
                   >
                     <div className="flex items-start gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-700">
+                      <span className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
+                        index === currentDraft.correct_index ? 'border-emerald-400 bg-emerald-100 text-emerald-700' : 'border-slate-200 text-slate-700'
+                      }`}>
                         {currentDraft.option_label_style === 'numeric' ? index + 1 : String.fromCharCode(65 + index)}
                       </span>
                       <div className="min-w-0 flex-1 text-sm text-slate-700">
                         {option || `Choose option ${index + 1}`}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
