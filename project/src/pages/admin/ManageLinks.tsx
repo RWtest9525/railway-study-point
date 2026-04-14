@@ -95,6 +95,7 @@ export function ManageLinks() {
             <label className={`mb-2 block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Category</label>
             <select
               value={selectedCategoryId}
+              onChange={(e) => setSelectedCategoryId(e.target.value)}
               className={`w-full rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-gray-700 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
             >
               {categories.map((category) => (

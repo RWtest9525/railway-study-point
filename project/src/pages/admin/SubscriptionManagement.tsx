@@ -21,6 +21,7 @@ interface UserProfile {
   full_name: string;
   is_premium: boolean;
   premium_until?: string | null;
+  created_at?: string;
 }
 
 const normalizeAmount = (amount: number) => (amount > 1000 ? amount / 100 : amount);
