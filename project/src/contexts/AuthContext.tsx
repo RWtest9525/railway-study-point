@@ -274,19 +274,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Debug: Log credentials (trim whitespace)
+      // ONLY trim the email. Passwords should NEVER be trimmed because spaces might be part of the actual password!
       const trimmedEmail = email.trim();
-      const trimmedPassword = password.trim();
       
-      console.log('DEBUG AUTH: Attempting sign in with:');
-      console.log('  Email:', trimmedEmail);
-      console.log('  Password length:', trimmedPassword.length);
-      console.log('  Auth config:', {
-        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      });
-      
-      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
       console.log('DEBUG AUTH: Sign in successful, user:', userCredential.user.email);
       console.log('DEBUG AUTH: User UID:', userCredential.user.uid);
     } catch (error: any) {
