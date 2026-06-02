@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
-import { getAttempt, getAttemptsByExam, getExam, getQuestions, getUsers, QuizAttempt, Exam, Question } from '../lib/firestore';
-import { Trophy, Clock, Target, CheckCircle, XCircle, ArrowLeft, BarChart3 } from 'lucide-react';
+import { getAttempt, getAttemptsByExam, getCategoryNode, getExam, getQuestions, getQuestionsByCategoryNode, getUsers, QuizAttempt, Exam, Question } from '../lib/firestore';
+import { Trophy, Clock, Target, CheckCircle, XCircle, ArrowLeft, BarChart3, Download } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { BottomNav } from '../components/BottomNav';
 
@@ -35,10 +35,29 @@ export function Results({ resultId }: ResultsProps) {
       if (!attemptData) throw new Error('Result not found');
       setAttempt(attemptData);
 
-      const examData = await getExam(attemptData.exam_id);
-      if (examData) setExam(examData);
-
-      const questionsData = await getQuestions(attemptData.exam_id);
+      let questionsData: Question[] = [];
+      if (attemptData.exam_id.startsWith('node_')) {
+        const nodeId = attemptData.exam_id.replace('node_', '');
+        const nodeData = await getCategoryNode(nodeId);
+        questionsData = await getQuestionsByCategoryNode(nodeId);
+        setExam({
+          id: attemptData.exam_id,
+          category_id: nodeData?.category_id || '',
+          category_node_id: nodeId,
+          title: nodeData?.name || 'Practice Test',
+          description: '',
+          duration_minutes: 0,
+          total_marks: questionsData.reduce((sum, question) => sum + (question.marks || 1), 0) || attemptData.total_questions,
+          is_premium: false,
+          is_active: true,
+          created_at: '',
+          updated_at: '',
+        });
+      } else {
+        const examData = await getExam(attemptData.exam_id);
+        if (examData) setExam(examData);
+        questionsData = await getQuestions(attemptData.exam_id);
+      }
       setQuestions(questionsData as QuestionWithSubject[]);
 
       const examAttempts = await getAttemptsByExam(attemptData.exam_id);
@@ -132,6 +151,44 @@ export function Results({ resultId }: ResultsProps) {
   const getOptionText = (question: QuestionWithSubject, option: string | undefined, index: number) =>
     option?.trim() ? option : `Choose option ${getOptionLabel(question, index)}`;
 
+  const downloadResult = () => {
+    if (!attempt || !exam) return;
+    const rows = [
+      ['Exam', exam.title],
+      ['Score', `${attempt.score} / ${totalMarks}`],
+      ['Percentage', `${percentage}%`],
+      ['Correct', String(correctCount)],
+      ['Wrong', String(wrongCount)],
+      ['Skipped', String(skippedCount)],
+      ['Time Taken', `${Math.floor(attempt.time_taken_seconds / 60)}m ${attempt.time_taken_seconds % 60}s`],
+      [],
+      ['Question No', 'Question', 'Selected Option', 'Correct Option', 'Status', 'Marks'],
+      ...attempt.answers.map((answer, index) => {
+        const question = questions.find((entry) => entry.id === answer.questionId);
+        const selected = answer.selectedOption >= 0 ? answer.selectedOption + 1 : 'Skipped';
+        const correct = (answer.correctOption ?? question?.correct_index ?? 0) + 1;
+        return [
+          String(index + 1),
+          answer.question_text || question?.question_text || '',
+          String(selected),
+          String(correct),
+          answer.skipped || answer.selectedOption < 0 ? 'Skipped' : answer.is_correct ? 'Correct' : 'Wrong',
+          String(answer.marks ?? question?.marks ?? 1),
+        ];
+      }),
+    ];
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${exam.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-result.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Header with back arrow */}
@@ -144,6 +201,13 @@ export function Results({ resultId }: ResultsProps) {
             <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
           </button>
           <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Results</h1>
+          <button
+            onClick={downloadResult}
+            className={`ml-auto inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${isDark ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </button>
         </div>
       </header>
 

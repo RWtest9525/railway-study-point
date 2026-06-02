@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
-import { getExam, getQuestions, getQuestionsByCategoryNode, createAttempt, Question, Exam, getCategoryNode } from '../lib/firestore';
+import { getExam, getQuestions, getQuestionsByCategoryNode, createAttempt, getAttempts, Question, Exam, getCategoryNode } from '../lib/firestore';
 import { Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useTheme } from '../contexts/ThemeContext';
@@ -36,7 +36,16 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const [reportReason, setReportReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [submitSuccessAttemptId, setSubmitSuccessAttemptId] = useState<string | null>(null);
+  const [existingAttemptId, setExistingAttemptId] = useState<string | null>(null);
+  const questionScrollerRef = useRef<HTMLDivElement | null>(null);
+  const questionButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const startedAtRef = useRef<number>(Date.now());
+  const draftKey = profile?.id ? `exam-draft:${profile.id}:${examId}` : '';
+
+  const getInitialTimeRemaining = (examData: Exam | null) =>
+    Math.max(0, Math.round((Number(examData?.duration_minutes) || 0) * 60));
 
   useEffect(() => {
     if (authLoading) return;
@@ -47,49 +56,37 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     loadExamData();
   }, [examId, canAccessTests, authLoading, navigate]);
 
-  // Auto Submit
+  // Warn students before closing/reloading the running exam. Do not submit here:
+  // React cleanup also runs during ordinary re-renders and route changes.
   useEffect(() => {
-    if (!hasStarted) return;
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      
-      // Auto Submit if they unmount without submitting and timer had started
-      if (timeRemaining > 0 && !isSubmitting && hasStarted) {
-        // Warning: React strict mode might trigger this twice in dev. Handled by isSubmitting state locking.
-        handleSubmit();
-      }
-    };
-  }, [hasStarted, timeRemaining, isSubmitting, exam]);
-
-  useEffect(() => {
-    if (hasStarted && timeRemaining > 0) {
-      const timer = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            handleSubmit();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(timer);
-    }
+    if (!hasStarted || timeRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
   }, [hasStarted, timeRemaining]);
+
+  useEffect(() => {
+    if (!draftKey || !hasStarted || submitSuccessAttemptId) return;
+    const draft = {
+      answers,
+      currentQuestionIndex,
+      timeRemaining,
+      startTime,
+      activeSubject,
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(draftKey, JSON.stringify(draft));
+  }, [activeSubject, answers, currentQuestionIndex, draftKey, hasStarted, startTime, submitSuccessAttemptId, timeRemaining]);
 
   const loadExamData = async () => {
     try {
+      let loadedQuestions: QuestionWithSubject[] = [];
       if (examId.startsWith('node_')) {
         const nodeId = examId.replace('node_', '');
         const nodeData = await getCategoryNode(nodeId).catch(() => null);
         const questionsData = await getQuestionsByCategoryNode(nodeId);
+        loadedQuestions = questionsData as QuestionWithSubject[];
         
         let totalMarks = 0;
         questionsData.forEach((q: any) => totalMarks += (q.marks || 1));
@@ -108,16 +105,42 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
         });
         
         setTimeRemaining(0); // infinite
-        setQuestions(questionsData as QuestionWithSubject[]);
+        setQuestions(loadedQuestions);
       } else {
         const examData = await getExam(examId);
         if (!examData) throw new Error('Exam not found');
 
         setExam(examData);
-        setTimeRemaining(examData.duration_minutes * 60);
+        setTimeRemaining(getInitialTimeRemaining(examData));
 
         const questionsData = await getQuestions(examId);
-        setQuestions(questionsData as QuestionWithSubject[]);
+        loadedQuestions = questionsData as QuestionWithSubject[];
+        setQuestions(loadedQuestions);
+      }
+
+      if (profile?.id) {
+        const existingAttempts = await getAttempts(profile.id, examId);
+        const completedAttempt = existingAttempts.find((attempt: any) => attempt.status === 'completed');
+        if (completedAttempt) {
+          setExistingAttemptId(completedAttempt.id);
+          return;
+        }
+      }
+
+      if (draftKey) {
+        const rawDraft = localStorage.getItem(draftKey);
+        if (rawDraft) {
+          const draft = JSON.parse(rawDraft);
+          const safeIndex = Math.max(0, Math.min(loadedQuestions.length - 1, Number(draft.currentQuestionIndex) || 0));
+          setAnswers(draft.answers || {});
+          setCurrentQuestionIndex(safeIndex);
+          setTimeRemaining(Math.max(0, Number(draft.timeRemaining) || 0));
+          setStartTime(Number(draft.startTime) || Date.now());
+          startedAtRef.current = Number(draft.startTime) || Date.now();
+          setActiveSubject(draft.activeSubject || 'All');
+          setHasStarted(true);
+          toast.success('Previous exam progress restored');
+        }
       }
     } catch (error) {
       console.error('Error loading exam:', error);
@@ -127,10 +150,9 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (source: 'manual' = 'manual') => {
+    if (source !== 'manual') return;
     if (!profile?.id || !exam || isSubmitting) return;
-    setIsSubmitting(true);
-
     setIsSubmitting(true);
     
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
@@ -196,12 +218,14 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
           os: window?.navigator?.platform || 'unknown_os',
         },
         subject_wise_scores: subjectWiseScores,
+        status: 'completed',
       });
 
       // Update exam attempt count (optional - for analytics)
       // Note: This would require adding 'attempts' field to Exam interface
 
       // Instead of navigate, show success modal
+      if (draftKey) localStorage.removeItem(draftKey);
       setSubmitSuccessAttemptId(attemptId);
       setSubmitConfirmOpen(false);
     } catch (error: any) {
@@ -214,12 +238,41 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
 
   const currentQuestion = questions[currentQuestionIndex];
 
+  useEffect(() => {
+    if (!hasStarted || !currentQuestion?.id) return;
+    questionButtonRefs.current[currentQuestion.id]?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    });
+  }, [currentQuestion?.id, hasStarted]);
+
   if (loading) {
     return (
       <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center`}>
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className={`${isDark ? 'text-white' : 'text-gray-900'} text-lg`}>Loading exam...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (existingAttemptId) {
+    return (
+      <div className={`min-h-screen ${isDark ? 'bg-gray-900 text-white' : 'bg-gray-50 text-slate-900'} flex flex-col items-center justify-center px-4`}>
+        <div className={`max-w-md w-full p-8 rounded-3xl shadow-2xl text-center ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Exam Already Submitted</h2>
+          <p className={`mb-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>You can take this test only one time.</p>
+          <button
+            onClick={() => navigate(`/results/${existingAttemptId}`)}
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition"
+          >
+            See Result
+          </button>
         </div>
       </div>
     );
@@ -271,8 +324,8 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
           <div className={`mb-8 space-y-4 max-w-md ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
             <p>This assessment contains <strong className={isDark?'text-white':'text-black'}>{questions.length} questions</strong>.</p>
             <p>You have <strong className={isDark?'text-white':'text-black'}>{exam?.duration_minutes === 0 ? "unlimited time" : `${exam?.duration_minutes} minutes`}</strong> to complete it.</p>
-            <p className={`text-sm mt-4 p-4 rounded-xl border ${isDark ? 'bg-red-500/10 border-red-500/20 text-red-200' : 'bg-red-50 border-red-200 text-red-700'}`}>
-              <strong>Note:</strong> Navigating away from this page via device back buttons will automatically submit your exam.
+            <p className={`text-sm mt-4 p-4 rounded-xl border ${isDark ? 'bg-blue-500/10 border-blue-500/20 text-blue-200' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+              Your progress is saved locally. Final result is saved only when you click Submit on the last question.
             </p>
           </div>
 
@@ -283,7 +336,13 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
           ) : (
             <button
               onClick={() => {
-                setStartTime(Date.now());
+                const now = Date.now();
+                startedAtRef.current = now;
+                setStartTime(now);
+                setTimeRemaining(getInitialTimeRemaining(exam));
+                setIsSubmitting(false);
+                setSubmitSuccessAttemptId(null);
+                setSubmitConfirmOpen(false);
                 setHasStarted(true);
               }}
               className="w-full sm:w-auto px-12 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 transition-transform active:scale-95"
@@ -320,6 +379,20 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     return `Choose option ${label}`;
   };
 
+  const goToQuestion = (index: number) => {
+    setCurrentQuestionIndex(Math.max(0, Math.min(questions.length - 1, index)));
+  };
+
+  const scrollQuestionBubbles = (direction: 'left' | 'right') => {
+    const scroller = questionScrollerRef.current;
+    if (!scroller) return;
+    const amount = Math.max(180, scroller.clientWidth * 0.7);
+    scroller.scrollBy({
+      left: direction === 'left' ? -amount : amount,
+      behavior: 'smooth',
+    });
+  };
+
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
 
@@ -329,7 +402,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <button 
-                onClick={() => setSubmitConfirmOpen(true)}
+                onClick={() => setLeaveConfirmOpen(true)}
                 className={`p-2 rounded-full transition ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
               >
                 <ArrowLeft className={`w-5 h-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
@@ -477,8 +550,9 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
 
             <div className="flex justify-between items-center mt-6">
               <button
-                onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
+                onClick={() => goToQuestion(currentQuestionIndex - 1)}
                 disabled={currentQuestionIndex === 0}
+                aria-label="Previous question"
                 className={`flex items-center justify-center w-14 h-14 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   isDark
                   ? 'bg-gray-800 hover:bg-gray-700 shadow-sm border border-gray-700 text-white'
@@ -494,8 +568,9 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
               {currentQuestionIndex < questions.length - 1 ? (
                 <button
                   onClick={() =>
-                    setCurrentQuestionIndex(Math.min(questions.length - 1, currentQuestionIndex + 1))
+                    goToQuestion(currentQuestionIndex + 1)
                   }
+                  aria-label="Next question"
                   className="flex items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold transition shadow-lg shadow-blue-600/20"
                 >
                   <ChevronRight className="w-6 h-6" />
@@ -503,9 +578,10 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
               ) : (
                 <button
                   onClick={() => setSubmitConfirmOpen(true)}
+                  disabled={isSubmitting}
                   className="flex items-center justify-center px-6 h-14 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-extrabold tracking-wide uppercase text-sm transition shadow-lg shadow-green-600/20"
                 >
-                  Submit
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
                 </button>
               )}
             </div>
@@ -513,26 +589,55 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
 
           <div className="lg:col-span-1">
             <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-5 border sticky top-24 shadow-lg`}>
-              <h3 className={`text-lg font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Quick Navigator</h3>
-              
-              <div className="grid grid-cols-5 gap-2 max-h-[35vh] lg:max-h-full overflow-y-auto pr-2 scrollbar-thin">
-                {filteredQuestions.map((question, index) => (
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Quick Navigator</h3>
+                <div className="flex gap-2">
                   <button
-                    key={question.id}
-                    onClick={() => setCurrentQuestionIndex(questions.findIndex(q => q.id === question.id))}
-                    className={`w-10 h-10 rounded-lg font-semibold text-sm transition ${
-                      questions.findIndex(q => q.id === question.id) === currentQuestionIndex
-                        ? 'bg-blue-600 text-white ring-2 ring-blue-400'
-                        : answers[question.id] !== undefined
-                        ? 'bg-green-600 text-white'
-                        : isDark
-                        ? 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 shadow-sm hover:bg-gray-50'
-                    }`}
+                    type="button"
+                    onClick={() => scrollQuestionBubbles('left')}
+                    aria-label="Scroll question numbers left"
+                    className={`flex h-9 w-9 items-center justify-center rounded-lg border text-lg font-bold transition ${isDark ? 'border-gray-600 bg-gray-900 text-gray-200 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'}`}
                   >
-                    {index + 1}
+                    {'<'}
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => scrollQuestionBubbles('right')}
+                    aria-label="Scroll question numbers right"
+                    className={`flex h-9 w-9 items-center justify-center rounded-lg border text-lg font-bold transition ${isDark ? 'border-gray-600 bg-gray-900 text-gray-200 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    {'>'}
+                  </button>
+                </div>
+              </div>
+              
+              <div
+                ref={questionScrollerRef}
+                className="flex max-w-full snap-x gap-2 overflow-x-auto pb-2 scrollbar-thin"
+              >
+                {filteredQuestions.map((question) => {
+                  const realIndex = questions.findIndex(q => q.id === question.id);
+                  return (
+                    <button
+                      key={question.id}
+                      ref={(node) => {
+                        questionButtonRefs.current[question.id] = node;
+                      }}
+                      onClick={() => goToQuestion(realIndex)}
+                      className={`h-10 w-10 flex-none snap-center rounded-lg font-semibold text-sm transition ${
+                        realIndex === currentQuestionIndex
+                          ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                          : answers[question.id] !== undefined
+                          ? 'bg-green-600 text-white'
+                          : isDark
+                          ? 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
+                          : 'bg-white text-gray-700 border-2 border-gray-200 shadow-sm hover:bg-gray-50'
+                      }`}
+                    >
+                      {realIndex + 1}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="mt-6 space-y-2 text-sm">
@@ -605,12 +710,23 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       <ConfirmModal
         isOpen={submitConfirmOpen}
         onCancel={() => setSubmitConfirmOpen(false)}
-        onConfirm={handleSubmit}
+        onConfirm={() => handleSubmit('manual')}
         title="Submit Exam"
         message="Are you sure you want to submit your exam now? You will not be able to return to change your answers."
         confirmText={isSubmitting ? "Submitting..." : "Yes, Submit"}
         cancelText="Review More"
         isDestructive={false}
+      />
+
+      <ConfirmModal
+        isOpen={leaveConfirmOpen}
+        onCancel={() => setLeaveConfirmOpen(false)}
+        onConfirm={() => navigate('/dashboard')}
+        title="Leave Exam"
+        message="Leave this exam without submitting? Your current progress will stay saved locally so you can continue later."
+        confirmText="Leave"
+        cancelText="Stay"
+        isDestructive={true}
       />
     </div>
   );

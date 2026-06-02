@@ -11,7 +11,7 @@ interface SubjectSelectionProps {
 }
 
 export function SubjectSelection({ examId }: SubjectSelectionProps) {
-  const { navigate, currentPath } = useRouter();
+  const { navigate } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [exams, setExams] = useState<Exam[]>([]);
@@ -38,9 +38,6 @@ export function SubjectSelection({ examId }: SubjectSelectionProps) {
       setLoading(false);
     }
   };
-
-  // Extract category ID from path if needed
-  const categoryId = currentPath.replace('/subjects/', '');
 
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
@@ -92,7 +89,6 @@ export function SubjectSelection({ examId }: SubjectSelectionProps) {
                 </div>
               </div>
             ))}
-          </div>
           </div>
         )}
       </main>

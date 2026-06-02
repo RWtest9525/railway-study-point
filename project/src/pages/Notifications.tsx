@@ -162,10 +162,8 @@ export function Notifications() {
 
       <ConfirmModal
         isOpen={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
         onConfirm={() => {
-          markAllAsRead();
-          setConfirmOpen(false);
+          void markAllAsRead();
         }}
         title="Mark All as Read?"
         message="Are you sure you want to mark all unread notifications as read?"

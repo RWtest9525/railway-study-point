@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BarChart3, Clock, Download, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
+import { BarChart3, Clock, Download, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from '../../contexts/RouterContext';
@@ -17,6 +17,7 @@ export function ExamCreator() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [retakeSourceExamId, setRetakeSourceExamId] = useState<string | null>(null);
   const [addingQuestionToExam, setAddingQuestionToExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -29,7 +30,7 @@ export function ExamCreator() {
     negative_marking: 0,
     schedule_date: '',
     schedule_time: '',
-    auto_submit: true,
+    auto_submit: false,
     instructions: '',
     attempt_limits: 1,
     partial_marking: false,
@@ -103,7 +104,7 @@ export function ExamCreator() {
       negative_marking: 0,
       schedule_date: '',
       schedule_time: '',
-      auto_submit: true,
+      auto_submit: false,
       instructions: '',
       attempt_limits: 1,
       partial_marking: false,
@@ -113,6 +114,7 @@ export function ExamCreator() {
       pause_resume_enabled: false,
     });
     setEditingId(null);
+    setRetakeSourceExamId(null);
     setShowForm(false);
   };
 
@@ -126,10 +128,22 @@ export function ExamCreator() {
     try {
       const payload = {
         ...formData,
+        auto_submit: false,
         created_by: profile.id,
       } as any;
 
-      if (editingId) {
+      if (retakeSourceExamId) {
+        const newExamId = await createExam({ ...payload, is_active: true });
+        const oldQuestions = await getQuestions(retakeSourceExamId);
+        if (oldQuestions.length > 0) {
+          const newQuestions = oldQuestions.map(q => {
+            const { id, created_at, updated_at, ...rest } = q as any;
+            return { ...rest, exam_id: newExamId };
+          });
+          await createQuestionsBatch(newQuestions);
+        }
+        toast.success('Retake exam scheduled with the same questions');
+      } else if (editingId) {
         const oldExam = exams.find(e => e.id === editingId);
         const scheduleChanged = oldExam && (
           oldExam.schedule_date !== formData.schedule_date || 
@@ -166,6 +180,7 @@ export function ExamCreator() {
 
   const handleEdit = (exam: Exam) => {
     setEditingId(exam.id);
+    setRetakeSourceExamId(null);
     setFormData({
       category_id: exam.category_id,
       title: exam.title,
@@ -176,12 +191,37 @@ export function ExamCreator() {
       negative_marking: exam.negative_marking || 0,
       schedule_date: exam.schedule_date || '',
       schedule_time: exam.schedule_time || '',
-      auto_submit: exam.auto_submit ?? true,
+      auto_submit: false,
       instructions: exam.instructions || '',
       attempt_limits: exam.attempt_limits || 1,
       partial_marking: exam.partial_marking ?? false,
       is_premium: exam.is_premium,
       is_active: exam.is_active,
+      is_private: exam.is_private ?? false,
+      pause_resume_enabled: exam.pause_resume_enabled ?? false,
+    });
+    setShowForm(true);
+  };
+
+  const handleRetake = (exam: Exam) => {
+    setEditingId(null);
+    setRetakeSourceExamId(exam.id);
+    setFormData({
+      category_id: exam.category_id,
+      title: exam.title,
+      description: exam.description || '',
+      duration_minutes: exam.duration_minutes,
+      total_marks: exam.total_marks,
+      passing_marks: exam.passing_marks || 40,
+      negative_marking: exam.negative_marking || 0,
+      schedule_date: '',
+      schedule_time: '',
+      auto_submit: false,
+      instructions: exam.instructions || '',
+      attempt_limits: exam.attempt_limits || 1,
+      partial_marking: exam.partial_marking ?? false,
+      is_premium: exam.is_premium,
+      is_active: true,
       is_private: exam.is_private ?? false,
       pause_resume_enabled: exam.pause_resume_enabled ?? false,
     });
@@ -259,6 +299,10 @@ export function ExamCreator() {
                   <BarChart3 className="h-4 w-4" />
                   Results
                 </button>
+                <button onClick={() => handleRetake(exam)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+                  <RotateCcw className="h-4 w-4" />
+                  Retake Exam
+                </button>
                 <button onClick={() => setAddingQuestionToExam(exam)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
                   <Plus className="h-4 w-4" />
                   Add Q
@@ -282,8 +326,8 @@ export function ExamCreator() {
           <div className={`${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border p-6 shadow-2xl`}>
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{editingId ? 'Edit exam' : 'Create exam'}</h2>
-                <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Create the timed exam details here.</p>
+                <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{retakeSourceExamId ? 'Retake exam' : editingId ? 'Edit exam' : 'Create exam'}</h2>
+                <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{retakeSourceExamId ? 'Choose the new date and time. Questions will be copied from the selected exam.' : 'Create the timed exam details here.'}</p>
               </div>
               <button onClick={resetForm} className={`rounded-2xl px-4 py-2 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Close</button>
             </div>
@@ -374,7 +418,6 @@ export function ExamCreator() {
                   <h4 className={`mb-3 font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Exam settings</h4>
                   <div className="space-y-3 text-sm">
                     {[
-                      ['auto_submit', 'Auto-submit on time expiry'],
                       ['pause_resume_enabled', 'Allow pause/resume'],
                       ['partial_marking', 'Enable partial marking'],
                     ].map(([key, label]) => (
@@ -403,7 +446,7 @@ export function ExamCreator() {
 
               <div className="flex gap-3">
                 <button type="button" onClick={resetForm} className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancel</button>
-                <button type="submit" className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">{editingId ? 'Update exam' : 'Create exam'}</button>
+                <button type="submit" className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">{retakeSourceExamId ? 'Schedule retake' : editingId ? 'Update exam' : 'Create exam'}</button>
               </div>
             </form>
           </div>
@@ -416,8 +459,9 @@ export function ExamCreator() {
           onSuccess={() => setAddingQuestionToExam(null)} 
           examId={addingQuestionToExam.id} 
           examTitle={addingQuestionToExam.title}
-          categoryNodeId={addingQuestionToExam.category_id}
-          linkedLabel={categoryName(addingQuestionToExam.category_id)}
+          categoryId={addingQuestionToExam.category_id}
+          categoryNodeId={addingQuestionToExam.category_node_id}
+          linkedLabel={addingQuestionToExam.title}
         />
       )}
     </div>

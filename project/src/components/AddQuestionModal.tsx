@@ -242,7 +242,7 @@ export function AddQuestionModal({
            category_node_id: categoryNodeId,
            title: linkedLabel || 'Folder Test',
            description: `Questions under ${linkedLabel}`,
-           duration_minutes: currentMaxOrder + validDrafts.length * 2,
+           duration_minutes: 0,
            total_marks: sumMarks,
            is_active: true,
            is_premium: true,
@@ -250,7 +250,6 @@ export function AddQuestionModal({
        } else {
          targetExamId = existingExam.id;
          await updateExam(existingExam.id, {
-           duration_minutes: currentMaxOrder + validDrafts.length * 2,
            total_marks: existingExam.total_marks + sumMarks,
          });
        }
@@ -320,7 +319,7 @@ export function AddQuestionModal({
              category_node_id: categoryNodeId,
              title: linkedLabel || 'Folder Test',
              description: `Questions under ${linkedLabel}`,
-             duration_minutes: currentMaxOrder + bulkFiles.length * 2,
+             duration_minutes: 0,
              total_marks: sumMarks,
              is_active: true,
              is_premium: true,
@@ -328,7 +327,6 @@ export function AddQuestionModal({
          } else {
            targetExamId = existingExam.id;
            await updateExam(existingExam.id, {
-             duration_minutes: currentMaxOrder + bulkFiles.length * 2,
              total_marks: existingExam.total_marks + sumMarks,
            });
          }

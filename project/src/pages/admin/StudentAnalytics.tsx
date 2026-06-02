@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Clock3, Search, Target, UserRound, XCircle, Trophy, BarChart3 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, Search, Target, XCircle, Trophy, BarChart3 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useRouter } from '../../contexts/RouterContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -160,6 +160,46 @@ export function StudentAnalytics() {
   const getAnswerLabel = (style: 'alphabet' | 'numeric' | undefined, index: number) =>
     style === 'numeric' ? String(index + 1) : String.fromCharCode(65 + index);
 
+  const downloadSelectedAttempt = () => {
+    if (!selectedAttempt) return;
+    const rows = [
+      ['Student', selectedAttempt.userName],
+      ['Email', selectedAttempt.userEmail],
+      ['Exam', selectedAttempt.examTitle],
+      ['Score', String(selectedAttempt.score)],
+      ['Correct', String(selectedAttempt.correct_answers)],
+      ['Wrong', String(selectedAttempt.wrongAnswers)],
+      ['Skipped', String(selectedAttempt.skippedAnswers)],
+      ['Time', formatDuration(selectedAttempt.time_taken_seconds)],
+      ['Submitted', formatDateTime(selectedAttempt.submitted_at)],
+      [],
+      ['Question No', 'Question', 'Selected Option', 'Correct Option', 'Status', 'Marks'],
+      ...selectedAttempt.answers.map((answer, index) => {
+        const question = attemptQuestions.find((entry) => entry.id === answer.questionId);
+        const selected = answer.selectedOption >= 0 ? getAnswerLabel(answer.option_label_style || question?.option_label_style, answer.selectedOption) : 'Skipped';
+        const correct = getAnswerLabel(answer.option_label_style || question?.option_label_style, answer.correctOption ?? question?.correct_index ?? 0);
+        return [
+          String(index + 1),
+          answer.question_text || question?.question_text || '',
+          selected,
+          correct,
+          answer.skipped || answer.selectedOption < 0 ? 'Skipped' : answer.is_correct ? 'Correct' : 'Wrong',
+          String(answer.marks ?? question?.marks ?? 1),
+        ];
+      }),
+    ];
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${selectedAttempt.userName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${selectedAttempt.examTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-result.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const selectedChartData = selectedAttempt ? [
     { name: 'Correct', value: selectedAttempt.correct_answers },
     { name: 'Wrong', value: selectedAttempt.wrongAnswers },
@@ -285,8 +325,17 @@ export function StudentAnalytics() {
 
           <div className="flex flex-col">
             <div className={`flex-1 overflow-hidden rounded-3xl border shadow-xl flex flex-col ${isDark ? 'border-white/10 bg-[#0F141F]' : 'border-slate-200 bg-white'}`}>
-              <div className={`border-b px-6 py-5 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
+              <div className={`flex items-center justify-between gap-3 border-b px-6 py-5 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
                 <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Detailed Breakdown</h2>
+                {selectedAttempt && (
+                  <button
+                    onClick={downloadSelectedAttempt}
+                    className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition ${isDark ? 'bg-blue-500/10 text-blue-300 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </button>
+                )}
               </div>
               
               {!selectedAttempt ? (
