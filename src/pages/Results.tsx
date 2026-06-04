@@ -73,10 +73,23 @@ export function Results({ resultId }: ResultsProps) {
     );
   }
 
-  const percentage = ((attempt.score / attempt.total_questions) * 100).toFixed(1);
-  const correctCount = attempt.correct_answers;
-  const wrongCount = attempt.total_questions - correctCount;
-  const userAnswers = attempt.answers;
+  // Helper: convert Firestore Timestamp or string to a readable date
+  const toDateString = (val: any): string => {
+    if (!val) return 'N/A';
+    if (typeof val === 'string') return new Date(val).toLocaleDateString();
+    if (val?.toDate) return val.toDate().toLocaleDateString(); // Firestore Timestamp
+    if (val?.seconds) return new Date(val.seconds * 1000).toLocaleDateString(); // Timestamp object
+    return new Date(val).toLocaleDateString();
+  };
+
+  const percentage = attempt.total_questions > 0
+    ? ((attempt.score / attempt.total_questions) * 100).toFixed(1)
+    : '0.0';
+  const correctCount = attempt.correct_answers ?? attempt.score ?? 0;
+  const userAnswers: { questionId: string; selectedOption: number }[] = attempt.answers || [];
+  const answeredCount = userAnswers.filter((a) => a.selectedOption !== -1).length;
+  const wrongCount = answeredCount - correctCount;
+  const unansweredCount = attempt.total_questions - answeredCount;
 
   // Build a map of questionId -> question for quick lookup
   const questionMap = new Map(questions.map(q => [q.id, q]));
@@ -150,7 +163,7 @@ export function Results({ resultId }: ResultsProps) {
 
             <div className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-50'} rounded-xl p-4 text-center`}>
               <div className="text-2xl sm:text-3xl font-bold text-red-400 mb-1">
-                {wrongCount}
+                {wrongCount < 0 ? 0 : wrongCount}
               </div>
               <div className={`flex items-center justify-center gap-1 text-xs sm:text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                 <XCircle className="w-4 h-4" />
@@ -160,7 +173,7 @@ export function Results({ resultId }: ResultsProps) {
 
             <div className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-50'} rounded-xl p-4 text-center`}>
               <div className={`text-2xl sm:text-3xl font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {Math.floor(attempt.time_taken_seconds / 60)}m {attempt.time_taken_seconds % 60}s
+                {Math.floor((attempt.time_taken_seconds || 0) / 60)}m {(attempt.time_taken_seconds || 0) % 60}s
               </div>
               <div className={`flex items-center justify-center gap-1 text-xs sm:text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                 <Clock className="w-4 h-4" />

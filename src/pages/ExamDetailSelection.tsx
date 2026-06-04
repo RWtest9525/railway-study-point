@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getExams, getCategory, Exam, Category } from '../lib/firestore';
-import { Play, Clock, Users, ArrowLeft, Award } from 'lucide-react';
+import { Play, Clock, Users, ArrowLeft, Award, Crown } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 
 interface ExamDetailSelectionProps {
@@ -13,6 +14,7 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
   const { navigate } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const { canAccessTests, isPremium } = useAuth();
   const [exams, setExams] = useState<Exam[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,7 +93,17 @@ export function ExamDetailSelection({ categoryId }: ExamDetailSelectionProps) {
                     ? 'bg-gray-800 border-gray-700 hover:border-blue-500' 
                     : 'bg-white border-gray-200 hover:border-blue-400'
                 } rounded-2xl border p-5 transition cursor-pointer`}
-                onClick={() => navigate(`/exam/${exam.id}`)}
+                onClick={() => {
+                  if (!canAccessTests) {
+                    navigate('/upgrade');
+                    return;
+                  }
+                  if (exam.is_premium && !isPremium) {
+                    navigate('/upgrade');
+                    return;
+                  }
+                  navigate(`/exam/${exam.id}`);
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

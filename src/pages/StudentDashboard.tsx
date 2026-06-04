@@ -316,13 +316,20 @@ export function StudentDashboard() {
                   <div className="hidden lg:block text-right">
                     <div className="bg-white/10 rounded-2xl p-6 border border-white/20">
                       <div className="text-4xl font-bold text-white mb-2">
-                        {recentResults.length > 0 ? recentResults[0].score : '0'}
+                        {recentResults.length > 0 ? `${recentResults[0].score}/${recentResults[0].total_questions}` : '—'}
                       </div>
                       <div className="text-blue-200 text-sm">Latest Score</div>
                       {recentResults.length > 0 && (
                         <div className="mt-4 flex items-center justify-end gap-4 text-sm text-gray-300">
-                          <span>Time: {Math.floor(recentResults[0].time_taken_seconds / 60)}m</span>
-                          <span>Date: {new Date(recentResults[0].started_at).toLocaleDateString()}</span>
+                          <span>Time: {Math.floor((recentResults[0].time_taken_seconds || 0) / 60)}m</span>
+                          <span>Date: {(() => {
+                            const v = recentResults[0].started_at;
+                            if (!v) return 'N/A';
+                            if (typeof v === 'string') return new Date(v).toLocaleDateString();
+                            if ((v as any)?.toDate) return (v as any).toDate().toLocaleDateString();
+                            if ((v as any)?.seconds) return new Date((v as any).seconds * 1000).toLocaleDateString();
+                            return 'N/A';
+                          })()}</span>
                         </div>
                       )}
                     </div>
@@ -409,7 +416,7 @@ export function StudentDashboard() {
                       <tbody className="divide-y divide-gray-700/50">
                         {recentResults.map((result) => (
                           <tr key={result.id} className="hover:bg-gray-700/30 transition">
-                            <td className="px-4 py-3 text-gray-300 text-sm">{new Date(result.started_at).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-gray-300 text-sm">{result.started_at ? (typeof result.started_at === 'string' ? new Date(result.started_at).toLocaleDateString() : (result.started_at as any)?.toDate ? (result.started_at as any).toDate().toLocaleDateString() : (result.started_at as any)?.seconds ? new Date((result.started_at as any).seconds * 1000).toLocaleDateString() : 'N/A') : 'N/A'}</td>
                             <td className="px-4 py-3 text-gray-300 text-sm">Mock Test</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
