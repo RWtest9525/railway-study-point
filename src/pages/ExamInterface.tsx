@@ -51,13 +51,9 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   useEffect(() => {
     if (authLoading) return;
     if (examLoadedRef.current === examId) return;
-    if (!canAccessTests) {
-      navigate('/upgrade');
-      return;
-    }
     examLoadedRef.current = examId;
     loadExamData();
-  }, [examId, canAccessTests, authLoading, navigate]);
+  }, [examId, authLoading, navigate]);
 
   // Warn students before closing/reloading the running exam. Do not submit here:
   // React cleanup also runs during ordinary re-renders and route changes.

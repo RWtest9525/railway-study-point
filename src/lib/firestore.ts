@@ -539,9 +539,15 @@ export const getAttempts = async (userId: string, examId?: string) => {
     q = query(
       attemptsRef, 
       where('user_id', '==', userId),
-      where('exam_id', '==', examId),
-      orderBy('submitted_at', 'desc')
+      where('exam_id', '==', examId)
     );
+    const snapshot = await getDocs(q);
+    const attempts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizAttempt));
+    return attempts.sort((a, b) => {
+      const aTime = a.submitted_at ? new Date(timestampToString(a.submitted_at)).getTime() : 0;
+      const bTime = b.submitted_at ? new Date(timestampToString(b.submitted_at)).getTime() : 0;
+      return bTime - aTime;
+    });
   } else {
     q = query(
       attemptsRef, 
@@ -549,9 +555,9 @@ export const getAttempts = async (userId: string, examId?: string) => {
       orderBy('submitted_at', 'desc'),
       limit(50)
     );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizAttempt));
   }
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizAttempt));
 };
 
 export const getUserAttempts = getAttempts;
