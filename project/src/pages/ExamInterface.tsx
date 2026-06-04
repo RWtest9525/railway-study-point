@@ -42,6 +42,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const questionScrollerRef = useRef<HTMLDivElement | null>(null);
   const questionButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const startedAtRef = useRef<number>(Date.now());
+  const examLoadedRef = useRef<string | null>(null);
   const draftKey = profile?.id ? `exam-draft:${profile.id}:${examId}` : '';
 
   const getInitialTimeRemaining = (examData: Exam | null) =>
@@ -49,10 +50,12 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
 
   useEffect(() => {
     if (authLoading) return;
+    if (examLoadedRef.current === examId) return;
     if (!canAccessTests) {
       navigate('/upgrade');
       return;
     }
+    examLoadedRef.current = examId;
     loadExamData();
   }, [examId, canAccessTests, authLoading, navigate]);
 

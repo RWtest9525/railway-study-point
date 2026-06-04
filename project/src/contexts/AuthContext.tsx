@@ -207,24 +207,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         console.log('User logged in, loading profile...');
         setUser(firebaseUser);
-        // Load profile but don't wait for it to set loading to false
-        loadProfile(
-          firebaseUser.uid,
-          firebaseUser.email ?? undefined,
-          firebaseUser.displayName ?? undefined
-        ).then(() => {
+        try {
+          await loadProfile(
+            firebaseUser.uid,
+            firebaseUser.email ?? undefined,
+            firebaseUser.displayName ?? undefined
+          );
           console.log('Profile loaded for user:', firebaseUser.uid);
-          recordLogin(firebaseUser.uid);
-        }).catch((err) => {
+          await recordLogin(firebaseUser.uid);
+        } catch (err) {
           console.error('Error loading profile:', err);
-        });
+        }
       } else {
         console.log('User logged out');
         setUser(null);
         setProfile(null);
       }
       
-      // Set loading to false once we know the auth state
+      // Set loading to false once we know the auth state and profile is loaded
       setLoading(false);
       console.log('Loading state set to:', false);
       

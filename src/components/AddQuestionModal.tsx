@@ -261,7 +261,7 @@ export function AddQuestionModal({
       const draft = validDrafts[idx];
       const payload: any = {
         exam_id: targetExamId,
-        category_node_id: categoryNodeId,
+        category_node_id: categoryNodeId || null,
         subject: linkedLabel || 'General',
         question_text: draft.question_text.trim() || 'Screenshot question',
         options: buildFinalOptions(draft.options, draft.option_label_style),
@@ -346,7 +346,7 @@ export function AddQuestionModal({
       await createQuestionsBatch(
         uploadedUrls.map((url, index) => ({
           exam_id: targetExamId,
-          category_node_id: categoryNodeId,
+          category_node_id: categoryNodeId || null,
           subject: linkedLabel || 'General',
           question_text: `Screenshot question ${currentMaxOrder + index + 1}`,
           options: buildFallbackOptions(currentDraft.option_label_style),
