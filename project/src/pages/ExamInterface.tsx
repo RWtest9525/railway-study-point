@@ -74,10 +74,11 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       timeRemaining,
       startTime,
       activeSubject,
+      markedForReview: Array.from(markedForReview),
       savedAt: Date.now(),
     };
     localStorage.setItem(draftKey, JSON.stringify(draft));
-  }, [activeSubject, answers, currentQuestionIndex, draftKey, hasStarted, startTime, submitSuccessAttemptId, timeRemaining]);
+  }, [activeSubject, answers, currentQuestionIndex, draftKey, hasStarted, startTime, submitSuccessAttemptId, timeRemaining, markedForReview]);
 
   const loadExamData = async () => {
     try {
@@ -138,6 +139,11 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
           setStartTime(Number(draft.startTime) || Date.now());
           startedAtRef.current = Number(draft.startTime) || Date.now();
           setActiveSubject(draft.activeSubject || 'All');
+          if (draft.markedForReview && Array.isArray(draft.markedForReview)) {
+            setMarkedForReview(new Set(draft.markedForReview));
+          } else {
+            setMarkedForReview(new Set());
+          }
           setHasStarted(true);
           toast.success('Previous exam progress restored');
         }
@@ -150,8 +156,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     }
   };
 
-  const handleSubmit = async (source: 'manual' = 'manual') => {
-    if (source !== 'manual') return;
+  const handleSubmit = async () => {
     if (!profile?.id || !exam || isSubmitting) return;
     setIsSubmitting(true);
     
@@ -503,83 +508,128 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                   />
                 </div>
               )}
-
-              <div className="space-y-3">
-                {currentQuestion?.options?.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() =>
-                      setAnswers({
-                        ...answers,
-                        [currentQuestion.id]: index,
-                      })
-                    }
-                    className={`w-full text-left p-4 rounded-xl border-2 transition ${
-                      answers[currentQuestion.id] === index
-                        ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                        : isDark
-                        ? 'border-gray-600 bg-gray-700/50 text-gray-300 hover:border-gray-500'
-                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center font-semibold ${
-                        answers[currentQuestion.id] === index
-                          ? 'border-blue-500 bg-blue-500 text-white'
+              <div className="space-y-3.5">
+                {currentQuestion?.options?.map((option, index) => {
+                  const isSelected = answers[currentQuestion.id] === index;
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() =>
+                        setAnswers({
+                          ...answers,
+                          [currentQuestion.id]: index,
+                        })
+                      }
+                      className={`w-full text-left p-4.5 rounded-2xl border-2 transition-all duration-200 transform ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-600/10 text-blue-650 dark:text-blue-400 shadow-md shadow-blue-500/5'
                           : isDark
-                          ? 'border-gray-500 text-gray-400'
-                          : 'border-gray-400 text-gray-500'
-                      }`}>
-                        {getOptionLabel(currentQuestion, index)}
-                      </span>
-                      <div className="flex-1 pt-1">
-                        <div>{getOptionText(currentQuestion, option, index)}</div>
-                        {currentQuestion.option_images?.[index] && (
-                          <img
-                            src={currentQuestion.option_images[index]}
-                            alt={`Option ${index + 1}`}
-                            className="mt-3 max-h-44 rounded-xl object-contain"
-                          />
-                        )}
+                          ? 'border-slate-800/85 bg-slate-900/50 text-slate-300 hover:border-slate-700 hover:bg-slate-800/40 hover:-translate-y-0.5'
+                          : 'border-slate-200/80 bg-white text-slate-750 hover:border-slate-350 hover:bg-slate-50 hover:-translate-y-0.5 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <span className={`flex-shrink-0 w-8.5 h-8.5 rounded-full border-2 flex items-center justify-center font-bold text-sm transition-all duration-200 ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                            : isDark
+                            ? 'border-slate-800 bg-slate-900 text-slate-400'
+                            : 'border-slate-250 bg-slate-100 text-slate-500'
+                        }`}>
+                          {getOptionLabel(currentQuestion, index)}
+                        </span>
+                        <div className="flex-1 pt-1 text-base font-medium leading-relaxed">
+                          <div>{getOptionText(currentQuestion, option, index)}</div>
+                          {currentQuestion.option_images?.[index] && (
+                            <img
+                              src={currentQuestion.option_images[index]}
+                              alt={`Option ${index + 1}`}
+                              className="mt-3.5 max-h-44 rounded-2xl border border-slate-700/25 object-contain shadow-sm"
+                            />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex justify-between items-center mt-6">
+            <div className="flex flex-wrap gap-3 justify-between items-center mt-6">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => goToQuestion(currentQuestionIndex - 1)}
+                  disabled={currentQuestionIndex === 0}
+                  aria-label="Previous question"
+                  className={`flex items-center justify-center w-14 h-14 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDark
+                    ? 'bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white shadow-sm'
+                    : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-750 shadow-sm'
+                  }`}
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newAnswers = { ...answers };
+                    delete newAnswers[currentQuestion.id];
+                    setAnswers(newAnswers);
+                  }}
+                  disabled={answers[currentQuestion.id] === undefined}
+                  className={`px-4 h-14 rounded-2xl font-semibold text-xs transition border flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed ${
+                    isDark
+                      ? 'bg-slate-900 border-slate-800 hover:bg-slate-850 text-slate-400 hover:text-slate-200'
+                      : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-750'
+                  }`}
+                >
+                  Clear Answer
+                </button>
+              </div>
+
               <button
-                onClick={() => goToQuestion(currentQuestionIndex - 1)}
-                disabled={currentQuestionIndex === 0}
-                aria-label="Previous question"
-                className={`flex items-center justify-center w-14 h-14 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isDark
-                  ? 'bg-gray-800 hover:bg-gray-700 shadow-sm border border-gray-700 text-white'
-                  : 'bg-white hover:bg-gray-50 shadow-sm border border-gray-200 text-gray-700'
+                type="button"
+                onClick={() => {
+                  const newMarked = new Set(markedForReview);
+                  if (newMarked.has(currentQuestion.id)) {
+                    newMarked.delete(currentQuestion.id);
+                  } else {
+                    newMarked.add(currentQuestion.id);
+                  }
+                  setMarkedForReview(newMarked);
+                }}
+                className={`px-5 h-14 rounded-2xl font-semibold text-xs transition border flex items-center gap-1.5 ${
+                  markedForReview.has(currentQuestion.id)
+                    ? 'bg-amber-500/25 border-amber-500 text-amber-500 dark:text-amber-400 font-bold'
+                    : isDark
+                    ? 'bg-slate-900 border-slate-800 hover:bg-slate-850 text-slate-400 hover:text-slate-200'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-750'
                 }`}
               >
-                <ChevronLeft className="w-6 h-6" />
+                <Flag className="w-4 h-4" />
+                {markedForReview.has(currentQuestion.id) ? 'Bookmarked' : 'Bookmark'}
               </button>
-
-              {/* Spacing to keep < and > ends balanced */}
-              <div className="flex-1"></div>
 
               {currentQuestionIndex < questions.length - 1 ? (
                 <button
+                  type="button"
                   onClick={() =>
                     goToQuestion(currentQuestionIndex + 1)
                   }
                   aria-label="Next question"
-                  className="flex items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold transition shadow-lg shadow-blue-600/20"
+                  className="flex items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold transition shadow-lg shadow-blue-500/20"
                 >
                   <ChevronRight className="w-6 h-6" />
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={() => setSubmitConfirmOpen(true)}
                   disabled={isSubmitting}
-                  className="flex items-center justify-center px-6 h-14 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-extrabold tracking-wide uppercase text-sm transition shadow-lg shadow-green-600/20"
+                  className="flex items-center justify-center px-6 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-extrabold tracking-wide uppercase text-sm transition shadow-lg shadow-emerald-500/20"
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit'}
                 </button>
@@ -613,10 +663,29 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
               
               <div
                 ref={questionScrollerRef}
-                className="flex max-w-full snap-x gap-2 overflow-x-auto pb-2 scrollbar-thin"
+                className="flex max-w-full snap-x gap-2 overflow-x-auto pb-2.5 scrollbar-thin"
               >
                 {filteredQuestions.map((question) => {
                   const realIndex = questions.findIndex(q => q.id === question.id);
+                  const isCurrent = realIndex === currentQuestionIndex;
+                  const isAnswered = answers[question.id] !== undefined;
+                  const isBookmarked = markedForReview.has(question.id);
+                  
+                  let bubbleStyle = '';
+                  if (isCurrent) {
+                    bubbleStyle = 'bg-blue-600 text-white ring-4 ring-blue-500/30';
+                  } else if (isAnswered && isBookmarked) {
+                    bubbleStyle = 'bg-purple-600 text-white hover:bg-purple-500';
+                  } else if (isAnswered) {
+                    bubbleStyle = 'bg-emerald-600 text-white hover:bg-emerald-500';
+                  } else if (isBookmarked) {
+                    bubbleStyle = 'bg-amber-500 text-white hover:bg-amber-400';
+                  } else {
+                    bubbleStyle = isDark
+                      ? 'bg-slate-850 border border-slate-700 text-slate-350 hover:bg-slate-800'
+                      : 'bg-slate-100 border border-slate-200 text-slate-650 hover:bg-slate-200';
+                  }
+                  
                   return (
                     <button
                       key={question.id}
@@ -624,15 +693,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                         questionButtonRefs.current[question.id] = node;
                       }}
                       onClick={() => goToQuestion(realIndex)}
-                      className={`h-10 w-10 flex-none snap-center rounded-lg font-semibold text-sm transition ${
-                        realIndex === currentQuestionIndex
-                          ? 'bg-blue-600 text-white ring-2 ring-blue-400'
-                          : answers[question.id] !== undefined
-                          ? 'bg-green-600 text-white'
-                          : isDark
-                          ? 'bg-gray-800 text-gray-300 border border-gray-600 hover:bg-gray-700'
-                          : 'bg-white text-gray-700 border-2 border-gray-200 shadow-sm hover:bg-gray-50'
-                      }`}
+                      className={`h-10 w-10 flex-none snap-center rounded-xl font-bold text-xs transition duration-200 ${bubbleStyle}`}
                     >
                       {realIndex + 1}
                     </button>
@@ -640,14 +701,34 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                 })}
               </div>
 
-              <div className="mt-6 space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-green-600 rounded"></div>
-                  <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Answered ({Object.keys(answers).length})</span>
+              <div className="mt-6 space-y-2.5 text-xs font-semibold">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 bg-emerald-600 rounded-md"></div>
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>
+                    Answered ({Object.keys(answers).length})
+                  </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded border-2 ${isDark ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}></div>
-                  <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Not Answered ({questions.length - Object.keys(answers).length})</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 bg-amber-500 rounded-md"></div>
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>
+                    Bookmarked ({markedForReview.size})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 bg-purple-600 rounded-md"></div>
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>
+                    Answered & Bookmarked ({
+                      Object.keys(answers).filter(id => markedForReview.has(id)).length
+                    })
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-4 h-4 rounded-md border ${
+                    isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'
+                  }`}></div>
+                  <span className={isDark ? 'text-slate-300' : 'text-slate-655'}>
+                    Unanswered ({questions.length - Object.keys(answers).length})
+                  </span>
                 </div>
               </div>
             </div>
@@ -710,7 +791,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
       <ConfirmModal
         isOpen={submitConfirmOpen}
         onCancel={() => setSubmitConfirmOpen(false)}
-        onConfirm={() => handleSubmit('manual')}
+        onConfirm={handleSubmit}
         title="Submit Exam"
         message="Are you sure you want to submit your exam now? You will not be able to return to change your answers."
         confirmText={isSubmitting ? "Submitting..." : "Yes, Submit"}

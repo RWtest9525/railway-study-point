@@ -7,7 +7,7 @@ import { Signup } from './pages/Signup';
 import { ExamSelection } from './pages/ExamSelection';
 import { SubjectSelection } from './pages/SubjectSelection';
 import { ExamDetailSelection } from './pages/ExamDetailSelection';
-import ExamInterface from './pages/ExamInterface';
+import { ExamInterface } from './pages/ExamInterface';
 import { Results } from './pages/Results';
 import { Upgrade } from './pages/Upgrade';
 import { Leaderboard } from './pages/Leaderboard';
@@ -17,17 +17,35 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Membership } from './pages/Membership';
 import { ContactSupport } from './pages/ContactSupport';
 import { Notifications } from './pages/Notifications';
+import { PushNotificationsInfo } from './pages/PushNotificationsInfo';
 import { Settings } from './pages/Settings';
 import { MockTests } from './pages/MockTests';
 import { SubjectQuizzes } from './pages/SubjectQuizzes';
 import { PreviousYearPapers } from './pages/PreviousYearPapers';
+import { History } from './pages/History';
 import { AdminPortal } from './pages/admin/AdminPortal';
-import { StudentDashboard } from './pages/StudentDashboard';
+import { StudentAnalytics } from './pages/admin/StudentAnalytics';
 
 function AppContent() {
   const { currentPath, navigate } = useRouter();
-  const { user, loading, effectiveRole, isBanned, signOut } = useAuth();
+  const { user, loading, effectiveRole } = useAuth();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
+
+  // Handle post-login redirect
+  React.useEffect(() => {
+    if (user && !loading && !hasRedirected) {
+      // If user is on login/signup page after successful auth, redirect them
+      if (currentPath === '/login' || currentPath === '/signup') {
+        if (effectiveRole === 'admin') {
+          navigate('/admin-portal');
+        } else {
+          navigate('/dashboard');
+        }
+        setHasRedirected(true);
+      }
+    }
+  }, [user, loading, currentPath, navigate, effectiveRole, hasRedirected]);
 
   // Handle loading timeout - if loading takes more than 10 seconds, show retry option
   React.useEffect(() => {
@@ -41,33 +59,7 @@ function AppContent() {
     }
   }, [loading]);
 
-  // 1. BANNED CHECK: Highest Priority
-  if (isBanned) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-        <div className="bg-gray-800 border border-red-500/30 rounded-2xl p-8 max-w-md text-center shadow-2xl">
-          <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-4xl text-red-500">🚫</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">Account Banned</h1>
-          <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-            Your access to Railway Study Point has been suspended by an administrator. 
-            Please contact support if you believe this is an error.
-          </p>
-          <button
-            onClick={() => {
-              signOut();
-              navigate('/login');
-            }}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-red-900/20"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // 1. BANNED CHECK removed: ProtectedRoute handles this securely and allows /support bypassing.
   // 2. ADMIN OVERRIDE
   const isAdmin = effectiveRole === 'admin';
 
@@ -102,11 +94,17 @@ function AppContent() {
   // If not logged in, go to login
   if (!user) return <Login />;
 
+  const isAdminRoute =
+    currentPath === '/admin' ||
+    currentPath === '/admin-portal' ||
+    currentPath.startsWith('/admin/');
+
   // ADMIN OVERRIDE: If admin, prioritize Admin Portal
   if (isAdmin) {
     if (
       currentPath === '/dashboard' ||
       currentPath === '/' ||
+      currentPath === '/admin' ||
       currentPath === '/admin-portal'
     ) {
       return (
@@ -139,7 +137,7 @@ function AppContent() {
     const examId = currentPath.replace('/exam/', '');
     return (
       <ProtectedRoute>
-        <ExamInterface key={`exam-${examId}`} examId={examId} />
+        <ExamInterface examId={examId} />
       </ProtectedRoute>
     );
   }
@@ -148,7 +146,7 @@ function AppContent() {
     const resultId = currentPath.replace('/results/', '');
     return (
       <ProtectedRoute>
-        <Results key={`result-${resultId}`} resultId={resultId} />
+        <Results resultId={resultId} />
       </ProtectedRoute>
     );
   }
@@ -193,10 +191,26 @@ function AppContent() {
     );
   }
 
+  if (currentPath === '/history') {
+    return (
+      <ProtectedRoute>
+        <History />
+      </ProtectedRoute>
+    );
+  }
+
   if (currentPath === '/notifications') {
     return (
       <ProtectedRoute>
         <Notifications />
+      </ProtectedRoute>
+    );
+  }
+
+  if (currentPath === '/notifications/push') {
+    return (
+      <ProtectedRoute>
+        <PushNotificationsInfo />
       </ProtectedRoute>
     );
   }
@@ -233,7 +247,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/admin-portal') {
+  if (currentPath === '/admin' || currentPath === '/admin-portal') {
     return (
       <ProtectedRoute requireAdmin>
         <AdminPortal />
@@ -241,11 +255,22 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <Login />;
+  if (currentPath.startsWith('/admin/student-analytics')) {
+    return (
+      <ProtectedRoute requireAdmin>
+        <StudentAnalytics />
+      </ProtectedRoute>
+    );
   }
 
   if (effectiveRole === 'admin') {
+    if (isAdminRoute) {
+      return (
+        <ProtectedRoute requireAdmin>
+          <AdminPortal />
+        </ProtectedRoute>
+      );
+    }
     return (
       <ProtectedRoute requireAdmin>
         <AdminPortal />
@@ -253,11 +278,7 @@ function AppContent() {
     );
   }
 
-  return (
-    <ProtectedRoute>
-      <StudentDashboard />
-    </ProtectedRoute>
-  );
+  return <Login />;
 }
 
 function App() {

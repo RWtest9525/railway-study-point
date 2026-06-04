@@ -4,17 +4,19 @@ import { useTheme } from '../contexts/ThemeContext';
 import { getExams, Exam } from '../lib/firestore';
 import { ArrowLeft, Clock, Award } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface SubjectSelectionProps {
   examId?: string;
 }
 
 export function SubjectSelection({ examId }: SubjectSelectionProps) {
-  const { navigate, currentPath } = useRouter();
+  const { navigate } = useRouter();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [examToStart, setExamToStart] = useState<Exam | null>(null);
 
   useEffect(() => {
     loadExams();
@@ -36,9 +38,6 @@ export function SubjectSelection({ examId }: SubjectSelectionProps) {
       setLoading(false);
     }
   };
-
-  // Extract category ID from path if needed
-  const categoryId = currentPath.replace('/subjects/', '');
 
   return (
     <div className={`min-h-screen pb-24 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
@@ -69,7 +68,7 @@ export function SubjectSelection({ examId }: SubjectSelectionProps) {
               <div
                 key={exam.id}
                 className={`${isDark ? 'bg-gray-800 border-gray-700 hover:border-purple-500' : 'bg-white border-gray-200 hover:border-purple-400'} rounded-2xl border p-5 transition cursor-pointer`}
-                onClick={() => navigate(`/exam/${exam.id}`)}
+                onClick={() => setExamToStart(exam)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -93,6 +92,21 @@ export function SubjectSelection({ examId }: SubjectSelectionProps) {
           </div>
         )}
       </main>
+
+      <ConfirmModal
+        isOpen={!!examToStart}
+        onCancel={() => setExamToStart(null)}
+        onConfirm={() => {
+          if (examToStart) {
+            navigate(`/exam/${examToStart.id}`);
+          }
+        }}
+        title="Start Exam"
+        message={examToStart ? `Are you sure you want to start "${examToStart.title}" now? The timer will begin immediately once started.` : ''}
+        confirmText="Start Exam"
+        cancelText="Cancel"
+      />
+
       <BottomNav />
     </div>
   );

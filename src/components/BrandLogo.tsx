@@ -27,6 +27,8 @@ export function BrandLogo({ variant = 'hero', circular = true, className = '' }:
       className={`object-contain object-center shrink-0 ${shape} ${variantClass[variant]} ${className}`.trim()}
       width={variant === 'hero' ? 160 : variant === 'nav' ? 48 : 36}
       height={variant === 'hero' ? 160 : variant === 'nav' ? 48 : 36}
+      loading="eager"
+      fetchPriority="high"
     />
   );
 }

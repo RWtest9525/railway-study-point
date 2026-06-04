@@ -14,9 +14,14 @@ import {
   Settings,
   User,
   ChevronRight,
+  Bell,
+  CalendarDays,
+  Lock,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { trialWholeDaysLeft } from '../lib/authUtils';
+import { ConfirmModal } from '../components/ConfirmModal';
+import toast from 'react-hot-toast';
 
 export function StudentDashboard() {
   const { profile, signOut, isPremium, effectiveRole, canAccessTests, trialExpiredNeedsPremium } =
@@ -26,19 +31,9 @@ export function StudentDashboard() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [recentResults, setRecentResults] = useState<QuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const settingsRef = useRef<HTMLDivElement>(null);
+  const [examToStart, setExamToStart] = useState<Exam | null>(null);
   const daysLeftTrial = useMemo(() => trialWholeDaysLeft(profile), [profile]);
 
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
-        setSettingsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, []);
 
   useEffect(() => {
     loadRecentResults();
@@ -123,130 +118,13 @@ export function StudentDashboard() {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-4">
-              <div className="hidden sm:flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate('/leaderboard')}
-                  className="text-gray-300 hover:text-white text-xs sm:text-sm flex items-center gap-1 transition"
-                >
-                  <Trophy className="w-4 h-4 text-amber-400" />
-                  <span className="hidden md:inline">Leaderboard</span>
-                </button>
-                {effectiveRole === 'admin' && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/admin-portal')}
-                    className="text-gray-300 hover:text-white text-xs sm:text-sm flex items-center gap-1 transition"
-                  >
-                    <Shield className="w-4 h-4 text-red-400" />
-                    <span className="hidden md:inline">Admin</span>
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5 sm:gap-3">
-                {isPremium ? (
-                  <div className="flex items-center gap-1 bg-yellow-600/20 text-yellow-500 border border-yellow-500/30 px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider">
-                    <Crown className="w-3 h-3 sm:w-4 h-4" />
-                    <span className="hidden xs:inline">Premium</span>
-                    <span className="xs:hidden">Pro</span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/upgrade')}
-                    className="flex items-center gap-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-bold transition shadow-lg shadow-yellow-900/20"
-                  >
-                    <Crown className="w-3 h-3 sm:w-4 h-4" />
-                    <span className="hidden xs:inline uppercase tracking-wider">Go Premium</span>
-                    <span className="xs:hidden">Upgrade</span>
-                  </button>
-                )}
-
-                <div className="relative" ref={settingsRef}>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsOpen((prev: boolean) => !prev)}
-                    className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition"
-                    aria-expanded={settingsOpen}
-                  >
-                    <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
-                  </button>
-                  {settingsOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-[150] py-2 text-sm overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-700 mb-1">
-                        <p className="text-gray-400 text-[10px] uppercase tracking-widest font-bold mb-1">Signed in as</p>
-                        <p className="text-white font-medium truncate">{profile?.full_name || 'Student'}</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
-                        onClick={() => {
-                          setSettingsOpen(false);
-                          navigate('/profile');
-                        }}
-                      >
-                        <User className="w-4 h-4 text-blue-400" />
-                        Profile
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3"
-                        onClick={() => {
-                          setSettingsOpen(false);
-                          navigate('/membership');
-                        }}
-                      >
-                        <Crown className="w-4 h-4 text-yellow-400" />
-                        Membership
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3 sm:hidden"
-                        onClick={() => {
-                          setSettingsOpen(false);
-                          navigate('/leaderboard');
-                        }}
-                      >
-                        <Trophy className="w-4 h-4 text-amber-400" />
-                        Leaderboard
-                      </button>
-                      {effectiveRole === 'admin' && (
-                        <button
-                          type="button"
-                          className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3 sm:hidden"
-                          onClick={() => {
-                            setSettingsOpen(false);
-                            navigate('/admin-portal');
-                          }}
-                        >
-                          <Shield className="w-4 h-4 text-red-400" />
-                          Admin Portal
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="w-full text-left px-4 py-2.5 text-gray-200 hover:bg-gray-700 transition flex items-center gap-3 border-t border-gray-700 mt-1"
-                        onClick={() => {
-                          setSettingsOpen(false);
-                          navigate('/support');
-                        }}
-                      >
-                        <Briefcase className="w-4 h-4 text-green-400" />
-                        Contact Support
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full text-left px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition flex items-center gap-3"
-                        onClick={handleSignOut}
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Sign Out
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/notifications')}
+                className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition"
+              >
+                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
             </div>
           </div>
         </div>
@@ -316,20 +194,13 @@ export function StudentDashboard() {
                   <div className="hidden lg:block text-right">
                     <div className="bg-white/10 rounded-2xl p-6 border border-white/20">
                       <div className="text-4xl font-bold text-white mb-2">
-                        {recentResults.length > 0 ? `${recentResults[0].score}/${recentResults[0].total_questions}` : '—'}
+                        {recentResults.length > 0 ? recentResults[0].score : '0'}
                       </div>
                       <div className="text-blue-200 text-sm">Latest Score</div>
                       {recentResults.length > 0 && (
                         <div className="mt-4 flex items-center justify-end gap-4 text-sm text-gray-300">
-                          <span>Time: {Math.floor((recentResults[0].time_taken_seconds || 0) / 60)}m</span>
-                          <span>Date: {(() => {
-                            const v = recentResults[0].started_at;
-                            if (!v) return 'N/A';
-                            if (typeof v === 'string') return new Date(v).toLocaleDateString();
-                            if ((v as any)?.toDate) return (v as any).toDate().toLocaleDateString();
-                            if ((v as any)?.seconds) return new Date((v as any).seconds * 1000).toLocaleDateString();
-                            return 'N/A';
-                          })()}</span>
+                          <span>Time: {Math.floor(recentResults[0].time_taken_seconds / 60)}m</span>
+                          <span>Date: {new Date(recentResults[0].started_at).toLocaleDateString()}</span>
                         </div>
                       )}
                     </div>
@@ -416,7 +287,7 @@ export function StudentDashboard() {
                       <tbody className="divide-y divide-gray-700/50">
                         {recentResults.map((result) => (
                           <tr key={result.id} className="hover:bg-gray-700/30 transition">
-                            <td className="px-4 py-3 text-gray-300 text-sm">{result.started_at ? (typeof result.started_at === 'string' ? new Date(result.started_at).toLocaleDateString() : (result.started_at as any)?.toDate ? (result.started_at as any).toDate().toLocaleDateString() : (result.started_at as any)?.seconds ? new Date((result.started_at as any).seconds * 1000).toLocaleDateString() : 'N/A') : 'N/A'}</td>
+                            <td className="px-4 py-3 text-gray-300 text-sm">{new Date(result.started_at).toLocaleDateString()}</td>
                             <td className="px-4 py-3 text-gray-300 text-sm">Mock Test</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
@@ -474,6 +345,39 @@ export function StudentDashboard() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Upcoming / Disabled Exams Section */}
+            <div className="mt-12 mb-8">
+              <div className="flex items-center gap-3 mb-6">
+                 <CalendarDays className="w-6 h-6 text-indigo-400" />
+                 <h2 className="text-2xl font-bold text-white">Upcoming Series</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[
+                  { title: 'RRB NTPC CBT-2 Mega Mock Series', desc: 'Expected Next Month', tags: ['120 Questions', 'Advanced'] },
+                  { title: 'RPF Sub-Inspector Target Complete', desc: 'Notifications Soon', tags: ['Full Length', 'Mock'] },
+                  { title: 'RRB JE Technical Stage 1', desc: 'Preparing Content', tags: ['100 Questions', 'Core'] }
+                ].map((item, idx) => (
+                  <button 
+                    key={idx} 
+                    onClick={() => toast('This exam series is currently unavailable and will be launched soon!', { icon: '⏳' })} 
+                    className="relative overflow-hidden bg-gray-800/30 rounded-2xl p-6 border border-gray-700/50 transition group text-left opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 focus:outline-none"
+                  >
+                    <div className="absolute top-4 right-4 bg-gray-700 px-3 py-1 rounded-full text-[10px] font-extrabold text-blue-300 uppercase tracking-widest shadow-md">Coming Soon</div>
+                    <div className="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center mb-4">
+                      <Lock className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-300 mb-1.5 pr-16 leading-tight">{item.title}</h3>
+                    <p className="text-gray-500 text-sm mb-6">{item.desc}</p>
+                    <div className="flex items-center gap-2 mt-auto">
+                      {item.tags.map(tag => (
+                        <div key={tag} className="px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-400 text-[10px] font-bold uppercase">{tag}</div>
+                      ))}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
           </>
@@ -541,7 +445,7 @@ export function StudentDashboard() {
                         navigate('/upgrade');
                         return;
                       }
-                      navigate(`/exam/${exam.id}`);
+                      setExamToStart(exam);
                     }}
                     className={`w-full py-3 rounded-xl font-bold transition shadow-lg mt-auto ${
                       !canAccessTests || (exam.is_premium && !isPremium)
@@ -561,6 +465,20 @@ export function StudentDashboard() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!examToStart}
+        onCancel={() => setExamToStart(null)}
+        onConfirm={() => {
+          if (examToStart) {
+            navigate(`/exam/${examToStart.id}`);
+          }
+        }}
+        title="Start Exam"
+        message={examToStart ? `Are you sure you want to start "${examToStart.title}" now? The timer will begin immediately once started.` : ''}
+        confirmText="Start Exam"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

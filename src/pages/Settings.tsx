@@ -8,6 +8,7 @@ import {
   Trophy, 
   HelpCircle, 
   Crown,
+  History as HistoryIcon,
   ChevronRight,
   LogOut,
   Moon,
@@ -17,7 +18,7 @@ import {
 export function Settings() {
   const { profile, signOut, isPremium } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { navigate } = useRouter();
+  const { navigate, goBack } = useRouter();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -34,6 +35,17 @@ export function Settings() {
       day: 'numeric', 
       month: 'long', 
       year: 'numeric' 
+    });
+  };
+
+  const formatDateTime = (dateString?: string) => {
+    if (!dateString) return 'Unavailable';
+    return new Date(dateString).toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
     });
   };
 
@@ -55,6 +67,14 @@ export function Settings() {
       action: () => navigate('/leaderboard')
     },
     {
+      icon: HistoryIcon,
+      title: 'Exam History',
+      description: 'View previous test analytics and logs',
+      color: 'text-indigo-500',
+      bgColor: 'bg-indigo-500/10',
+      action: () => navigate('/history')
+    },
+    {
       icon: HelpCircle,
       title: 'Help & Support',
       description: 'Get help and contact support',
@@ -62,16 +82,6 @@ export function Settings() {
       bgColor: 'bg-green-500/10',
       action: () => navigate('/support')
     },
-    {
-      icon: Crown,
-      title: isPremium ? 'Manage Premium' : 'Upgrade to Premium',
-      description: isPremium 
-        ? `Premium until ${profile?.premium_expires_at ? formatDate(profile.premium_expires_at) : 'N/A'}`
-        : 'Unlock all features',
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10',
-      action: () => navigate('/upgrade')
-    }
   ];
 
   return (
@@ -86,7 +96,7 @@ export function Settings() {
       } border-b`}>
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
           <button
-            onClick={() => window.history.back()}
+            onClick={() => goBack()}
             className={`p-2 rounded-full transition ${
               theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
             }`}
@@ -110,11 +120,17 @@ export function Settings() {
             : 'bg-gradient-to-br from-white to-blue-50 border-gray-200 shadow-sm'
         }`}>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">
-                {profile?.full_name?.charAt(0).toUpperCase() || profile?.email?.charAt(0).toUpperCase() || 'U'}
-              </span>
-            </div>
+            {profile?.avatar_url ? (
+              <div className="w-16 h-16 rounded-[24px] overflow-hidden bg-blue-50/50 shadow-md border border-gray-100 dark:border-gray-800 shrink-0">
+                <img src={profile.avatar_url} alt="User Avatar" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
+                <span className="text-2xl font-bold text-white">
+                  {profile?.full_name?.charAt(0).toUpperCase() || profile?.email?.charAt(0).toUpperCase() || 'U'}
+                </span>
+              </div>
+            )}
             <div className="flex-1">
               <h2 className={`text-lg font-semibold ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
@@ -132,6 +148,7 @@ export function Settings() {
               )}
             </div>
           </div>
+
         </div>
 
         {/* Theme Toggle */}
@@ -206,13 +223,40 @@ export function Settings() {
           ))}
         </div>
 
+        {/* Membership Details Button */}
+        <button
+          onClick={() => navigate('/membership')}
+          className={`w-full mt-6 flex items-center justify-between gap-4 p-4 rounded-xl border transition-all ${
+            theme === 'dark'
+              ? 'bg-gradient-to-r from-purple-500/10 to-transparent hover:from-purple-500/20 border-purple-500/30'
+              : 'bg-gradient-to-r from-purple-50 to-white hover:from-purple-100 border-purple-200 shadow-sm'
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-purple-500/20' : 'bg-purple-100'}`}>
+              <Crown className="w-6 h-6 text-purple-500" />
+            </div>
+            <div className="text-left">
+              <h3 className={`text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Membership Details
+              </h3>
+              <p className={`text-sm mt-0.5 ${theme === 'dark' ? 'text-purple-300' : 'text-purple-600'}`}>
+                {isPremium 
+                  ? `Premium ends ${profile?.premium_until ? formatDate(profile.premium_until) : 'N/A'}`
+                  : `Free Trial / Manage Plan`}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className={`w-5 h-5 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-500'} transition`} />
+        </button>
+
         {/* Sign Out Button */}
         <button
           onClick={handleSignOut}
-          className={`w-full mt-6 flex items-center justify-center gap-2 p-4 rounded-xl border font-medium transition-all ${
+          className={`w-full mt-3 flex items-center justify-center gap-2 p-4 rounded-xl border font-bold uppercase tracking-wider text-sm transition-all ${
             theme === 'dark'
-              ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400'
-              : 'bg-red-50 hover:bg-red-100 border-red-200 text-red-600'
+              ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-500'
+              : 'bg-red-50 hover:bg-red-100 border-red-200 text-red-600 shadow-sm'
           }`}
         >
           <LogOut className="w-5 h-5" />

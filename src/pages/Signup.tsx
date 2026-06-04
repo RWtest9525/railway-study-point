@@ -27,15 +27,20 @@ export function Signup() {
     try {
       const { needsEmailConfirmation } = await signUp(email, password, fullName);
       if (needsEmailConfirmation) {
-        setInfo(
-          'Account created! Please check your email to verify your account, then log in.'
-        );
+          setInfo(
+            'Account created! You need to verify your email. If you turned off email confirmation, try logging in now.'
+          );
         setTimeout(() => navigate('/login'), 5000);
       } else {
         navigate('/dashboard');
       }
-    } catch (err) {
-      setError('Failed to create account. Please try again.');
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists.');
+      } else {
+        setError(err.message || 'Failed to create account. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -44,8 +49,9 @@ export function Signup() {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
-    } catch (err) {
-      setError('Failed to sign in with Google');
+    } catch (err: any) {
+      console.error('Google sign in error:', err);
+      setError(err.message || 'Failed to sign in with Google');
     }
   };
 

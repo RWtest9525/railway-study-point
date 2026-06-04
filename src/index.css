@@ -13,3 +13,36 @@
     @apply bg-gray-50 text-gray-900;
   }
 }
+
+/* Custom thin premium scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.4);
+  border-radius: 20px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.5);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(75, 85, 99, 0.8);
+}
+
+@keyframes toast-progress {
+  from { width: 100%; left: 0; right: auto; }
+  to { width: 0%; left: 0; right: auto; }
+}
+
+/* Ensure the time picker clock icon is visible in dark mode */
+.css-invert-time-icon::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}

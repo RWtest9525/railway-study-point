@@ -5,7 +5,7 @@ import { RouterProvider } from './contexts/RouterContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TrialUpgradeNudge } from './components/TrialUpgradeNudge';
-import { Toaster, toast, resolveValue } from 'react-hot-toast';
+import { Toaster, toast, resolveValue, Toast } from 'react-hot-toast';
 import { X } from 'lucide-react';
 import './index.css';
 
@@ -16,7 +16,7 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <TrialUpgradeNudge />
           <Toaster position="top-right">
-            {(t) => (
+            {(t: Toast) => (
               <div
                 className={`
                   max-w-xs w-full bg-[#1F2937] text-white shadow-2xl rounded-2xl pointer-events-auto flex flex-col overflow-hidden transition-all duration-300

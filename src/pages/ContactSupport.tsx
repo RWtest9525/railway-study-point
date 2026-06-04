@@ -5,6 +5,7 @@ import { MessageSquare, PhoneCall, Clock, User as UserIcon, ArrowLeft } from 'lu
 import { getDocs, collection, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { createSupportQuery } from '../lib/firestore';
+import { formatDate } from '../lib/dateUtils';
 import { BottomNav } from '../components/BottomNav';
 
 interface SupportQuery {
@@ -16,17 +17,11 @@ interface SupportQuery {
   created_at: string;
 }
 
-const TOPICS = [
-  'Account issue',
-  'Premium related issue',
-  'Test related',
-  'Another issue'
-];
-
 export function ContactSupport() {
-  const { profile } = useAuth();
+  const { profile, effectiveRole } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+
   const [method, setMethod] = useState<'chat' | 'call' | null>(null);
   const [topic, setTopic] = useState('');
   const [message, setMessage] = useState('');
@@ -34,10 +29,21 @@ export function ContactSupport() {
   const [preferredTime, setPreferredTime] = useState('');
   
   const [loading, setLoading] = useState(false);
-  const [listLoading, setListLoading] = useState(true);
-  const [items, setItems] = useState<SupportQuery[]>([]);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
+
+  const [items, setItems] = useState<SupportQuery[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  
+  const TOPICS = [
+    ...(effectiveRole === 'banned' ? ['Unban Request'] : []),
+    'Account issue',
+    'Premium related issue',
+    'Test related',
+    'Another issue'
+  ];
+
 
   useEffect(() => {
     if (profile?.id) load();
@@ -129,17 +135,21 @@ export function ContactSupport() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl border p-6 sm:p-8 mb-8`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`p-2 rounded-lg ${isDark ? 'bg-blue-600/20' : 'bg-blue-100'}`}>
-              <MessageSquare className={`w-6 h-6 sm:w-8 sm:h-8 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-            </div>
-            <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Help & Support</h1>
-          </div>
+        <div className="mb-6">
+          <h1 className={`text-2xl font-bold tracking-tight mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>How can we help?</h1>
+          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Select a preferred method to reach our team immediately.</p>
+        </div>
           
-          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mb-8`}>
-            Choose how you'd like to get assistance from our team.
-          </p>
+          {effectiveRole === 'banned' && (
+            <div className={`mb-6 p-4 rounded-xl text-sm font-semibold border ${isDark ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-red-50 text-red-600 border-red-200'} flex items-start gap-3`}>
+              <div className="mt-0.5">⚠️</div>
+              <div>
+                Your account is currently suspended. You can use this form to submit an unban request or explanation. Our administration will review it.
+              </div>
+            </div>
+          )}
+
+
 
           {feedback && (
             <div className={`${isDark ? 'bg-green-900/40 border-green-600 text-green-200' : 'bg-green-100 border-green-300 text-green-700'} px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2 border`}>
@@ -154,27 +164,31 @@ export function ContactSupport() {
           )}
 
           {!method ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid gap-3 mb-8">
               <button
                 onClick={() => setMethod('chat')}
-                className={`flex flex-col items-center justify-center p-6 border rounded-2xl transition-all group ${isDark ? 'bg-gray-700/50 hover:bg-gray-700 border-gray-600 hover:border-blue-500' : 'bg-gray-50 hover:bg-gray-100 border-gray-200 hover:border-blue-400'}`}
+                className={`flex items-center gap-4 p-4 lg:p-5 rounded-2xl border transition-all text-left shadow-sm ${isDark ? 'bg-gray-800 border-gray-700 hover:border-blue-500/50' : 'bg-white border-gray-200 hover:border-blue-400/50 hover:bg-gray-50'}`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition ${isDark ? 'bg-blue-600/20' : 'bg-blue-100'}`}>
+                <div className={`w-12 h-12 rounded-full shrink-0 flex items-center justify-center ${isDark ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
                   <MessageSquare className={`w-6 h-6 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                 </div>
-                <span className={`font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>Help via Chat</span>
-                <span className={`text-xs text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Instant support via messaging</span>
+                <div>
+                  <h3 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Chat Support</h3>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Send a direct message</p>
+                </div>
               </button>
 
               <button
                 onClick={() => setMethod('call')}
-                className={`flex flex-col items-center justify-center p-6 border rounded-2xl transition-all group ${isDark ? 'bg-gray-700/50 hover:bg-gray-700 border-gray-600 hover:border-amber-500' : 'bg-gray-50 hover:bg-gray-100 border-gray-200 hover:border-amber-400'}`}
+                className={`flex items-center gap-4 p-4 lg:p-5 rounded-2xl border transition-all text-left shadow-sm ${isDark ? 'bg-gray-800 border-gray-700 hover:border-amber-500/50' : 'bg-white border-gray-200 hover:border-amber-400/50 hover:bg-gray-50'}`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition ${isDark ? 'bg-amber-600/20' : 'bg-amber-100'}`}>
+                <div className={`w-12 h-12 rounded-full shrink-0 flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
                   <PhoneCall className={`w-6 h-6 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
                 </div>
-                <span className={`font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>Help via Call</span>
-                <span className={`text-xs text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Schedule a call with admin</span>
+                <div>
+                  <h3 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Schedule a Call</h3>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>We will call you back</p>
+                </div>
               </button>
             </div>
           ) : method === 'chat' ? (
@@ -192,22 +206,19 @@ export function ContactSupport() {
 
               <div>
                 <label className={`block text-xs font-bold uppercase tracking-widest mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Select Topic</label>
-                <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className={`w-full px-4 py-3.5 rounded-xl border appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold transition ${
+                    isDark ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'
+                  }`}
+                  required
+                >
+                  <option value="" disabled>Select a topic...</option>
                   {TOPICS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTopic(t)}
-                      className={`px-3 py-2 rounded-lg text-xs font-medium border transition ${
-                        topic === t 
-                          ? 'bg-blue-600 border-blue-500 text-white' 
-                          : (isDark ? 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500' : 'bg-gray-100 border-gray-200 text-gray-700 hover:border-gray-400')
-                      }`}
-                    >
-                      {t}
-                    </button>
+                    <option key={t} value={t}>{t}</option>
                   ))}
-                </div>
+                </select>
               </div>
 
               <div>
@@ -289,12 +300,22 @@ export function ContactSupport() {
               </p>
             </form>
           )}
-        </div>
 
-        <div className="flex items-center justify-between mb-4">
-          <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Your Requests History</h2>
-          <div className={`h-px flex-1 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} mx-4`} />
-        </div>
+        {!method && (
+          <div className="animate-in fade-in py-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Your Requests History</h2>
+              <div className={`h-px flex-1 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} mx-4 hidden sm:block`} />
+              {items.length > 5 && !showAllHistory && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllHistory(true)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition ${isDark ? 'bg-gray-800 border-gray-700 text-gray-300 hover:text-white hover:bg-gray-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                >
+                  See All
+                </button>
+              )}
+            </div>
 
         {listLoading ? (
           <div className="flex justify-center py-8">
@@ -306,7 +327,7 @@ export function ContactSupport() {
           </div>
         ) : (
           <div className="space-y-4">
-            {items.map((q) => (
+            {(showAllHistory ? items : items.slice(0, 5)).map((q) => (
               <div
                 key={q.id}
                 className={`${isDark ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-gray-200 hover:border-gray-300'} rounded-2xl border p-5 transition`}
@@ -314,7 +335,7 @@ export function ContactSupport() {
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex flex-col">
                     <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-[10px] uppercase tracking-widest font-bold`}>
-                      {new Date(q.created_at).toLocaleDateString()} at {new Date(q.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatDate(q.created_at)}
                     </span>
                     <span className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${
                       q.status === 'pending' ? 'text-amber-400' : 
@@ -350,6 +371,8 @@ export function ContactSupport() {
                 )}
               </div>
             ))}
+          </div>
+        )}
           </div>
         )}
         </main>
