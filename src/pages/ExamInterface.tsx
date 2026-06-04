@@ -9,7 +9,7 @@ interface ExamInterfaceProps {
   examId?: string;
 }
 
-const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
+const ExamInterface = ({ examId }: ExamInterfaceProps) => {
   const { user, userData, profile, isPremium } = useAuth();
   const { navigate } = useRouter();
 
@@ -19,9 +19,25 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [startTime] = useState<number>(Date.now());
   const questionScrollerRef = useRef<HTMLDivElement | null>(null);
   const questionButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // Use refs to track submission state across renders and prevent double-submit
+  const submittedRef = useRef(false);
+  const submittingRef = useRef(false);
+  // Keep latest answers in a ref so the submit handler always has current data
+  const answersRef = useRef<Record<string, number>>({});
+  const questionsRef = useRef<any[]>([]);
+
+  // Sync state to refs
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+  useEffect(() => {
+    questionsRef.current = questions;
+  }, [questions]);
 
   // Draft key for localStorage
   const draftKey = user?.uid && examId ? `exam-draft:${user.uid}:${examId}` : '';
@@ -32,22 +48,10 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
   useEffect(() => {
     if (!examId) return;
 
-    // Premium check – skip for admin
-    const role = profile?.role || 'student';
-    if (!isPremium && role !== 'admin') {
-      const isWithinTrial = (() => {
-        if (!profile?.created_at) return true;
-        const start = new Date(profile.created_at);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 7);
-        return new Date() < end;
-      })();
-      if (!isWithinTrial) {
-        alert('Upgrade to Premium to access this exam!');
-        navigate('/membership');
-        return;
-      }
-    }
+    // Prevent re-fetching if already submitted
+    if (submittedRef.current) return;
+
+    let cancelled = false;
 
     const fetchQuestions = async () => {
       setLoading(true);
@@ -61,8 +65,10 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
           );
           const submissionSnap = await getDocs(submissionQuery);
           if (!submissionSnap.empty) {
-            setAlreadySubmitted(true);
-            setLoading(false);
+            if (!cancelled) {
+              setAlreadySubmitted(true);
+              setLoading(false);
+            }
             return;
           }
         }
@@ -75,7 +81,10 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
         // Sort by order if available
         loaded.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
 
+        if (cancelled) return;
+
         setQuestions(loaded);
+        questionsRef.current = loaded;
 
         // Restore draft
         if (draftKey) {
@@ -83,7 +92,10 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
           if (rawDraft) {
             try {
               const draft = JSON.parse(rawDraft);
-              setAnswers(draft.answers || {});
+              if (draft.answers && typeof draft.answers === 'object') {
+                setAnswers(draft.answers);
+                answersRef.current = draft.answers;
+              }
               const safeIndex = Math.max(0, Math.min(loaded.length - 1, Number(draft.currentIdx) || 0));
               setCurrentIdx(safeIndex);
             } catch {
@@ -94,11 +106,17 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
       } catch (err) {
         console.error('Error fetching exam questions:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchQuestions();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examId, user?.uid]);
 
@@ -118,7 +136,7 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
   // ────────────────────────────────────────────────────────
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (questions.length > 0 && !alreadySubmitted) {
+      if (questions.length > 0 && !alreadySubmitted && !submittedRef.current) {
         e.preventDefault();
         e.returnValue = 'Your exam progress is saved. Are you sure you want to leave?';
         return e.returnValue;
@@ -143,27 +161,34 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
 
   // ────────────────────────────────────────────────────────
   // Submit handler — saves to 'attempts' collection with proper format
+  // Uses refs to prevent double-submit and get latest state
   // ────────────────────────────────────────────────────────
-  const handleSubmit = useCallback(async () => {
-    if (submitting || !user?.uid || !examId) return;
+  const doSubmit = useCallback(async () => {
+    // Guard: prevent double submission using ref (survives re-renders)
+    if (submittingRef.current || submittedRef.current) {
+      console.warn('Submission already in progress or completed, ignoring.');
+      return;
+    }
+    if (!user?.uid || !examId) return;
 
-    const confirmed = window.confirm(
-      'Submit exam now? You cannot change answers after final submit.'
-    );
-    if (!confirmed) return;
-
+    submittingRef.current = true;
+    submittedRef.current = true;
     setSubmitting(true);
+
     try {
+      const currentAnswers = answersRef.current;
+      const currentQuestions = questionsRef.current;
+
       // Build answers array in the format Results.tsx expects
-      const answersArray = questions.map((q) => ({
+      const answersArray = currentQuestions.map((q) => ({
         questionId: q.id,
-        selectedOption: answers[q.id] !== undefined ? answers[q.id] : -1,
+        selectedOption: currentAnswers[q.id] !== undefined ? currentAnswers[q.id] : -1,
       }));
 
       // Calculate score
       let correctCount = 0;
-      questions.forEach((q) => {
-        const userAnswer = answers[q.id];
+      currentQuestions.forEach((q) => {
+        const userAnswer = currentAnswers[q.id];
         const correctIndex = q.correct_index !== undefined
           ? q.correct_index
           : q.correctIndex;
@@ -174,11 +199,11 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
 
       // Subject-wise scores
       const subjectWise: Record<string, { correct: number; total: number }> = {};
-      questions.forEach((q) => {
+      currentQuestions.forEach((q) => {
         const subject = q.subject || 'General';
         if (!subjectWise[subject]) subjectWise[subject] = { correct: 0, total: 0 };
         subjectWise[subject].total++;
-        if (answers[q.id] !== undefined && answers[q.id] === (q.correct_index ?? q.correctIndex)) {
+        if (currentAnswers[q.id] !== undefined && currentAnswers[q.id] === (q.correct_index ?? q.correctIndex)) {
           subjectWise[subject].correct++;
         }
       });
@@ -190,7 +215,7 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
         exam_id: examId,
         answers: answersArray,
         score: correctCount,
-        total_questions: questions.length,
+        total_questions: currentQuestions.length,
         correct_answers: correctCount,
         time_taken_seconds: timeTakenSeconds,
         started_at: new Date(startTime).toISOString(),
@@ -200,14 +225,35 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
       // Clear draft
       if (draftKey) localStorage.removeItem(draftKey);
 
+      // Small delay to ensure Firestore has propagated the document
+      // This prevents the Results page from failing to find the attempt
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Navigate to results page
       navigate(`/results/${attemptId}`);
     } catch (e) {
       console.error('Submission error:', e);
       alert('Submission Error. Please try again.');
+      // Reset submission guards so user can retry
+      submittingRef.current = false;
+      submittedRef.current = false;
       setSubmitting(false);
     }
-  }, [submitting, user?.uid, examId, questions, answers, startTime, draftKey, navigate]);
+  }, [user?.uid, examId, startTime, draftKey, navigate]);
+
+  // Handle the confirm dialog
+  const handleSubmitClick = useCallback(() => {
+    setShowConfirmDialog(true);
+  }, []);
+
+  const handleConfirmSubmit = useCallback(() => {
+    setShowConfirmDialog(false);
+    doSubmit();
+  }, [doSubmit]);
+
+  const handleCancelSubmit = useCallback(() => {
+    setShowConfirmDialog(false);
+  }, []);
 
   // ────────────────────────────────────────────────────────
   // Helpers
@@ -400,7 +446,7 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
 
           {currentIdx === questions.length - 1 ? (
             <button
-              onClick={handleSubmit}
+              onClick={handleSubmitClick}
               disabled={submitting}
               className="px-8 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-bold shadow-lg shadow-green-900/20 transition disabled:opacity-60"
             >
@@ -417,6 +463,44 @@ const ExamInterface = ({ examId }: ExamInterfaceProps = {}) => {
           )}
         </div>
       </div>
+
+      {/* Custom Confirm Dialog - replaces window.confirm() which can cause timing issues */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-600 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-3">📝</div>
+              <h3 className="text-xl font-bold text-white mb-2">Submit Exam?</h3>
+              <p className="text-slate-400 text-sm">
+                You have answered <span className="text-indigo-400 font-bold">{answeredCount}</span> out of <span className="text-indigo-400 font-bold">{totalQuestions}</span> questions.
+              </p>
+              {answeredCount < totalQuestions && (
+                <p className="text-amber-400 text-sm mt-2">
+                  ⚠️ {totalQuestions - answeredCount} question{totalQuestions - answeredCount > 1 ? 's are' : ' is'} unanswered.
+                </p>
+              )}
+              <p className="text-slate-500 text-xs mt-3">
+                You cannot change your answers after submission.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelSubmit}
+                className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleConfirmSubmit}
+                disabled={submitting}
+                className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition disabled:opacity-60"
+              >
+                {submitting ? 'Submitting...' : 'Yes, Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

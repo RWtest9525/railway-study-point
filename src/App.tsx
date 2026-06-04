@@ -139,7 +139,7 @@ function AppContent() {
     const examId = currentPath.replace('/exam/', '');
     return (
       <ProtectedRoute>
-        <ExamInterface examId={examId} />
+        <ExamInterface key={`exam-${examId}`} examId={examId} />
       </ProtectedRoute>
     );
   }
@@ -148,7 +148,7 @@ function AppContent() {
     const resultId = currentPath.replace('/results/', '');
     return (
       <ProtectedRoute>
-        <Results resultId={resultId} />
+        <Results key={`result-${resultId}`} resultId={resultId} />
       </ProtectedRoute>
     );
   }

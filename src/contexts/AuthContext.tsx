@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -17,17 +17,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userData, setUserData] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  // Track whether initial auth check is done — never re-set loading to true after this
+  const initialLoadDone = useRef(false);
 
   useEffect(() => {
     let profileUnsub: (() => void) | null = null;
+    let userDataUnsub: (() => void) | null = null;
 
     const authUnsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
+      // Only show loading spinner on initial load, not on subsequent auth changes
+      // This prevents ExamInterface from being unmounted mid-exam
+      if (!initialLoadDone.current) {
+        setLoading(true);
+      }
 
-      // Clean up previous profile listener
+      // Clean up previous listeners
       if (profileUnsub) {
         profileUnsub();
         profileUnsub = null;
+      }
+      if (userDataUnsub) {
+        userDataUnsub();
+        userDataUnsub = null;
       }
 
       if (firebaseUser) {
@@ -38,7 +49,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
 
         // Listen to users collection for userData (isPremium field)
-        onSnapshot(userDocRef, (docSnap) => {
+        // FIX: Store the unsubscribe function so it gets cleaned up
+        userDataUnsub = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             setUserData(docSnap.data());
           }
@@ -68,11 +80,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setLoading(false);
+      initialLoadDone.current = true;
     });
 
     return () => {
       authUnsub();
       if (profileUnsub) profileUnsub();
+      if (userDataUnsub) userDataUnsub();
     };
   }, []);
 
@@ -104,7 +118,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
