@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from '../contexts/RouterContext';
 import { getExam, getQuestions, getQuestionsByCategoryNode, createAttempt, getAttempts, Question, Exam, getCategoryNode } from '../lib/firestore';
-import { Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, ArrowLeft, AlertTriangle, Award, FileText, X, RotateCcw } from 'lucide-react';
+import { Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, ArrowLeft, AlertTriangle, RotateCcw } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useTheme } from '../contexts/ThemeContext';
 import toast from 'react-hot-toast';
@@ -29,7 +29,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
   const [loading, setLoading] = useState(true);
   const [startTime, setStartTime] = useState(Date.now());
   
-  // Dialog States
   const [hasStarted, setHasStarted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
@@ -52,7 +51,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     loadExamData();
   }, [examId, authLoading, navigate]);
 
-  // Timer Tick
   useEffect(() => {
     if (!hasStarted || timeRemaining <= 0) return;
     const timer = setInterval(() => {
@@ -61,7 +59,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     return () => clearInterval(timer);
   }, [hasStarted, timeRemaining]);
 
-  // Save Progress draft
   useEffect(() => {
     if (!draftKey || !hasStarted || submitSuccessAttemptId) return;
     const draft = {
@@ -370,55 +367,41 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
     setCurrentQuestionIndex(Math.max(0, Math.min(questions.length - 1, index)));
   };
 
-  const scrollQuestionBubbles = (direction: 'left' | 'right') => {
-    const scroller = questionScrollerRef.current;
-    if (!scroller) return;
-    const amount = 180;
-    scroller.scrollBy({
-      left: direction === 'left' ? -amount : amount,
-      behavior: 'smooth',
-    });
-  };
-
   const answeredCount = Object.keys(answers).length;
   const flaggedCount = markedForReview.size;
   const unansweredCount = questions.length - answeredCount;
   const isFlagged = currentQuestion ? markedForReview.has(currentQuestion.id) : false;
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
+  const isFirstQuestion = currentQuestionIndex === 0;
 
   return (
     <div className={`h-screen flex flex-col overflow-hidden ${isDark ? 'bg-[#060A13] text-white' : 'bg-slate-100 text-slate-900'}`}>
 
-      {/* ─── Compact Header ─── */}
-      <header className={`flex-shrink-0 z-10 px-3 sm:px-5 py-2.5 ${isDark ? 'bg-[#0C1222]/95 border-[#1E293B]/60' : 'bg-white/95 border-slate-200/80'} border-b backdrop-blur-md`}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-          
-          {/* Left: Back + Title */}
+      {/* ─── Header ─── only title once, timer, compact info */}
+      <header className={`flex-shrink-0 z-10 px-3 sm:px-5 py-2.5 ${
+        isDark ? 'bg-[#0C1222]/95 border-[#1E293B]/60' : 'bg-white/95 border-slate-200/80'
+      } border-b backdrop-blur-md`}>
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <button 
               onClick={() => setLeaveConfirmOpen(true)}
-              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+              className={`p-1.5 rounded-lg transition ${isDark ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <h1 className={`text-sm sm:text-base font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+            <h1 className={`text-sm sm:text-base font-bold truncate max-w-[160px] sm:max-w-xs ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
               {exam?.title}
             </h1>
           </div>
 
-          {/* Right: Timer + Q count + Marks in single row */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            {/* Timer - most prominent */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-xs font-bold ${
-              isDark 
-                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
-                : 'bg-blue-50 text-blue-700 border border-blue-200'
+              isDark ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-700 border border-blue-200'
             }`}>
               <Clock className="w-3.5 h-3.5" />
               <span>{timeRemaining > 0 ? formatTime(timeRemaining) : '∞'}</span>
             </div>
-            {/* Compact Q/Marks */}
-            <div className={`hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-bold ${
+            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold ${
               isDark ? 'bg-white/5 text-slate-400 border border-white/5' : 'bg-slate-50 text-slate-500 border border-slate-200'
             }`}>
               <span>{questions.length}Q</span>
@@ -429,25 +412,17 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
         </div>
       </header>
 
-      {/* ─── Main Question Area (fills remaining space) ─── */}
-      <main className="flex-1 overflow-hidden flex flex-col p-2.5 sm:p-4 md:p-5">
-        
-        {/* Question Card - takes all space */}
-        <div className={`flex-1 rounded-2xl sm:rounded-3xl border overflow-hidden flex flex-col ${
-          isDark 
-            ? 'bg-gradient-to-b from-[#0F172A]/80 to-[#0C1222] border-[#1E293B]/50 shadow-2xl shadow-black/40' 
-            : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
-        }`}>
-          
-          {/* Question Header Bar - inside card */}
-          <div className={`flex items-center justify-between px-4 sm:px-6 py-3 flex-shrink-0 ${
-            isDark ? 'border-b border-white/5' : 'border-b border-slate-100'
-          }`}>
+      {/* ─── Scrollable Content Area ─── everything flows inside here */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-3 sm:px-5 py-4 sm:py-5">
+
+          {/* Question Info Bar */}
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
                 isDark ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-50 text-blue-600'
               }`}>
-                Q{currentQuestionIndex + 1}/{questions.length}
+                Q {currentQuestionIndex + 1} / {questions.length}
               </span>
               {currentQuestion?.subject && (
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
@@ -457,7 +432,6 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                 </span>
               )}
             </div>
-
             {/* Flag Icon Button */}
             <button
               type="button"
@@ -475,7 +449,7 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
                   ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30 scale-110'
                   : isDark
                   ? 'bg-white/5 text-slate-500 hover:bg-white/10 hover:text-amber-400'
-                  : 'bg-slate-50 text-slate-400 hover:bg-amber-50 hover:text-amber-500'
+                  : 'bg-slate-100 text-slate-400 hover:bg-amber-50 hover:text-amber-500'
               }`}
               title={isFlagged ? 'Remove flag' : 'Flag this question'}
             >
@@ -483,226 +457,209 @@ export function ExamInterface({ examId }: ExamInterfaceProps) {
             </button>
           </div>
 
-          {/* Scrollable Question Content */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5">
-            {/* Question Text */}
-            <h2 className={`text-base sm:text-lg md:text-xl font-bold leading-relaxed mb-5 ${isDark ? 'text-slate-50' : 'text-slate-800'}`}>
-              {currentQuestion?.question_text}
-            </h2>
+          {/* Question Text */}
+          <h2 className={`text-base sm:text-lg md:text-xl font-bold leading-relaxed mb-5 ${isDark ? 'text-slate-50' : 'text-slate-800'}`}>
+            {currentQuestion?.question_text}
+          </h2>
 
-            {/* Question Image */}
-            {currentQuestion?.image_url && (
-              <div className={`mb-6 p-2 rounded-2xl flex items-center justify-center max-w-lg mx-auto border ${isDark ? 'bg-black/20 border-white/5' : 'bg-slate-50 border-slate-150'}`}>
-                <img
-                  src={currentQuestion.image_url}
-                  alt="Question contextual content"
-                  className="max-h-[20vh] w-auto max-w-full rounded-lg object-contain"
-                />
-              </div>
-            )}
-
-            {/* Options - Bigger & More Premium */}
-            <div className="grid gap-3 sm:gap-3.5 max-w-3xl mx-auto">
-              {currentQuestion?.options?.map((option, index) => {
-                const isSelected = answers[currentQuestion.id] === index;
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() =>
-                      setAnswers({
-                        ...answers,
-                        [currentQuestion.id]: index,
-                      })
-                    }
-                    className={`w-full text-left px-4 sm:px-5 py-4 sm:py-[18px] rounded-xl sm:rounded-2xl border-2 transition-all duration-200 ${
-                      isSelected
-                        ? isDark
-                          ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
-                          : 'border-blue-500 bg-blue-50 shadow-md shadow-blue-200/40'
-                        : isDark
-                        ? 'border-[#1E293B] bg-white/[0.02] hover:border-slate-600 hover:bg-white/[0.04] active:scale-[0.99]'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm active:scale-[0.99]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3.5 sm:gap-4">
-                      <span className={`flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center font-black text-sm transition-all duration-200 ${
-                        isSelected
-                          ? 'border-blue-500 bg-blue-600 text-white'
-                          : isDark
-                          ? 'border-[#334155] bg-[#0F172A] text-slate-400'
-                          : 'border-slate-200 bg-slate-50 text-slate-500'
-                      }`}>
-                        {getOptionLabel(currentQuestion, index)}
-                      </span>
-                      <div className="flex-1 text-sm sm:text-base font-semibold leading-relaxed">
-                        <div className={isSelected ? (isDark ? 'text-blue-300' : 'text-blue-700') : (isDark ? 'text-slate-300' : 'text-slate-700')}>
-                          {getOptionText(currentQuestion, option, index)}
-                        </div>
-                        {currentQuestion.option_images?.[index] && (
-                          <img
-                            src={currentQuestion.option_images[index]}
-                            alt={`Option ${index + 1}`}
-                            className="mt-3 max-h-36 rounded-xl border border-slate-700/20 object-contain"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+          {/* Question Image */}
+          {currentQuestion?.image_url && (
+            <div className={`mb-6 p-2 rounded-2xl flex items-center justify-center max-w-lg mx-auto border ${
+              isDark ? 'bg-black/20 border-white/5' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <img
+                src={currentQuestion.image_url}
+                alt="Question"
+                className="max-h-[22vh] w-auto max-w-full rounded-lg object-contain"
+              />
             </div>
+          )}
+
+          {/* ─── Options (Bigger) ─── */}
+          <div className="grid gap-3 sm:gap-3.5">
+            {currentQuestion?.options?.map((option, index) => {
+              const isSelected = answers[currentQuestion.id] === index;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() =>
+                    setAnswers({
+                      ...answers,
+                      [currentQuestion.id]: index,
+                    })
+                  }
+                  className={`w-full text-left px-4 sm:px-5 py-4 sm:py-5 rounded-xl sm:rounded-2xl border-2 transition-all duration-200 ${
+                    isSelected
+                      ? isDark
+                        ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
+                        : 'border-blue-500 bg-blue-50 shadow-md shadow-blue-200/40'
+                      : isDark
+                      ? 'border-[#1E293B] bg-white/[0.02] hover:border-slate-600 hover:bg-white/[0.04] active:scale-[0.995]'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm active:scale-[0.995]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5 sm:gap-4">
+                    <span className={`flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 flex items-center justify-center font-black text-sm sm:text-base transition-all duration-200 ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-600 text-white'
+                        : isDark
+                        ? 'border-[#334155] bg-[#0F172A] text-slate-400'
+                        : 'border-slate-200 bg-slate-50 text-slate-500'
+                    }`}>
+                      {getOptionLabel(currentQuestion, index)}
+                    </span>
+                    <div className="flex-1 text-sm sm:text-base font-semibold leading-relaxed">
+                      <div className={isSelected ? (isDark ? 'text-blue-300' : 'text-blue-700') : (isDark ? 'text-slate-300' : 'text-slate-700')}>
+                        {getOptionText(currentQuestion, option, index)}
+                      </div>
+                      {currentQuestion.option_images?.[index] && (
+                        <img
+                          src={currentQuestion.option_images[index]}
+                          alt={`Option ${index + 1}`}
+                          className="mt-3 max-h-36 rounded-xl border border-slate-700/20 object-contain"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
-          {/* ─── Controls Bar (Prev / Clear / Next / Submit) — inside card, below options ─── */}
-          <div className={`flex-shrink-0 px-4 sm:px-6 py-3 flex items-center justify-between gap-2 ${
-            isDark ? 'border-t border-white/5 bg-black/20' : 'border-t border-slate-100 bg-slate-50/50'
-          }`}>
-            {/* Left: Prev + Clear */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <button
-                type="button"
-                onClick={() => goToQuestion(currentQuestionIndex - 1)}
-                disabled={currentQuestionIndex === 0}
-                className={`flex items-center justify-center h-10 sm:h-11 px-3 sm:px-4 rounded-xl font-bold text-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                  isDark
-                    ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-                    : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-sm'
-                }`}
-              >
-                <ChevronLeft className="w-4 h-4 sm:mr-1" />
-                <span className="hidden sm:inline">Prev</span>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  const newAnswers = { ...answers };
-                  delete newAnswers[currentQuestion.id];
-                  setAnswers(newAnswers);
-                }}
-                disabled={answers[currentQuestion.id] === undefined}
-                className={`flex items-center justify-center h-10 sm:h-11 px-3 rounded-xl transition-all disabled:opacity-20 disabled:cursor-not-allowed ${
-                  isDark
-                    ? 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/5'
-                    : 'bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 shadow-sm'
-                }`}
-                title="Clear answer"
-              >
-                <RotateCcw className="w-3.5 h-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline text-xs font-bold">Clear</span>
-              </button>
-            </div>
+          {/* ─── Controls: ◀ Prev | Clear | Next ▶ / Submit ─── right below options */}
+          <div className="flex items-center justify-between mt-5 gap-2">
+            {/* Left: Prev circle */}
+            <button
+              type="button"
+              onClick={() => goToQuestion(currentQuestionIndex - 1)}
+              disabled={isFirstQuestion}
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all disabled:opacity-25 disabled:cursor-not-allowed ${
+                isDark
+                  ? 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
+                  : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-sm'
+              }`}
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
 
-            {/* Right: Next or Submit */}
+            {/* Center: Clear */}
+            <button
+              type="button"
+              onClick={() => {
+                const newAnswers = { ...answers };
+                delete newAnswers[currentQuestion.id];
+                setAnswers(newAnswers);
+              }}
+              disabled={answers[currentQuestion.id] === undefined}
+              className={`flex items-center gap-1.5 h-10 px-4 rounded-full transition-all text-xs font-bold disabled:opacity-20 disabled:cursor-not-allowed ${
+                isDark
+                  ? 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10'
+                  : 'bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 shadow-sm'
+              }`}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Clear</span>
+            </button>
+
+            {/* Right: Next circle OR Submit on last question */}
             {!isLastQuestion ? (
               <button
                 type="button"
                 onClick={() => goToQuestion(currentQuestionIndex + 1)}
-                className={`flex items-center justify-center h-10 sm:h-11 px-4 sm:px-5 rounded-xl font-bold text-sm transition-all ${
+                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all ${
                   isDark
-                    ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25'
-                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25'
                 }`}
               >
-                <span>Next</span>
-                <ChevronRight className="w-4 h-4 ml-1" />
+                <ChevronRight className="w-5 h-5" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setSubmitConfirmOpen(true)}
                 disabled={isSubmitting}
-                className="flex items-center justify-center h-10 sm:h-11 px-5 sm:px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50"
+                className="h-11 sm:h-12 px-5 sm:px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-black uppercase text-[11px] tracking-widest transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50"
               >
-                {isSubmitting ? 'Submitting...' : 'Submit'}
+                {isSubmitting ? '...' : 'Submit'}
               </button>
             )}
           </div>
-        </div>
-      </main>
 
-      {/* ─── Bottom Navigator ─── */}
-      <div className={`flex-shrink-0 z-10 px-3 sm:px-5 py-2 ${
-        isDark 
-          ? 'bg-[#0C1222]/95 border-t border-[#1E293B]/60 backdrop-blur-md' 
-          : 'bg-white/95 border-t border-slate-200/80 backdrop-blur-md'
-      }`}>
-        <div className="max-w-6xl mx-auto flex items-center gap-2 sm:gap-3">
-          {/* Scroll Left */}
-          <button
-            type="button"
-            onClick={() => scrollQuestionBubbles('left')}
-            className={`flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-xs font-bold transition ${
-              isDark ? 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/5' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
-            }`}
+          {/* ─── Navigation Circles ─── colorful border box, sliding, right below arrows */}
+          <div className={`mt-5 mb-4 rounded-2xl p-3 border-2 ${
+            isDark
+              ? 'border-gradient bg-[#0C1222]/80'
+              : 'bg-white/80'
+          }`}
+          style={{
+            borderImage: isDark
+              ? 'linear-gradient(135deg, #3B82F6, #8B5CF6, #F59E0B, #10B981) 1'
+              : 'linear-gradient(135deg, #3B82F6, #8B5CF6, #F59E0B, #10B981) 1',
+            borderImageSlice: 1,
+          }}
           >
-            {'<'}
-          </button>
-          
-          {/* Question Bubbles */}
-          <div
-            ref={questionScrollerRef}
-            className="flex-1 flex snap-x gap-1.5 sm:gap-2 overflow-x-auto py-1 scrollbar-none"
-          >
-            {questions.map((question, realIndex) => {
-              const isCurrent = realIndex === currentQuestionIndex;
-              const isAnswered = answers[question.id] !== undefined;
-              const isBookmarked = markedForReview.has(question.id);
-              
-              let bubbleStyle = '';
-              if (isCurrent) {
-                bubbleStyle = isDark
-                  ? 'bg-blue-600 text-white ring-2 ring-blue-400/50 ring-offset-1 ring-offset-[#0C1222]'
-                  : 'bg-blue-600 text-white ring-2 ring-blue-300 ring-offset-1 ring-offset-white';
-              } else if (isBookmarked) {
-                bubbleStyle = 'bg-amber-500 text-white';
-              } else if (isAnswered) {
-                bubbleStyle = isDark ? 'bg-emerald-600 text-white' : 'bg-emerald-500 text-white';
-              } else {
-                bubbleStyle = isDark
-                  ? 'bg-white/5 border border-white/10 text-slate-500 hover:bg-white/10'
-                  : 'bg-slate-100 border border-slate-200 text-slate-500 hover:bg-slate-200';
-              }
-              
-              return (
-                <button
-                  key={realIndex}
-                  ref={(node) => {
-                    questionButtonRefs.current[question.id] = node;
-                  }}
-                  onClick={() => goToQuestion(realIndex)}
-                  className={`h-8 w-8 sm:h-9 sm:w-9 flex-none snap-center rounded-full font-bold text-[11px] sm:text-xs transition-all duration-200 flex items-center justify-center ${bubbleStyle}`}
-                >
-                  {realIndex + 1}
-                </button>
-              );
-            })}
+            {/* Mini stat indicators */}
+            <div className="flex items-center justify-center gap-3 mb-2.5">
+              <span className={`text-[10px] font-bold flex items-center gap-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                {answeredCount} Ans
+              </span>
+              <span className={`text-[10px] font-bold flex items-center gap-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                {flaggedCount} Flag
+              </span>
+              <span className={`text-[10px] font-bold flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                <span className={`w-2 h-2 rounded-full inline-block ${isDark ? 'bg-slate-600' : 'bg-slate-300'}`}></span>
+                {unansweredCount} Left
+              </span>
+            </div>
+
+            {/* Scrollable question circles — no < > arrows, just swipe/scroll */}
+            <div
+              ref={questionScrollerRef}
+              className="flex gap-2 overflow-x-auto py-1 scrollbar-none scroll-smooth"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {questions.map((question, realIndex) => {
+                const isCurrent = realIndex === currentQuestionIndex;
+                const isAnswered = answers[question.id] !== undefined;
+                const isBookmarked = markedForReview.has(question.id);
+                
+                let bubbleStyle = '';
+                if (isCurrent) {
+                  bubbleStyle = isDark
+                    ? 'bg-blue-600 text-white ring-2 ring-blue-400/60 ring-offset-1 ring-offset-[#0C1222] scale-110'
+                    : 'bg-blue-600 text-white ring-2 ring-blue-300 ring-offset-1 ring-offset-white scale-110';
+                } else if (isBookmarked && isAnswered) {
+                  bubbleStyle = isDark ? 'bg-purple-500 text-white' : 'bg-purple-500 text-white';
+                } else if (isBookmarked) {
+                  bubbleStyle = 'bg-amber-500 text-white';
+                } else if (isAnswered) {
+                  bubbleStyle = isDark ? 'bg-emerald-500 text-white' : 'bg-emerald-500 text-white';
+                } else {
+                  bubbleStyle = isDark
+                    ? 'bg-white/5 border border-white/10 text-slate-500 hover:bg-white/10'
+                    : 'bg-slate-100 border border-slate-200 text-slate-500 hover:bg-slate-200';
+                }
+                
+                return (
+                  <button
+                    key={realIndex}
+                    ref={(node) => {
+                      questionButtonRefs.current[question.id] = node;
+                    }}
+                    onClick={() => goToQuestion(realIndex)}
+                    className={`h-9 w-9 flex-none rounded-full font-bold text-xs transition-all duration-200 flex items-center justify-center ${bubbleStyle}`}
+                  >
+                    {realIndex + 1}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Scroll Right */}
-          <button
-            type="button"
-            onClick={() => scrollQuestionBubbles('right')}
-            className={`flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-xs font-bold transition ${
-              isDark ? 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/5' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
-            }`}
-          >
-            {'>'}
-          </button>
-
-          {/* Separator + Mini Stats */}
-          <div className={`hidden sm:flex items-center gap-1.5 pl-2 border-l flex-shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
-              {answeredCount}✓
-            </span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
-              {flaggedCount}⚑
-            </span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-white/5 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
-              {unansweredCount}○
-            </span>
-          </div>
         </div>
       </div>
 
